@@ -1896,43 +1896,46 @@ async function fetchDeclinedShipments(){
   if(!CONFIG.C7_WORKER_URL)throw new Error('C7_WORKER_URL not set');
   const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
   const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-  const base='https://api.commerce7.com/v1/';
-  // Commerce7 admin uses /club/subscription-shipment?status=Active
-  // API mirror: paymentStatus param varies — try all known combinations
-  const endpoints=[
-    {url:base+'subscription-shipment?paymentStatus=Declined&limit=100',key:'subscriptionShipments'},
-    {url:base+'subscription-shipment?status=Declined&limit=100',key:'subscriptionShipments'},
-    {url:base+'subscription-shipment?paymentStatus=Declined&processingStatus=Active&limit=100',key:'subscriptionShipments'},
-    {url:base+'subscription-shipment?limit=100',key:'subscriptionShipments'},
+  const w=CONFIG.C7_WORKER_URL;
+
+  // Step 1: verify proxy is working with a known endpoint
+  try{
+    const test=await fetch(w+'?url='+encodeURIComponent('https://api.commerce7.com/v1/club?limit=1'),{headers});
+    if(!test.ok)throw new Error('Proxy test failed: '+test.status);
+  }catch(e){throw new Error('Proxy not reachable: '+e.message);}
+
+  // Step 2: try every plausible subscription shipment path
+  const paths=[
+    'subscription-shipment?paymentStatus=Declined&limit=100',
+    'subscription-shipment?limit=50',
+    'club-package-shipment?paymentStatus=Declined&limit=100',
+    'club-package-shipment?limit=50',
+    'club-membership/shipment?paymentStatus=Declined&limit=100',
+    'club/subscription-shipment?paymentStatus=Declined&limit=100',
+    'club/shipment?paymentStatus=Declined&limit=100',
   ];
   const log=[];
-  for(const ep of endpoints){
-    let status='?',bodyText='';
+  for(const path of paths){
+    const url='https://api.commerce7.com/v1/'+path;
     try{
-      const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(ep.url),{headers});
-      status=res.status;
-      bodyText=await res.text();
-      log.push(ep.url.replace(base,'')+' → '+status+(status!==404?' body:'+bodyText.slice(0,200):''));
-      if(status===404)continue;
-      if(status===200){
-        const data=JSON.parse(bodyText);
-        const keys=Object.keys(data);
-        console.log('Success at',ep.url,'keys:',keys.join(','));
-        // If no filter worked, filter client-side by paymentStatus
-        const all=data[ep.key]||data[keys.find(k=>Array.isArray(data[k]))]||[];
-        const declined=all.filter(s=>{
-          const ps=(s.paymentStatus||s.status||'').toLowerCase();
-          return ps==='declined'||ps==='decline';
+      const res=await fetch(w+'?url='+encodeURIComponent(url),{headers});
+      const body=await res.text();
+      log.push(path+' → '+res.status+' '+body.slice(0,150));
+      if(res.status===200){
+        const data=JSON.parse(body);
+        const arrayKey=Object.keys(data).find(k=>Array.isArray(data[k]));
+        if(!arrayKey)continue;
+        const all=data[arrayKey];
+        console.log('Found endpoint:',path,'key:',arrayKey,'total:',all.length,'sample:',JSON.stringify(all[0]).slice(0,200));
+        // Filter to declined only, checking multiple possible field names
+        return all.filter(s=>{
+          const ps=(s.paymentStatus||s.status||s.paymentDeclineStatus||'').toLowerCase();
+          return ps.includes('declin');
         });
-        // If we got results with a decline filter URL, use them directly
-        // If we got all records (no filter), return only declined ones
-        return ep.url.includes('Declined')?all:declined;
       }
-    }catch(e){
-      log.push(ep.url.replace(base,'')+' → error: '+e.message);
-    }
+    }catch(e){log.push(path+' → '+e.message);}
   }
-  throw new Error('Could not reach subscription-shipment endpoint.\n'+log.join('\n'));
+  throw new Error('No working endpoint found. Log:\n'+log.join('\n'));
 }
 
 async function syncDeclinedShipments(){
