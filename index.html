@@ -268,8 +268,13 @@ select.fi{cursor:pointer;}
               <option>Other</option>
             </select>
           </div>
-          <button class="btn btnp" onclick="openNewTicket()">+ New ticket</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn" id="check-resolved-btn" onclick="checkResolvedDeclines()" title="Re-check Commerce7 and resolve tickets where payment is no longer declined">↻ Check resolved</button>
+            <button class="btn" id="sync-declines-btn" onclick="syncDeclinedShipments()" title="Fetch declined club shipments from Commerce7 and create tickets">⬇ Sync declines</button>
+            <button class="btn btnp" onclick="openNewTicket()">+ New ticket</button>
+          </div>
         </div>
+        <div id="declines-status" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;"></div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
           <div class="dsc"><div class="dsn" id="tk-open">0</div><div class="dsl">Open</div></div>
           <div class="dsc"><div class="dsn" id="tk-inprog">0</div><div class="dsl">In progress</div></div>
@@ -1872,6 +1877,130 @@ async function toggleReminder(id){
     if(rowIdx>=0)await sheetsUpdate('Reminders!H'+(rowIdx+2),[[r.done.toString()]]);
     renderReminders();
   }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+// ---- Club Decline Sync ----
+const DECLINE_TICKET_TYPE='Club membership issue';
+const DECLINE_TICKET_SUBJECT_PREFIX='Club shipment payment declined';
+
+function setDeclinesStatus(msg,type='info'){
+  const el=document.getElementById('declines-status');
+  if(!el)return;
+  el.style.display='block';
+  el.style.background=type==='ok'?'var(--s-bg)':type==='err'?'var(--d-bg)':'var(--i-bg)';
+  el.style.color=type==='ok'?'var(--s-tx)':type==='err'?'var(--d-tx)':'var(--i-tx)';
+  el.textContent=msg;
+}
+
+async function fetchDeclinedShipments(){
+  if(!CONFIG.C7_WORKER_URL)throw new Error('C7_WORKER_URL not set');
+  const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
+  const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
+  // Fetch club shipments with declined payment status, up to 100
+  const url='https://api.commerce7.com/v1/club-shipment?paymentStatus=Declined&limit=100';
+  const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
+  if(!res.ok)throw new Error('API error '+res.status+' — make sure your app has Club Shipment: Read permission');
+  const data=await res.json();
+  return data.clubShipments||data.shipments||data.items||[];
+}
+
+async function syncDeclinedShipments(){
+  const btn=document.getElementById('sync-declines-btn');
+  btn.textContent='Syncing...';btn.disabled=true;
+  setDeclinesStatus('Fetching declined shipments from Commerce7...','info');
+  try{
+    const shipments=await fetchDeclinedShipments();
+    if(!shipments.length){
+      setDeclinesStatus('No declined club shipments found in Commerce7.','ok');
+      return;
+    }
+    let created=0,skipped=0;
+    for(const s of shipments){
+      const customerId=s.customerId||'';
+      const customerName=(s.customer&&(s.customer.firstName+' '+s.customer.lastName))||s.customerName||'Unknown member';
+      const customerEmail=(s.customer&&s.customer.emails&&s.customer.emails[0])?s.customer.emails[0].email:'';
+      const customerPhone=(s.customer&&s.customer.phones&&s.customer.phones[0])?s.customer.phones[0].phone:'';
+      const shipmentId=s.id||'';
+      // Check if ticket already exists for this shipment
+      const exists=S.tickets.some(t=>
+        t.type===DECLINE_TICKET_TYPE&&
+        t.status!=='Resolved'&&
+        (t.refShipmentId===shipmentId||(t.customerId===customerId&&t.subject.startsWith(DECLINE_TICKET_SUBJECT_PREFIX)))
+      );
+      if(exists){skipped++;continue;}
+      // Create ticket
+      const id=uid();const createdAt=today();
+      const ticket={
+        id,
+        subject:DECLINE_TICKET_SUBJECT_PREFIX+(customerName?' — '+customerName:''),
+        type:DECLINE_TICKET_TYPE,
+        priority:'High',
+        status:'Open',
+        customerId,
+        customerName,
+        customerEmail,
+        customerPhone,
+        orderNo:'',
+        assignee:-1,
+        createdAt,
+        refShipmentId:shipmentId
+      };
+      await sheetsAppend('Tickets!A:L',[[id,ticket.subject,ticket.type,ticket.priority,ticket.status,ticket.customerId,ticket.customerName,ticket.orderNo,ticket.assignee,createdAt,ticket.customerEmail,ticket.customerPhone]]);
+      // Add initial note
+      const msgId=uid();
+      const note='Automatic ticket: Club shipment payment declined in Commerce7.'+(s.clubTitle?' Club: '+s.clubTitle:'')+(s.total?' Amount: '+fmt$(Math.round(s.total)/100):'');
+      await sheetsAppend('TicketMessages!A:G',[[msgId,id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System',createdAt,'']]);
+      S.tickets.push(ticket);
+      S.ticketMsgs.push({id:msgId,ticketId:id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',createdAt,method:''});
+      created++;
+    }
+    setDeclinesStatus('Done — '+created+' new ticket'+(created!==1?'s':'')+' created, '+skipped+' already existed.','ok');
+    renderTickets();updateCounts();
+  }catch(e){
+    setDeclinesStatus('Error: '+e.message,'err');
+  }finally{
+    btn.textContent='⬇ Sync declines';btn.disabled=false;
+  }
+}
+
+async function checkResolvedDeclines(){
+  const btn=document.getElementById('check-resolved-btn');
+  btn.textContent='Checking...';btn.disabled=true;
+  setDeclinesStatus('Checking Commerce7 for resolved declines...','info');
+  try{
+    const shipments=await fetchDeclinedShipments();
+    const stillDeclinedIds=new Set(shipments.map(s=>s.id));
+    const stillDeclinedCustomerIds=new Set(shipments.map(s=>s.customerId).filter(Boolean));
+    // Find open decline tickets
+    const openDeclineTickets=S.tickets.filter(t=>
+      t.type===DECLINE_TICKET_TYPE&&
+      t.status!=='Resolved'&&
+      t.subject.startsWith(DECLINE_TICKET_SUBJECT_PREFIX)
+    );
+    let resolved=0;
+    for(const t of openDeclineTickets){
+      // Resolve if customer no longer has a declined shipment
+      const stillDeclined=t.refShipmentId
+        ?stillDeclinedIds.has(t.refShipmentId)
+        :stillDeclinedCustomerIds.has(t.customerId);
+      if(!stillDeclined){
+        t.status='Resolved';
+        await updateTicketInSheet(t);
+        // Add auto-resolution message
+        const msgId=uid();const createdAt=today();
+        const note='Auto-resolved: Payment decline cleared in Commerce7.';
+        await sheetsAppend('TicketMessages!A:G',[[msgId,t.id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System',createdAt,'']]);
+        S.ticketMsgs.push({id:msgId,ticketId:t.id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',createdAt,method:''});
+        resolved++;
+      }
+    }
+    setDeclinesStatus('Done — '+resolved+' ticket'+(resolved!==1?'s':'')+' auto-resolved.','ok');
+    renderTickets();updateCounts();
+  }catch(e){
+    setDeclinesStatus('Error: '+e.message,'err');
+  }finally{
+    btn.textContent='↻ Check resolved';btn.disabled=false;
+  }
 }
 
 // ---- Export ----
