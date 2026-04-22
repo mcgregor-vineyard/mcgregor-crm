@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>McGregor Winery — Campaign CRM</title>
+<title>McGregor Vineyard — Campaign CRM</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
@@ -24,7 +24,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);f
 .logo{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:600;letter-spacing:.03em;}
 .logo span{opacity:.55;font-size:13px;font-weight:400;margin-left:8px;}
 .nav{display:flex;gap:2px;}
-.ntab{padding:5px 12px;border-radius:5px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.6);background:none;border:none;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.ntab{padding:7px 16px;border-radius:5px;cursor:pointer;font-size:14px;color:rgba(255,255,255,.6);background:none;border:none;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .ntab:hover{color:white;background:rgba(255,255,255,.1);}
 .ntab.on{color:white;background:rgba(255,255,255,.18);}
 .usr{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.7);}
@@ -135,11 +135,12 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Winery <span>Campaigns</span></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
       <button class="ntab" onclick="sv('tickets')">Tickets</button>
+      <button class="ntab" onclick="sv('reminders')">Reminders</button>
       <button class="ntab" onclick="sv('reports')">Reports</button>
     </div>
   </div>
@@ -209,6 +210,34 @@ select.fi{cursor:pointer;}
           <div class="dsc"><div class="dsn" id="ds-rev">$0</div><div class="dsl">Revenue</div></div>
         </div>
         <div id="camps-list"></div>
+        <div id="camp-detail" style="display:none;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <button class="btn" onclick="closeCampDetail()" style="font-size:12px;">← Back</button>
+            <div class="vtitle" id="cd-name"></div>
+          </div>
+          <div style="background:white;border:1px solid var(--bdr);border-radius:8px;padding:16px;margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+              <div>
+                <div style="font-size:12px;color:var(--ink-m);" id="cd-dates"></div>
+                <div style="font-size:13px;color:var(--ink-m);margin-top:4px;" id="cd-desc"></div>
+              </div>
+              <button class="btn btnp" style="font-size:11px;padding:3px 10px;" onclick="openImportForCamp(S.activeCamp)">+ Add contacts</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+              <div class="dsc"><div class="dsn" id="cd-contacts">0</div><div class="dsl">Contacts</div></div>
+              <div class="dsc"><div class="dsn" id="cd-attempts">0</div><div class="dsl">Attempts</div></div>
+              <div class="dsc"><div class="dsn" id="cd-sold">0</div><div class="dsl">Sold</div></div>
+              <div class="dsc"><div class="dsn" id="cd-conv">0%</div><div class="dsl">Conversion</div></div>
+              <div class="dsc"><div class="dsn" id="cd-rev">$0</div><div class="dsl">Revenue</div></div>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl" style="table-layout:auto;">
+              <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Attempts</th><th>Last outcome</th><th>Last contact date</th><th>Assigned</th><th>Sale $</th><th></th></tr></thead>
+              <tbody id="cd-contacts-tbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <div id="view-contacts" class="view">
@@ -255,8 +284,44 @@ select.fi{cursor:pointer;}
         </div>
       </div>
 
+      <div id="view-reminders" class="view">
+        <div class="vhdr">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="vtitle">Reminders</div>
+            <select id="reminder-filter" class="fi" style="width:auto;font-size:12px;padding:5px 9px;" onchange="renderReminders()">
+              <option value="upcoming">Upcoming</option>
+              <option value="today">Due today</option>
+              <option value="overdue">Overdue</option>
+              <option value="all">All</option>
+              <option value="done">Completed</option>
+            </select>
+          </div>
+          <button class="btn btnp" onclick="openNewReminder()">+ New reminder</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+          <div class="dsc"><div class="dsn" id="rm-overdue">0</div><div class="dsl">Overdue</div></div>
+          <div class="dsc"><div class="dsn" id="rm-today">0</div><div class="dsl">Due today</div></div>
+          <div class="dsc"><div class="dsn" id="rm-upcoming">0</div><div class="dsl">Upcoming</div></div>
+          <div class="dsc"><div class="dsn" id="rm-done">0</div><div class="dsl">Completed</div></div>
+        </div>
+        <div id="reminders-list"></div>
+      </div>
+
       <div id="view-reports" class="view">
-        <div class="vhdr"><div class="vtitle">Sales report</div><button class="btn" onclick="exportCSV()">Export CSV</button></div>
+        <div class="vhdr">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="vtitle">Sales report</div>
+            <select id="report-date-filter" class="fi" style="width:auto;font-size:12px;padding:5px 9px;" onchange="renderReports()">
+              <option value="">All time</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="60">Last 60 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="365">Last 12 months</option>
+            </select>
+          </div>
+          <button class="btn" onclick="exportCSV()">Export CSV</button>
+        </div>
         <div class="dstats" style="grid-template-columns:repeat(4,1fr);">
           <div class="dsc"><div class="dsn" id="rp-rev">$0</div><div class="dsl">Total revenue</div></div>
           <div class="dsc"><div class="dsn" id="rp-sold">0</div><div class="dsl">Customers sold</div></div>
@@ -424,7 +489,41 @@ select.fi{cursor:pointer;}
         <div id="order-error" style="display:none;padding:8px 10px;background:var(--d-bg);color:var(--d-tx);border-radius:6px;font-size:12px;margin-top:4px;"></div>
       </div>
     </div>
-    <div class="mftr"><button class="btn" onclick="closeModal('attempt-modal')">Cancel</button><button class="btn btnp" id="am-save-btn" onclick="saveAttempt()">Save</button></div>
+    <div class="mftr"><button class="btn" onclick="closeModal('attempt-modal')">Cancel</button><button class="btn" onclick="openNewReminder('contact',document.getElementById('am-cid').value,'')">+ Reminder</button><button class="btn btnp" id="am-save-btn" onclick="saveAttempt()">Save</button></div>
+  </div>
+</div>
+
+<!-- Reminder modal -->
+<div id="reminder-modal" class="modal-backdrop">
+  <div class="modal" style="width:460px;">
+    <div class="mhdr"><div class="mtitle" id="rm-modal-title">New reminder</div><button class="mcls" onclick="closeModal('reminder-modal')">✕</button></div>
+    <div class="mbdy">
+      <input type="hidden" id="rm-id" />
+      <div class="fr"><label class="fl">Reminder *</label><input type="text" class="fi" id="rm-note" placeholder="What do you need to do?" /></div>
+      <div class="f2">
+        <div class="fr"><label class="fl">Due date *</label><input type="date" class="fi" id="rm-date" /></div>
+        <div class="fr"><label class="fl">Assigned to</label>
+          <select class="fi" id="rm-assignee">
+            <option value="0">Dan Jimerson</option>
+            <option value="1">Mike DeGaetano</option>
+            <option value="2">Ellen Quibell</option>
+          </select>
+        </div>
+      </div>
+      <div class="f2">
+        <div class="fr"><label class="fl">Related to</label>
+          <select class="fi" id="rm-type">
+            <option value="">None</option>
+            <option value="contact">Contact</option>
+            <option value="ticket">Ticket</option>
+            <option value="campaign">Campaign</option>
+          </select>
+        </div>
+        <div class="fr"><label class="fl">Reference</label><input type="text" class="fi" id="rm-ref-name" placeholder="Name or subject" readonly style="background:var(--cream);" /></div>
+      </div>
+      <input type="hidden" id="rm-ref-id" />
+    </div>
+    <div class="mftr"><button class="btn" onclick="closeModal('reminder-modal')">Cancel</button><button class="btn btnp" onclick="saveReminder()">Save</button></div>
   </div>
 </div>
 
@@ -505,10 +604,11 @@ select.fi{cursor:pointer;}
 <div id="thread-modal" class="modal-backdrop">
   <div class="modal" style="width:580px;">
     <div class="mhdr">
-      <div>
+      <div style="flex:1;">
         <div class="mtitle" id="thread-title">Ticket</div>
         <div style="font-size:12px;color:var(--ink-m);margin-top:2px;" id="thread-meta"></div>
-        <a id="thread-c7link" href="#" target="_blank" style="display:none;font-size:11px;color:var(--burg);text-decoration:none;border:1px solid var(--bdr-s);border-radius:4px;padding:2px 8px;margin-top:5px;display:inline-block;">View customer in Commerce7 ↗</a>
+        <div style="font-size:12px;color:var(--ink);margin-top:4px;padding:6px 8px;background:var(--burg-f);border-radius:5px;display:inline-block;" id="thread-customer-info"></div>
+        <a id="thread-c7link" href="#" target="_blank" style="display:none;font-size:11px;color:var(--burg);text-decoration:none;border:1px solid var(--bdr-s);border-radius:4px;padding:2px 8px;margin-top:5px;display:inline-block;">View in Commerce7 ↗</a>
       </div>
       <button class="mcls" onclick="closeModal('thread-modal')">✕</button>
     </div>
@@ -546,7 +646,10 @@ select.fi{cursor:pointer;}
     </div>
     <div class="mftr" style="justify-content:space-between;">
       <button class="btn" style="color:var(--d-tx);border-color:var(--d-tx);" onclick="deleteTicketPrompt()">Delete ticket</button>
-      <button class="btn" onclick="closeModal('thread-modal')">Close</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="openNewReminder('ticket',S.activeTicketId,document.getElementById('thread-title').textContent)">+ Reminder</button>
+        <button class="btn" onclick="closeModal('thread-modal')">Close</button>
+      </div>
     </div>
   </div>
 </div>
@@ -559,7 +662,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev/',
+  C7_WORKER_URL: '',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -595,9 +698,9 @@ KGp83R3Cm4HG0H0o3zOQLQ==
 
 const TEAM=[{name:'Dan Jimerson',init:'DJ',cls:'av-b'},{name:'Mike DeGaetano',init:'MD',cls:'av-g'},{name:'Ellen Quibell',init:'EQ',cls:'av-t'}];
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
-const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages'};
+const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders'};
 
-let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null};
+let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null};
 
 function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function today(){return new Date().toISOString().slice(0,10);}
@@ -674,15 +777,16 @@ async function ensureSheets(){
   if(needed.includes('Attempts'))await sheetsUpdate('Attempts!A1:I1',[['ID','ContactID','Method','Date','Outcome','Notes','Sales','AssignedBy','CreatedAt']]);
   if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:L1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone']]);
   if(needed.includes('TicketMessages'))await sheetsUpdate('TicketMessages!A1:G1',[['ID','TicketID','Message','Author','AuthorName','CreatedAt','Method']]);
+  if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
 }
 
 async function loadFromSheets(){
   setSyncBar('loading','Loading from Google Sheets...');
   try{
     await ensureSheets();
-    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows]=await Promise.all([
-      sheetsGet('Campaigns!A2:F'),sheetsGet('Contacts!A2:I'),sheetsGet('Attempts!A2:I'),
-      sheetsGet('Tickets!A2:J'),sheetsGet('TicketMessages!A2:F')
+    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows]=await Promise.all([
+      sheetsGet('Campaigns!A2:F'),sheetsGet('Contacts!A2:J'),sheetsGet('Attempts!A2:I'),
+      sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:H')
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||''}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',attempts:[]}));
@@ -690,6 +794,7 @@ async function loadFromSheets(){
     S.contacts.forEach(c=>{c.attempts=attempts.filter(a=>a.contactId===c.id);});
     S.tickets=ticketRows.filter(r=>r[0]).map(r=>({id:r[0],subject:r[1]||'',type:r[2]||'',priority:r[3]||'Normal',status:r[4]||'Open',customerId:r[5]||'',customerName:r[6]||'',orderNo:r[7]||'',assignee:parseInt(r[8])||0,createdAt:r[9]||'',customerEmail:r[10]||'',customerPhone:r[11]||''}));
     S.ticketMsgs=ticketMsgRows.filter(r=>r[0]).map(r=>({id:r[0],ticketId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||'',method:r[6]||''}));
+    S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
     renderAll();
   }catch(e){
@@ -746,7 +851,7 @@ function sv(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   document.getElementById('view-'+view).classList.add('on');
-  ['campaigns','contacts','tickets','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
+  ['campaigns','contacts','tickets','reminders','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
   closeDP();renderAll();
 }
 function setCU(i){S.cu=parseInt(i);document.getElementById('cuav').textContent=TEAM[S.cu].init;}
@@ -754,7 +859,7 @@ function setF(f,el){S.filter=f;document.querySelectorAll('.fbtn').forEach(b=>b.c
 function openModal(id){document.getElementById(id).classList.add('op');}
 function closeModal(id){document.getElementById(id).classList.remove('op');}
 
-function renderAll(){renderSidebar();renderCampaigns();renderContacts();renderTickets();renderReports();updateCounts();}
+function renderAll(){renderSidebar();renderCampaigns();renderContacts();renderTickets();renderReminders();renderReports();updateCounts();}
 
 function updateCounts(){
   const all=S.contacts.length;
@@ -791,6 +896,8 @@ function renderSidebar(){
 
 function renderCampaigns(){
   const el=document.getElementById('camps-list');el.innerHTML='';
+  document.getElementById('camp-detail').style.display='none';
+  el.style.display='block';
   if(!S.campaigns.length){el.innerHTML='<div class="empty">No campaigns yet. Create one to get started.</div>';return;}
   S.campaigns.forEach(c=>{
     const contacts=S.contacts.filter(x=>x.campId===c.id);
@@ -798,7 +905,10 @@ function renderCampaigns(){
     const att=contacts.reduce((s,x)=>s+(x.attempts?x.attempts.length:0),0);
     const rev=contacts.reduce((s,x)=>s+getContactRevenue(x),0);
     const pct=contacts.length?Math.round(sold/contacts.length*100):0;
-    const div=document.createElement('div');div.className='camp-card';
+    const div=document.createElement('div');div.className='camp-card';div.style.cursor='pointer';
+    div.onmouseenter=()=>div.style.borderColor='var(--burg-l)';
+    div.onmouseleave=()=>div.style.borderColor='var(--bdr)';
+    div.onclick=(e)=>{if(!e.target.closest('button'))openCampDetail(c.id);};
     div.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
         <div><div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;">${c.name}</div>
@@ -806,18 +916,71 @@ function renderCampaigns(){
         <div style="text-align:right;"><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;color:var(--burg);">${fmt$(rev)}</div><div style="font-size:11px;color:var(--ink-m);">revenue</div></div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
-        <div style="text-align:center;"><div style="font-size:18px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${contacts.length}</div><div style="font-size:10px;color:var(--ink-m);">contacts</div></div>
-        <div style="text-align:center;"><div style="font-size:18px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${att}</div><div style="font-size:10px;color:var(--ink-m);">attempts</div></div>
-        <div style="text-align:center;"><div style="font-size:18px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${sold}</div><div style="font-size:10px;color:var(--ink-m);">sold</div></div>
-        <div style="text-align:center;"><div style="font-size:18px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${pct}%</div><div style="font-size:10px;color:var(--ink-m);">conv.</div></div>
+        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${contacts.length}</div><div style="font-size:11px;color:var(--ink-m);">contacts</div></div>
+        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${att}</div><div style="font-size:11px;color:var(--ink-m);">attempts</div></div>
+        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${sold}</div><div style="font-size:11px;color:var(--ink-m);">sold</div></div>
+        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${pct}%</div><div style="font-size:11px;color:var(--ink-m);">conv.</div></div>
       </div>
       <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
       <div style="margin-top:10px;display:flex;gap:8px;">
-        <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="S.activeCamp='${c.id}';sv('contacts')">View contacts</button>
+        <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="openCampDetail('${c.id}')">View contacts</button>
         <button class="btn btnp" style="font-size:11px;padding:3px 10px;" onclick="openImportForCamp('${c.id}')">+ Add contacts</button>
       </div>`;
     el.appendChild(div);
   });
+}
+
+function openCampDetail(campId){
+  S.activeCamp=campId;
+  const c=S.campaigns.find(x=>x.id===campId);if(!c)return;
+  const contacts=S.contacts.filter(x=>x.campId===campId);
+  const sold=contacts.filter(x=>x.attempts&&x.attempts.some(a=>a.outcome==='sold')).length;
+  const att=contacts.reduce((s,x)=>s+(x.attempts?x.attempts.length:0),0);
+  const rev=contacts.reduce((s,x)=>s+getContactRevenue(x),0);
+  const pct=contacts.length?Math.round(sold/contacts.length*100):0;
+  document.getElementById('camps-list').style.display='none';
+  document.getElementById('camp-detail').style.display='block';
+  document.getElementById('cd-name').textContent=c.name;
+  document.getElementById('cd-dates').textContent=(c.start||'')+(c.end?' → '+c.end:'');
+  document.getElementById('cd-desc').textContent=c.desc||'';
+  document.getElementById('cd-contacts').textContent=contacts.length;
+  document.getElementById('cd-attempts').textContent=att;
+  document.getElementById('cd-sold').textContent=sold;
+  document.getElementById('cd-conv').textContent=pct+'%';
+  document.getElementById('cd-rev').textContent=fmt$(rev);
+  // Render contacts sorted by last outcome date, oldest first
+  const tbody=document.getElementById('cd-contacts-tbody');
+  tbody.innerHTML='';
+  const sorted=[...contacts].sort((a,b)=>{
+    const aDate=a.attempts&&a.attempts.length?a.attempts[a.attempts.length-1].date:'';
+    const bDate=b.attempts&&b.attempts.length?b.attempts[b.attempts.length-1].date:'';
+    return aDate.localeCompare(bDate);
+  });
+  if(!sorted.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--ink-m);">No contacts in this campaign.</td></tr>';return;}
+  sorted.forEach(contact=>{
+    const lo=getLastOutcome(contact);
+    const lastDate=contact.attempts&&contact.attempts.length?contact.attempts[contact.attempts.length-1].date:'—';
+    const rev2=getContactRevenue(contact);
+    const m=TEAM[contact.assignee]||TEAM[0];
+    const tr=document.createElement('tr');tr.style.cursor='pointer';tr.onclick=()=>showContactDetail(contact.id);
+    tr.innerHTML=`
+      <td><div style="display:flex;align-items:center;gap:7px;"><div class="av ${m.cls}">${((contact.first||'')[0]||'')+((contact.last||'')[0]||'')}</div><span style="font-weight:500;">${contact.first} ${contact.last}</span></div></td>
+      <td style="color:var(--ink-m);font-size:12px;">${contact.phone||'—'}</td>
+      <td style="color:var(--ink-m);font-size:12px;">${contact.email||'—'}</td>
+      <td style="text-align:center;">${(contact.attempts||[]).length}</td>
+      <td>${outcomeBadge(lo)}</td>
+      <td style="font-size:12px;color:var(--ink-m);">${lastDate}</td>
+      <td><div style="display:flex;align-items:center;gap:5px;"><div class="av ${m.cls}" style="width:18px;height:18px;font-size:8px;">${m.init}</div><span style="font-size:12px;">${m.name}</span></div></td>
+      <td style="font-family:'Cormorant Garamond',serif;font-size:15px;color:var(--burg);">${rev2>0?fmt$(rev2):'—'}</td>
+      <td><button class="btn btnp" style="font-size:11px;padding:3px 8px;" onclick="event.stopPropagation();openAttempt('${contact.id}')">+ Log</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function closeCampDetail(){
+  document.getElementById('camp-detail').style.display='none';
+  document.getElementById('camps-list').style.display='block';
+  S.activeCamp=null;
 }
 
 function renderContacts(){
@@ -844,15 +1007,31 @@ function renderContacts(){
 }
 
 function renderReports(){
-  const sold=S.contacts.filter(c=>c.attempts&&c.attempts.some(a=>a.outcome==='sold'));
-  const rev=totalRevenue();const conv=S.contacts.length?Math.round(sold.length/S.contacts.length*100):0;
-  const avg=sold.length?Math.round(rev/sold.length):0;
-  document.getElementById('rp-rev').textContent=fmt$(rev);document.getElementById('rp-sold').textContent=sold.length;
-  document.getElementById('rp-conv').textContent=conv+'%';document.getElementById('rp-avg').textContent=fmt$(avg);
+  const dateFilterEl=document.getElementById('report-date-filter');
+  const days=dateFilterEl?parseInt(dateFilterEl.value)||0:0;
+  const cutoff=days?new Date(Date.now()-days*86400000).toISOString().slice(0,10):'';
+  // Filter attempts by date
+  const filteredAttempts=S.contacts.flatMap(c=>(c.attempts||[]).filter(a=>!cutoff||a.date>=cutoff));
+  const contactsWithSale=days
+    ?S.contacts.filter(c=>(c.attempts||[]).some(a=>a.outcome==='sold'&&(!cutoff||a.date>=cutoff)))
+    :S.contacts.filter(c=>c.attempts&&c.attempts.some(a=>a.outcome==='sold'));
+  const rev=days
+    ?filteredAttempts.reduce((s,a)=>{if(a.outcome!=='sold')return s;const first=a.sales&&a.sales[0];if(first&&first.total!=null&&first.total!=='')return s+parseFloat(first.total);return s+(a.sales||[]).reduce((ss,item)=>ss+(parseFloat(item.qty||0)*parseFloat(item.price||0)),0);},0)
+    :totalRevenue();
+  const contactsTotal=days?S.contacts.filter(c=>(c.attempts||[]).some(a=>!cutoff||a.date>=cutoff)).length:S.contacts.length;
+  const conv=contactsTotal?Math.round(contactsWithSale.length/contactsTotal*100):0;
+  const avg=contactsWithSale.length?Math.round(rev/contactsWithSale.length):0;
+  document.getElementById('rp-rev').textContent=fmt$(rev);
+  document.getElementById('rp-sold').textContent=contactsWithSale.length;
+  document.getElementById('rp-conv').textContent=conv+'%';
+  document.getElementById('rp-avg').textContent=fmt$(avg);
   const ldr=document.getElementById('leaderboard');ldr.innerHTML='';
   TEAM.map((t,i)=>{
     const mine=S.contacts.filter(c=>c.assignee===i);
-    return{...t,sold:mine.filter(c=>c.attempts&&c.attempts.some(a=>a.outcome==='sold')).length,rev:mine.reduce((s,c)=>s+getContactRevenue(c),0),contacts:mine.length,att:mine.reduce((s,c)=>s+(c.attempts?c.attempts.length:0),0)};
+    const myAtts=mine.flatMap(c=>(c.attempts||[]).filter(a=>!cutoff||a.date>=cutoff));
+    const mySold=mine.filter(c=>(c.attempts||[]).some(a=>a.outcome==='sold'&&(!cutoff||a.date>=cutoff)));
+    const myRev=days?myAtts.reduce((s,a)=>{if(a.outcome!=='sold')return s;const first=a.sales&&a.sales[0];if(first&&first.total!=null&&first.total!=='')return s+parseFloat(first.total);return s+(a.sales||[]).reduce((ss,item)=>ss+(parseFloat(item.qty||0)*parseFloat(item.price||0)),0);},0):mine.reduce((s,c)=>s+getContactRevenue(c),0);
+    return{...t,sold:mySold.length,rev:myRev,contacts:mine.length,att:myAtts.length};
   }).sort((a,b)=>b.rev-a.rev).forEach((r,i)=>{
     const div=document.createElement('div');div.className='ldr-row';
     div.innerHTML=`<div class="ldr-rank">${i+1}</div><div class="av ${r.cls}">${r.init}</div><div class="ldr-info"><div class="ldr-name">${r.name}</div><div class="ldr-sub">${r.sold} sold · ${r.contacts} contacts · ${r.att} attempts</div></div><div class="ldr-rev">${fmt$(r.rev)}</div>`;
@@ -927,6 +1106,7 @@ function showContactDetail(id){
   }
   html+='<button class="btn btnp" style="width:100%;margin-top:4px;" onclick="openAttempt(\''+c.id+'\')">+ Log attempt</button>';
   html+='<button class="btn" style="width:100%;margin-top:6px;" onclick="openNewTicket(\''+c.id+'\',\''+c.first+' '+c.last+'\');closeDP();">+ New ticket</button>';
+  html+='<button class="btn" style="width:100%;margin-top:6px;" onclick="openNewReminder(\'contact\',\''+c.id+'\',\''+c.first+' '+c.last+'\');">+ Set reminder</button>';
   const cTickets=S.tickets.filter(t=>t.customerId===c.id);
   if(cTickets.length){
     html+='<div style="margin-top:12px;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:8px;">Tickets ('+cTickets.length+')</div>';
@@ -1258,7 +1438,12 @@ function filteredTickets(){
   const typeEl=document.getElementById('ticket-type-filter');
   const typeFilter=typeEl?typeEl.value:'';
   if(typeFilter)ts=ts.filter(t=>t.type===typeFilter);
-  return ts.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  // Sort by last message date, oldest first
+  return ts.sort((a,b)=>{
+    const aLast=S.ticketMsgs.filter(m=>m.ticketId===a.id).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,a.createdAt);
+    const bLast=S.ticketMsgs.filter(m=>m.ticketId===b.id).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,b.createdAt);
+    return aLast.localeCompare(bLast);
+  });
 }
 
 function renderTickets(){
@@ -1415,17 +1600,19 @@ function openTicketThread(id){
   document.getElementById('thread-title').textContent=t.subject;
   let meta=t.type+' · '+t.priority+' priority';
   if(t.orderNo)meta+=' · Order #'+t.orderNo;
-  if(t.customerName)meta+=' · '+t.customerName;
-  if(t.customerEmail)meta+=' · '+t.customerEmail;
-  if(t.customerPhone)meta+=' · '+t.customerPhone;
   document.getElementById('thread-meta').textContent=meta;
+  // Build customer info block
   const c7link=document.getElementById('thread-c7link');
+  let custHtml='';
+  if(t.customerName)custHtml+='<span style="font-weight:500;">'+t.customerName+'</span>';
+  if(t.customerEmail)custHtml+=' &nbsp;·&nbsp; '+t.customerEmail;
+  if(t.customerPhone)custHtml+=' &nbsp;·&nbsp; '+t.customerPhone;
+  const custEl=document.getElementById('thread-customer-info');
+  if(custEl)custEl.innerHTML=custHtml;
   if(t.customerId&&c7link){
     c7link.href='https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+t.customerId;
     c7link.style.display='inline-block';
-  } else if(c7link){
-    c7link.style.display='none';
-  }
+  } else if(c7link){c7link.style.display='none';}
   document.getElementById('thread-status').value=t.status;
   document.getElementById('thread-assignee').value=t.assignee;
   document.getElementById('thread-new-msg').value='';
@@ -1456,13 +1643,22 @@ function renderThreadMessages(ticketId){
 
 async function addThreadMessage(){
   const msg=document.getElementById('thread-new-msg').value.trim();
-  if(!msg||!S.activeTicketId)return;
+  if(!S.activeTicketId)return;
   const method=document.getElementById('thread-method').value;
+  if(!msg&&!method){showToast('Please enter a message or select a contact method','err');return;}
   const id=uid();const createdAt=today();
-  const newMsg={id,ticketId:S.activeTicketId,message:msg,author:S.cu,authorName:TEAM[S.cu].name,createdAt,method};
+  const displayMsg=msg||(method?'['+method+']':'');
+  const newMsg={id,ticketId:S.activeTicketId,message:displayMsg,author:S.cu,authorName:TEAM[S.cu].name,createdAt,method};
   try{
-    await sheetsAppend('TicketMessages!A:G',[[id,S.activeTicketId,msg,S.cu,TEAM[S.cu].name,createdAt,method]]);
+    await sheetsAppend('TicketMessages!A:G',[[id,S.activeTicketId,displayMsg,S.cu,TEAM[S.cu].name,createdAt,method]]);
     S.ticketMsgs.push(newMsg);
+    // Auto-advance Open tickets to In Progress
+    const t=S.tickets.find(x=>x.id===S.activeTicketId);
+    if(t&&t.status==='Open'){
+      t.status='In Progress';
+      document.getElementById('thread-status').value='In Progress';
+      await updateTicketInSheet(t);
+    }
     document.getElementById('thread-new-msg').value='';
     document.getElementById('thread-method').value='';
     renderThreadMessages(S.activeTicketId);
@@ -1505,6 +1701,102 @@ async function deleteTicketPrompt(){
   closeModal('thread-modal');
   renderAll();
   showToast('Ticket deleted — sync Google Sheet manually to remove from storage');
+}
+
+// ---- Reminders ----
+function renderReminders(){
+  const f=document.getElementById('reminder-filter')?document.getElementById('reminder-filter').value:'upcoming';
+  const t=today();
+  let rs=[...S.reminders];
+  if(f==='today')rs=rs.filter(r=>!r.done&&r.dueDate===t);
+  else if(f==='overdue')rs=rs.filter(r=>!r.done&&r.dueDate<t);
+  else if(f==='upcoming')rs=rs.filter(r=>!r.done&&r.dueDate>=t);
+  else if(f==='done')rs=rs.filter(r=>r.done);
+  rs.sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const overdue=S.reminders.filter(r=>!r.done&&r.dueDate<t).length;
+  const dueToday=S.reminders.filter(r=>!r.done&&r.dueDate===t).length;
+  const upcoming=S.reminders.filter(r=>!r.done&&r.dueDate>t).length;
+  const done=S.reminders.filter(r=>r.done).length;
+  document.getElementById('rm-overdue').textContent=overdue;
+  document.getElementById('rm-today').textContent=dueToday;
+  document.getElementById('rm-upcoming').textContent=upcoming;
+  document.getElementById('rm-done').textContent=done;
+  const el=document.getElementById('reminders-list');el.innerHTML='';
+  if(!rs.length){el.innerHTML='<div class="empty">No reminders found.</div>';return;}
+  rs.forEach(r=>{
+    const m=TEAM[r.assignee]||TEAM[0];
+    const isOverdue=!r.done&&r.dueDate<t;
+    const isToday=!r.done&&r.dueDate===t;
+    const div=document.createElement('div');
+    div.style.cssText='background:white;border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;'+(r.done?'opacity:.55;':'');
+    div.innerHTML='<div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:'+(r.done?'var(--burg)':'white')+';color:white;font-size:10px;" onclick="toggleReminder(\''+r.id+'\')">'+(r.done?'✓':'')+'</div>'
+      +'<div style="flex:1;">'
+      +'<div style="font-weight:500;font-size:14px;'+(r.done?'text-decoration:line-through;':'')+'">'+r.note+'</div>'
+      +'<div style="display:flex;gap:10px;margin-top:4px;font-size:12px;color:var(--ink-m);">'
+      +'<span style="color:'+(isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)')+';">'+r.dueDate+'</span>'
+      +(r.refName?'<span>↳ '+r.refName+'</span>':'')
+      +'<div style="display:flex;align-items:center;gap:4px;"><div class="av '+m.cls+'" style="width:16px;height:16px;font-size:7px;">'+m.init+'</div>'+m.name+'</div>'
+      +'</div></div>'
+      +'<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="openEditReminder(\''+r.id+'\')">Edit</button>';
+    el.appendChild(div);
+  });
+}
+
+function openNewReminder(refType,refId,refName){
+  document.getElementById('rm-id').value='';
+  document.getElementById('rm-modal-title').textContent='New reminder';
+  document.getElementById('rm-note').value='';
+  document.getElementById('rm-date').value=today();
+  document.getElementById('rm-assignee').value=S.cu;
+  document.getElementById('rm-type').value=refType||'';
+  document.getElementById('rm-ref-id').value=refId||'';
+  document.getElementById('rm-ref-name').value=refName||'';
+  openModal('reminder-modal');
+}
+
+function openEditReminder(id){
+  const r=S.reminders.find(x=>x.id===id);if(!r)return;
+  document.getElementById('rm-id').value=r.id;
+  document.getElementById('rm-modal-title').textContent='Edit reminder';
+  document.getElementById('rm-note').value=r.note;
+  document.getElementById('rm-date').value=r.dueDate;
+  document.getElementById('rm-assignee').value=r.assignee;
+  document.getElementById('rm-type').value=r.refType||'';
+  document.getElementById('rm-ref-id').value=r.refId||'';
+  document.getElementById('rm-ref-name').value=r.refName||'';
+  openModal('reminder-modal');
+}
+
+async function saveReminder(){
+  const note=document.getElementById('rm-note').value.trim();
+  const dueDate=document.getElementById('rm-date').value;
+  if(!note||!dueDate){showToast('Please enter a note and due date','err');return;}
+  const editId=document.getElementById('rm-id').value;
+  const r={id:editId||uid(),note,dueDate,assignee:parseInt(document.getElementById('rm-assignee').value),refType:document.getElementById('rm-type').value,refId:document.getElementById('rm-ref-id').value,refName:document.getElementById('rm-ref-name').value,done:false};
+  try{
+    if(editId){
+      const existing=S.reminders.find(x=>x.id===editId);
+      if(existing){r.done=existing.done;Object.assign(existing,r);}
+      const allRows=await sheetsGet('Reminders!A2:H');
+      const rowIdx=allRows.findIndex(row=>row[0]===editId);
+      if(rowIdx>=0)await sheetsUpdate('Reminders!A'+(rowIdx+2)+':H'+(rowIdx+2),[[r.id,r.note,r.dueDate,r.assignee,r.refType,r.refId,r.refName,r.done]]);
+    } else {
+      await sheetsAppend('Reminders!A:H',[[r.id,r.note,r.dueDate,r.assignee,r.refType,r.refId,r.refName,'false']]);
+      S.reminders.push(r);
+    }
+    renderReminders();closeModal('reminder-modal');showToast(editId?'Reminder updated':'Reminder saved');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+async function toggleReminder(id){
+  const r=S.reminders.find(x=>x.id===id);if(!r)return;
+  r.done=!r.done;
+  try{
+    const allRows=await sheetsGet('Reminders!A2:H');
+    const rowIdx=allRows.findIndex(row=>row[0]===id);
+    if(rowIdx>=0)await sheetsUpdate('Reminders!H'+(rowIdx+2),[[r.done.toString()]]);
+    renderReminders();
+  }catch(e){showToast('Error: '+e.message,'err');}
 }
 
 // ---- Export ----
