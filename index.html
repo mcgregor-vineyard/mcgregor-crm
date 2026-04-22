@@ -1896,27 +1896,25 @@ async function fetchDeclinedShipments(){
   if(!CONFIG.C7_WORKER_URL)throw new Error('C7_WORKER_URL not set');
   const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
   const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-  // Try subscription club endpoint first, then traditional club shipment
+  // Subscription clubs use /subscription-shipment; traditional clubs use /club-shipment
   const endpoints=[
-    'https://api.commerce7.com/v1/club-membership-shipment?paymentStatus=Declined&limit=100',
-    'https://api.commerce7.com/v1/subscription-shipment?paymentStatus=Declined&limit=100',
-    'https://api.commerce7.com/v1/club-shipment?paymentStatus=Declined&limit=100',
+    {url:'https://api.commerce7.com/v1/subscription-shipment?paymentStatus=Declined&limit=100',key:'subscriptionShipments'},
+    {url:'https://api.commerce7.com/v1/club-shipment?paymentStatus=Declined&limit=100',key:'clubShipments'},
+    {url:'https://api.commerce7.com/v1/club-membership-shipment?paymentStatus=Declined&limit=100',key:'clubMembershipShipments'},
   ];
-  let lastError='';
-  for(const url of endpoints){
+  const tried=[];
+  for(const ep of endpoints){
     try{
-      const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
-      if(res.status===404){lastError='404 at '+url;continue;}
-      if(!res.ok)throw new Error('API error '+res.status);
+      const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(ep.url),{headers});
+      if(res.status===404){tried.push(ep.url+' → 404');continue;}
+      if(!res.ok){tried.push(ep.url+' → '+res.status);continue;}
       const data=await res.json();
-      // Return whichever array key Commerce7 uses
-      return data.clubMembershipShipments||data.subscriptionShipments||data.clubShipments||data.shipments||data.items||[];
-    }catch(e){
-      if(e.message.includes('404')){lastError=e.message;continue;}
-      throw e;
-    }
+      const shipments=data[ep.key]||data.shipments||data.items||[];
+      console.log('Decline sync: found',shipments.length,'declined shipments at',ep.url);
+      return shipments;
+    }catch(e){tried.push(ep.url+' → '+e.message);}
   }
-  throw new Error('Could not find declined shipments endpoint. Last error: '+lastError);
+  throw new Error('All endpoints returned 404. Tried:\n'+tried.join('\n')+'\n\nPlease check Commerce7 Dev Center app permissions include Club Shipment: Read or Subscription: Read.');
 }
 
 async function syncDeclinedShipments(){
