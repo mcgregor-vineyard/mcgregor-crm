@@ -1896,25 +1896,33 @@ async function fetchDeclinedShipments(){
   if(!CONFIG.C7_WORKER_URL)throw new Error('C7_WORKER_URL not set');
   const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
   const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-  // Subscription clubs use /subscription-shipment; traditional clubs use /club-shipment
   const endpoints=[
     {url:'https://api.commerce7.com/v1/subscription-shipment?paymentStatus=Declined&limit=100',key:'subscriptionShipments'},
     {url:'https://api.commerce7.com/v1/club-shipment?paymentStatus=Declined&limit=100',key:'clubShipments'},
     {url:'https://api.commerce7.com/v1/club-membership-shipment?paymentStatus=Declined&limit=100',key:'clubMembershipShipments'},
   ];
-  const tried=[];
+  const log=[];
   for(const ep of endpoints){
+    let status='?',bodyText='';
     try{
       const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(ep.url),{headers});
-      if(res.status===404){tried.push(ep.url+' → 404');continue;}
-      if(!res.ok){tried.push(ep.url+' → '+res.status);continue;}
-      const data=await res.json();
-      const shipments=data[ep.key]||data.shipments||data.items||[];
-      console.log('Decline sync: found',shipments.length,'declined shipments at',ep.url);
-      return shipments;
-    }catch(e){tried.push(ep.url+' → '+e.message);}
+      status=res.status;
+      bodyText=await res.text();
+      log.push(ep.url+' → '+status);
+      if(status===404){continue;}
+      if(status===200){
+        const data=JSON.parse(bodyText);
+        const shipments=data[ep.key]||data.shipments||data.items||[];
+        console.log('Decline sync: found',shipments.length,'at',ep.url,'keys:',Object.keys(data).join(','));
+        return shipments;
+      }
+      // Non-200, non-404 — log body for debugging
+      log.push('  body: '+bodyText.slice(0,200));
+    }catch(e){
+      log.push(ep.url+' → error: '+e.message);
+    }
   }
-  throw new Error('All endpoints returned 404. Tried:\n'+tried.join('\n')+'\n\nPlease check Commerce7 Dev Center app permissions include Club Shipment: Read or Subscription: Read.');
+  throw new Error('Could not find declined shipments. Results:\n'+log.join('\n'));
 }
 
 async function syncDeclinedShipments(){
