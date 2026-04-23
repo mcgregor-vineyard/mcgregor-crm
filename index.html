@@ -918,6 +918,8 @@ async function loadFromSheets(){
   }
 }
 
+function safeJSON(s){try{return JSON.parse(s||'[]');}catch{return[];}}
+
 function phoneLink(phone){
   if(!phone)return '—';
   return '<a href="tel:'+phone+'" style="color:var(--ink);text-decoration:none;">'+phone+'</a>'
