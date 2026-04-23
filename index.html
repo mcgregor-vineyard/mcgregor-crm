@@ -406,12 +406,19 @@ select.fi{cursor:pointer;}
         <div id="c7-selected-summary" style="margin-top:8px;font-size:12px;color:var(--burg);font-weight:500;min-height:18px;"></div>
       </div>
       <div id="imp-upload-tab" style="display:none;">
-        <div class="upload-area" onclick="document.getElementById('file-input').click()">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--ink-f);margin:0 auto 8px;display:block;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p style="font-size:13px;color:var(--ink-m);">Click to upload .xlsx or .csv</p>
-          <p style="font-size:11px;color:var(--ink-f);margin-top:4px;">Columns: First Name, Last Name, Email, Phone, City</p>
+        <div id="imp-upload-area">
+          <div class="upload-area" onclick="document.getElementById('file-input').click()">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--ink-f);margin:0 auto 8px;display:block;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p style="font-size:13px;color:var(--ink-m);">Click to upload .xlsx or .csv</p>
+          </div>
+          <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleFile(this)" />
         </div>
-        <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleFile(this)" />
+        <!-- Column mapping step — shown after file is read -->
+        <div id="imp-mapping" style="display:none;">
+          <div style="font-size:13px;font-weight:500;margin-bottom:10px;">Match your columns to CRM fields:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;" id="imp-mapping-grid"></div>
+          <button class="btn btnp" style="width:100%;" onclick="applyMapping()">Preview contacts →</button>
+        </div>
         <div id="import-preview" style="margin-top:10px;"></div>
       </div>
     </div>
@@ -1433,29 +1440,95 @@ function updateSelectedSummary(){
   document.getElementById('imp-btn').style.display=(n>0||S.pendingUpload.length>0)?'inline-block':'none';
 }
 
+let rawFileRows=[];
+
 function handleFile(input){
   const file=input.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
     const data=new Uint8Array(e.target.result);
-    const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-    S.pendingUpload=rows.map(r=>({
-      first:(r['First Name']||r['FirstName']||r['first_name']||r['first']||'').toString().trim(),
-      last:(r['Last Name']||r['LastName']||r['last_name']||r['last']||'').toString().trim(),
-      email:(r['Email']||r['email']||'').toString().trim(),
-      phone:(r['Phone']||r['phone']||'').toString().trim(),
-      city:(r['City']||r['city']||'').toString().trim()
-    })).filter(r=>r.first||r.last);
-    const preview=S.pendingUpload.slice(0,4);
-    document.getElementById('import-preview').innerHTML=`<div style="font-size:13px;color:var(--s-tx);margin-bottom:8px;">Found ${S.pendingUpload.length} contacts</div>
-      <div class="tbl-wrap"><table class="tbl" style="table-layout:auto;"><thead><tr><th>First</th><th>Last</th><th>Email</th></tr></thead><tbody>
-        ${preview.map(r=>`<tr><td>${r.first}</td><td>${r.last}</td><td style="font-size:11px;">${r.email}</td></tr>`).join('')}
-        ${S.pendingUpload.length>4?`<tr><td colspan="3" style="color:var(--ink-m);font-size:11px;">...and ${S.pendingUpload.length-4} more</td></tr>`:''}
-      </tbody></table></div>`;
-    document.getElementById('imp-btn').style.display='inline-block';
+    const wb=XLSX.read(data,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    rawFileRows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+    if(!rawFileRows.length){
+      document.getElementById('import-preview').innerHTML='<div style="color:var(--d-tx);font-size:13px;">No rows found in file.</div>';
+      return;
+    }
+    const cols=Object.keys(rawFileRows[0]);
+    // Build mapping UI
+    const fields=[
+      {key:'first',label:'First name',required:true},
+      {key:'last',label:'Last name',required:true},
+      {key:'email',label:'Email'},
+      {key:'phone',label:'Phone'},
+      {key:'city',label:'City'},
+    ];
+    const grid=document.getElementById('imp-mapping-grid');
+    grid.innerHTML='';
+    fields.forEach(f=>{
+      // Auto-guess best column match
+      const guess=cols.find(c=>{
+        const cl=c.toLowerCase().replace(/[\s_-]/g,'');
+        if(f.key==='first')return cl==='firstname'||cl==='first'||cl==='fname';
+        if(f.key==='last')return cl==='lastname'||cl==='last'||cl==='lname'||cl==='surname';
+        if(f.key==='email')return cl==='email'||cl==='emailaddress'||cl==='e-mail';
+        if(f.key==='phone')return cl==='phone'||cl==='phonenumber'||cl==='mobile'||cl==='cell'||cl==='telephone';
+        if(f.key==='city')return cl==='city'||cl==='town';
+        return false;
+      })||'';
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;flex-direction:column;gap:4px;';
+      row.innerHTML='<label style="font-size:12px;color:var(--ink-m);">'+f.label+(f.required?' *':'')+'</label>'
+        +'<select class="fi" id="map-'+f.key+'" style="font-size:12px;">'
+        +'<option value="">— Skip —</option>'
+        +cols.map(c=>'<option value="'+c+'"'+(c===guess?' selected':'')+'>'+c+'</option>').join('')
+        +'</select>';
+      grid.appendChild(row);
+    });
+    // Show sample from file
+    const sample=rawFileRows.slice(0,2);
+    document.getElementById('import-preview').innerHTML='<div style="font-size:11px;color:var(--ink-f);margin-top:8px;">File columns: '+cols.join(', ')+'</div>'
+      +'<div style="font-size:11px;color:var(--ink-f);margin-top:4px;">'+rawFileRows.length+' rows found · Sample: '
+      +Object.values(sample[0]||{}).slice(0,4).join(', ')+'</div>';
+    document.getElementById('imp-upload-area').style.display='none';
+    document.getElementById('imp-mapping').style.display='block';
+    document.getElementById('imp-btn').style.display='none';
   };
   reader.readAsArrayBuffer(file);
+}
+
+function applyMapping(){
+  const fields=['first','last','email','phone','city'];
+  const map={};
+  fields.forEach(f=>{map[f]=document.getElementById('map-'+f).value;});
+  if(!map.first&&!map.last){showToast('Please map at least First or Last name','err');return;}
+  S.pendingUpload=rawFileRows.map(r=>({
+    first:map.first?r[map.first].toString().trim():'',
+    last:map.last?r[map.last].toString().trim():'',
+    email:map.email?r[map.email].toString().trim():'',
+    phone:map.phone?r[map.phone].toString().trim():'',
+    city:map.city?r[map.city].toString().trim():'',
+  })).filter(r=>r.first||r.last);
+  if(!S.pendingUpload.length){showToast('No contacts found with those mappings','err');return;}
+  const preview=S.pendingUpload.slice(0,4);
+  document.getElementById('imp-mapping').style.display='none';
+  document.getElementById('import-preview').innerHTML=
+    '<div style="font-size:13px;color:var(--s-tx);margin-bottom:8px;">✓ Found '+S.pendingUpload.length+' contacts</div>'
+    +'<div class="tbl-wrap"><table class="tbl" style="table-layout:auto;"><thead><tr><th>First</th><th>Last</th><th>Email</th><th>Phone</th></tr></thead><tbody>'
+    +preview.map(r=>'<tr><td>'+r.first+'</td><td>'+r.last+'</td><td style="font-size:11px;">'+r.email+'</td><td style="font-size:11px;">'+r.phone+'</td></tr>').join('')
+    +(S.pendingUpload.length>4?'<tr><td colspan="4" style="color:var(--ink-m);font-size:11px;">...and '+(S.pendingUpload.length-4)+' more</td></tr>':'')
+    +'</tbody></table></div>'
+    +'<button class="btn" style="font-size:11px;margin-top:8px;" onclick="resetFileUpload()">↩ Re-map columns</button>';
+  document.getElementById('imp-btn').style.display='inline-block';
+}
+
+function resetFileUpload(){
+  S.pendingUpload=[];rawFileRows=[];
+  document.getElementById('imp-upload-area').style.display='block';
+  document.getElementById('imp-mapping').style.display='none';
+  document.getElementById('import-preview').innerHTML='';
+  document.getElementById('imp-btn').style.display='none';
+  document.getElementById('file-input').value='';
 }
 
 async function confirmImport(){
