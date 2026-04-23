@@ -1899,72 +1899,72 @@ async function fetchDeclinedShipments(){
   const w=CONFIG.C7_WORKER_URL;
   const base='https://api.commerce7.com/v1';
 
-  // Fetch active memberships page by page, look for declined shipments
-  // Commerce7 stores decline info on the membership's shipment records
+  // Step 1: get all clubs and find the two target club IDs
+  const clubRes=await fetch(w+'?url='+encodeURIComponent(base+'/club?limit=50'),{headers});
+  if(!clubRes.ok)throw new Error('Could not fetch clubs: '+clubRes.status);
+  const clubData=await clubRes.json();
+  const targetNames=['McGregor Vineyard Wine Club','McGregor Vineyard Library Wine Club'];
+  const targetClubs=(clubData.clubs||[]).filter(c=>targetNames.includes(c.title));
+  if(!targetClubs.length)throw new Error('Could not find target clubs. Found: '+(clubData.clubs||[]).map(c=>c.title).join(', '));
+  const clubIds=targetClubs.map(c=>c.id);
+  console.log('Target clubs:',targetClubs.map(c=>c.title+' ('+c.id+')').join(', '));
+
+  // Step 2: fetch active memberships for only these two clubs
   const declined=[];
-  let page=1;
-  const perPage=50;
-  let hasMore=true;
+  for(const clubId of clubIds){
+    const clubTitle=targetClubs.find(c=>c.id===clubId).title;
+    let page=1;const perPage=50;let hasMore=true;
+    while(hasMore){
+      await new Promise(r=>setTimeout(r,700)); // rate limit safety
+      const url=base+'/club-membership?clubId='+clubId+'&status=Active&limit='+perPage+'&page='+page;
+      const res=await fetch(w+'?url='+encodeURIComponent(url),{headers});
+      if(!res.ok){
+        const b=await res.text();
+        throw new Error('Membership fetch failed (club '+clubTitle+' p'+page+'): '+res.status+' '+b.slice(0,100));
+      }
+      const data=await res.json();
+      const memberships=data.clubMemberships||[];
+      const total=data.total||0;
 
-  while(hasMore){
-    const url=base+'/club-membership?status=Active&limit='+perPage+'&page='+page;
-    const res=await fetch(w+'?url='+encodeURIComponent(url),{headers});
-    if(!res.ok){
-      const body=await res.text();
-      throw new Error('club-membership fetch failed p'+page+': '+res.status+' '+body.slice(0,150));
+      // Log first record's subscription field for debugging
+      if(page===1&&memberships.length){
+        const m=memberships[0];
+        console.log('Club:',clubTitle,'Total active:',total);
+        console.log('subscription field:',JSON.stringify(m.subscription).slice(0,300));
+        console.log('tenderTypes:',JSON.stringify(m.tenderTypes).slice(0,200));
+        console.log('onHolds:',JSON.stringify(m.onHolds).slice(0,200));
+      }
+
+      for(const m of memberships){
+        // Check subscription object for decline status
+        const sub=m.subscription||{};
+        const isDeclined=
+          sub.paymentStatus==='Declined'||
+          sub.status==='Declined'||
+          sub.lastPaymentStatus==='Declined'||
+          sub.declineStatus==='Declined'||
+          m.paymentDeclined===true||
+          (m.tenderTypes||[]).some(t=>t.status==='Declined'||t.paymentStatus==='Declined');
+
+        if(isDeclined){
+          const cust=m.customer||{};
+          declined.push({
+            id:m.id,
+            customerId:m.customerId,
+            customerName:(cust.firstName||'')+(cust.lastName?' '+cust.lastName:''),
+            customerEmail:(cust.emails&&cust.emails[0])?cust.emails[0].email:'',
+            customerPhone:(cust.phones&&cust.phones[0])?cust.phones[0].phone:'',
+            clubTitle
+          });
+        }
+      }
+      hasMore=page*perPage<total;
+      page++;
+      if(memberships.length<perPage)hasMore=false;
     }
-    const data=await res.json();
-    const memberships=data.clubMemberships||[];
-    const total=data.total||0;
-
-    for(const m of memberships){
-      // Check the membership's shipTo/shipment for decline flags
-      // Fetch individual membership to get shipment details
-      const detailRes=await fetch(w+'?url='+encodeURIComponent(base+'/club-membership/'+m.id),{headers});
-      if(!detailRes.ok)continue;
-      const detail=await detailRes.json();
-
-      // Log first record structure for debugging
-      if(page===1&&memberships.indexOf(m)===0){
-        console.log('Full membership keys:',Object.keys(detail).join(', '));
-        console.log('Shipments field:',JSON.stringify(detail.shipments||detail.clubShipments||detail.currentShipment||'none').slice(0,300));
-      }
-
-      // Check all possible decline indicators
-      const isDeclined=
-        detail.paymentStatus==='Declined'||
-        detail.creditCardStatus==='Declined'||
-        (detail.shipments||[]).some(s=>s.paymentStatus==='Declined')||
-        (detail.clubShipments||[]).some(s=>s.paymentStatus==='Declined')||
-        detail.currentShipment?.paymentStatus==='Declined'||
-        detail.hasDeclinedShipment===true||
-        detail.isDeclined===true;
-
-      if(isDeclined){
-        const cust=detail.customer||m.customer||{};
-        declined.push({
-          id:detail.id||m.id,
-          customerId:detail.customerId||m.customerId,
-          customerName:(cust.firstName||'')+(cust.lastName?' '+cust.lastName:''),
-          customerEmail:(cust.emails&&cust.emails[0])?cust.emails[0].email:'',
-          customerPhone:(cust.phones&&cust.phones[0])?cust.phones[0].phone:'',
-          clubTitle:(detail.club&&detail.club.title)||''
-        });
-      }
-
-      // Rate limit safety — pause every 10 requests
-      if((memberships.indexOf(m)+1)%10===0){
-        await new Promise(r=>setTimeout(r,1000));
-      }
-    }
-
-    hasMore=page*perPage<Math.min(total,200); // cap at 200 memberships for now
-    page++;
-    if(memberships.length<perPage)hasMore=false;
-    // Pause between pages
-    if(hasMore)await new Promise(r=>setTimeout(r,1500));
   }
 
+  console.log('Total declined found:',declined.length);
   return declined;
 }
 
