@@ -1897,45 +1897,59 @@ async function fetchDeclinedShipments(){
   const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
   const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
   const w=CONFIG.C7_WORKER_URL;
+  const base='https://api.commerce7.com/v1';
 
-  // Step 1: verify proxy is working with a known endpoint
-  try{
-    const test=await fetch(w+'?url='+encodeURIComponent('https://api.commerce7.com/v1/club?limit=1'),{headers});
-    if(!test.ok)throw new Error('Proxy test failed: '+test.status);
-  }catch(e){throw new Error('Proxy not reachable: '+e.message);}
+  // Step 1: get all clubs to find subscription club IDs
+  const clubRes=await fetch(w+'?url='+encodeURIComponent(base+'/club?limit=50'),{headers});
+  if(!clubRes.ok)throw new Error('Could not fetch clubs: '+clubRes.status);
+  const clubData=await clubRes.json();
+  const clubs=(clubData.clubs||[]);
+  if(!clubs.length)throw new Error('No clubs found on this account');
 
-  // Step 2: try every plausible subscription shipment path
-  const paths=[
-    'subscription-shipment?paymentStatus=Declined&limit=100',
-    'subscription-shipment?limit=50',
-    'club-package-shipment?paymentStatus=Declined&limit=100',
-    'club-package-shipment?limit=50',
-    'club-membership/shipment?paymentStatus=Declined&limit=100',
-    'club/subscription-shipment?paymentStatus=Declined&limit=100',
-    'club/shipment?paymentStatus=Declined&limit=100',
-  ];
   const log=[];
-  for(const path of paths){
-    const url='https://api.commerce7.com/v1/'+path;
-    try{
-      const res=await fetch(w+'?url='+encodeURIComponent(url),{headers});
-      const body=await res.text();
-      log.push(path+' → '+res.status+' '+body.slice(0,150));
-      if(res.status===200){
-        const data=JSON.parse(body);
-        const arrayKey=Object.keys(data).find(k=>Array.isArray(data[k]));
-        if(!arrayKey)continue;
-        const all=data[arrayKey];
-        console.log('Found endpoint:',path,'key:',arrayKey,'total:',all.length,'sample:',JSON.stringify(all[0]).slice(0,200));
-        // Filter to declined only, checking multiple possible field names
-        return all.filter(s=>{
-          const ps=(s.paymentStatus||s.status||s.paymentDeclineStatus||'').toLowerCase();
-          return ps.includes('declin');
-        });
-      }
-    }catch(e){log.push(path+' → '+e.message);}
+  const allDeclined=[];
+
+  for(const club of clubs){
+    const clubId=club.id;
+    const clubTitle=club.title||clubId;
+    // Try both subscription-shipment and club-shipment under this club ID
+    const paths=[
+      base+'/club/'+clubId+'/subscription-shipment?paymentStatus=Declined&limit=100',
+      base+'/club/'+clubId+'/shipment?paymentStatus=Declined&limit=100',
+      base+'/club-membership?clubId='+clubId+'&paymentStatus=Declined&limit=100',
+    ];
+    for(const url of paths){
+      try{
+        const res=await fetch(w+'?url='+encodeURIComponent(url),{headers});
+        const body=await res.text();
+        const shortPath=url.replace(base+'/','').replace(clubId,'[id]');
+        log.push(shortPath+' → '+res.status+' '+body.slice(0,100));
+        if(res.status===200){
+          const data=JSON.parse(body);
+          const arrayKey=Object.keys(data).find(k=>Array.isArray(data[k]));
+          if(!arrayKey)continue;
+          const items=data[arrayKey];
+          const declined=items.filter(s=>{
+            const ps=(s.paymentStatus||s.status||'').toLowerCase();
+            return ps.includes('declin');
+          });
+          if(declined.length){
+            declined.forEach(s=>{s._clubTitle=clubTitle;});
+            allDeclined.push(...declined);
+          }
+          // Found a working path — no need to try other paths for this club
+          break;
+        }
+      }catch(e){log.push(url.slice(-40)+' → '+e.message);}
+    }
   }
-  throw new Error('No working endpoint found. Log:\n'+log.join('\n'));
+
+  if(allDeclined.length>0||log.some(l=>l.includes('→ 200'))){
+    console.log('Decline sync complete. Found:',allDeclined.length,'declined. Log:\n'+log.join('\n'));
+    return allDeclined;
+  }
+
+  throw new Error('No working endpoint found for any club. Log:\n'+log.join('\n'));
 }
 
 async function syncDeclinedShipments(){
