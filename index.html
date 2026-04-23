@@ -212,18 +212,20 @@ select.fi{cursor:pointer;}
         </div>
         <div id="camps-list"></div>
         <div id="camp-detail" style="display:none;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-            <button class="btn" onclick="closeCampDetail()" style="font-size:12px;">← Back</button>
-            <div class="vtitle" id="cd-name"></div>
-          </div>
-          <div style="background:white;border:1px solid var(--bdr);border-radius:8px;padding:16px;margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+          <!-- Campaign detail header -->
+          <div id="cd-header" style="border-radius:10px;padding:20px 24px;margin-bottom:16px;border:1px solid var(--bdr);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">
               <div>
-                <div style="font-size:12px;color:var(--ink-m);" id="cd-dates"></div>
-                <div style="font-size:13px;color:var(--ink-m);margin-top:4px;" id="cd-desc"></div>
+                <div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;line-height:1.1;" id="cd-name"></div>
+                <div style="font-size:12px;color:var(--ink-m);margin-top:4px;" id="cd-dates"></div>
               </div>
-              <button class="btn btnp" style="font-size:11px;padding:3px 10px;" onclick="openImportForCamp(S.activeCamp)">+ Add contacts</button>
+              <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+                <button class="btn" style="font-size:12px;" onclick="openEditCamp()">✎ Edit</button>
+                <button class="btn btnp" style="font-size:11px;padding:3px 10px;" onclick="openImportForCamp(S.activeCamp)">+ Add contacts</button>
+                <button class="btn" onclick="closeCampDetail()" style="font-size:12px;">← Back</button>
+              </div>
             </div>
+            <div style="font-size:14px;color:var(--ink-m);line-height:1.6;margin-bottom:14px;min-height:18px;" id="cd-desc"></div>
             <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
               <div class="dsc"><div class="dsn" id="cd-contacts">0</div><div class="dsl">Contacts</div></div>
               <div class="dsc"><div class="dsn" id="cd-attempts">0</div><div class="dsl">Attempts</div></div>
@@ -433,6 +435,23 @@ select.fi{cursor:pointer;}
       <div class="fr"><label class="fl">Description</label><textarea class="fi" id="cm-desc" rows="2"></textarea></div>
     </div>
     <div class="mftr"><button class="btn" onclick="closeModal('camp-modal')">Cancel</button><button class="btn btnp" onclick="saveCamp()">Save</button></div>
+  </div>
+</div>
+
+<!-- Edit campaign modal -->
+<div id="edit-camp-modal" class="modal-backdrop">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Edit campaign</div><button class="mcls" onclick="closeModal('edit-camp-modal')">✕</button></div>
+    <div class="mbdy">
+      <input type="hidden" id="ecm-id" />
+      <div class="fr"><label class="fl">Campaign name *</label><input type="text" class="fi" id="ecm-name" placeholder="e.g. Spring Allocation 2026" /></div>
+      <div class="f2">
+        <div class="fr"><label class="fl">Start date</label><input type="date" class="fi" id="ecm-start" /></div>
+        <div class="fr"><label class="fl">End date</label><input type="date" class="fi" id="ecm-end" /></div>
+      </div>
+      <div class="fr"><label class="fl">Description</label><textarea class="fi" id="ecm-desc" rows="3" placeholder="Describe the goal or context of this campaign..."></textarea></div>
+    </div>
+    <div class="mftr"><button class="btn" onclick="closeModal('edit-camp-modal')">Cancel</button><button class="btn btnp" onclick="saveEditCamp()">Save changes</button></div>
   </div>
 </div>
 
@@ -1078,6 +1097,7 @@ function renderCampaigns(){
 function openCampDetail(campId){
   S.activeCamp=campId;
   const c=S.campaigns.find(x=>x.id===campId);if(!c)return;
+  const col=getCampColor(campId);
   const contacts=S.contacts.filter(x=>x.campId===campId);
   const sold=contacts.filter(x=>x.attempts&&x.attempts.some(a=>a.outcome==='sold')).length;
   const att=contacts.reduce((s,x)=>s+(x.attempts?x.attempts.length:0),0);
@@ -1085,6 +1105,12 @@ function openCampDetail(campId){
   const pct=contacts.length?Math.round(sold/contacts.length*100):0;
   document.getElementById('camps-list').style.display='none';
   document.getElementById('camp-detail').style.display='block';
+  // Apply campaign color to header
+  const hdr=document.getElementById('cd-header');
+  hdr.style.background=col.bg;
+  hdr.style.borderColor=col.border;
+  hdr.style.borderLeft='5px solid '+col.border;
+  document.getElementById('cd-name').style.color=col.text;
   document.getElementById('cd-name').textContent=c.name;
   document.getElementById('cd-dates').textContent=(c.start||'')+(c.end?' → '+c.end:'');
   document.getElementById('cd-desc').textContent=c.desc||'';
@@ -1126,6 +1152,38 @@ function closeCampDetail(){
   document.getElementById('camp-detail').style.display='none';
   document.getElementById('camps-list').style.display='block';
   S.activeCamp=null;
+}
+
+function openEditCamp(){
+  const c=S.campaigns.find(x=>x.id===S.activeCamp);if(!c)return;
+  document.getElementById('ecm-id').value=c.id;
+  document.getElementById('ecm-name').value=c.name;
+  document.getElementById('ecm-start').value=c.start||'';
+  document.getElementById('ecm-end').value=c.end||'';
+  document.getElementById('ecm-desc').value=c.desc||'';
+  openModal('edit-camp-modal');
+}
+
+async function saveEditCamp(){
+  const id=document.getElementById('ecm-id').value;
+  const name=document.getElementById('ecm-name').value.trim();
+  if(!name){showToast('Please enter a campaign name','err');return;}
+  const c=S.campaigns.find(x=>x.id===id);if(!c)return;
+  c.name=name;
+  c.start=document.getElementById('ecm-start').value;
+  c.end=document.getElementById('ecm-end').value;
+  c.desc=document.getElementById('ecm-desc').value;
+  try{
+    const allRows=await sheetsGet('Campaigns!A2:F');
+    const rowIdx=allRows.findIndex(r=>r[0]===id);
+    if(rowIdx>=0){
+      await sheetsUpdate('Campaigns!A'+(rowIdx+2)+':F'+(rowIdx+2),[[c.id,c.name,c.start,c.end,c.desc,c.createdAt]]);
+    }
+    closeModal('edit-camp-modal');
+    renderAll();
+    openCampDetail(id);
+    showToast('Campaign updated');
+  }catch(e){showToast('Error: '+e.message,'err');}
 }
 
 function renderContacts(){
