@@ -195,6 +195,7 @@ select.fi{cursor:pointer;}
   <div class="main">
     <div class="tbar">
       <div class="sw"><span class="si">⌕</span><input type="text" id="srch" placeholder="Search contacts..." oninput="renderContacts()" /></div>
+      <button class="btn" onclick="openCallQueue()">☎ Call queue</button>
       <button class="btn" onclick="openAddContact()">+ Add contact</button>
       <button class="btn btnp" onclick="openImport()">+ Import list</button>
     </div>
@@ -541,6 +542,84 @@ select.fi{cursor:pointer;}
       <input type="hidden" id="rm-ref-id" />
     </div>
     <div class="mftr"><button class="btn" onclick="closeModal('reminder-modal')">Cancel</button><button class="btn btnp" onclick="saveReminder()">Save</button></div>
+  </div>
+</div>
+
+<!-- Call Queue Overlay -->
+<div id="call-queue-overlay" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:200;flex-direction:column;">
+  <!-- Queue Header -->
+  <div style="background:var(--burg);color:white;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;">Call Queue</div>
+      <div style="font-size:13px;opacity:.8;" id="cq-progress"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <select id="cq-sort" class="fi" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;font-size:12px;padding:5px 9px;width:auto;" onchange="buildQueue()">
+        <option value="never">Never contacted first</option>
+        <option value="oldest">Oldest contact date first</option>
+        <option value="campaign">By campaign</option>
+      </select>
+      <select id="cq-camp-filter" class="fi" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;font-size:12px;padding:5px 9px;width:auto;" onchange="buildQueue()">
+        <option value="">All campaigns</option>
+      </select>
+      <button onclick="closeCallQueue()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;padding:6px 14px;border-radius:5px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;">✕ Exit queue</button>
+    </div>
+  </div>
+  <!-- Queue Body -->
+  <div style="flex:1;display:flex;overflow:hidden;">
+    <!-- Contact Card -->
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;" id="cq-card-area">
+      <div id="cq-empty" style="display:none;text-align:center;">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:32px;color:var(--burg);margin-bottom:12px;">Queue complete</div>
+        <div style="font-size:14px;color:var(--ink-m);">All contacts have been reached or logged.</div>
+        <button onclick="closeCallQueue()" class="btn btnp" style="margin-top:20px;">Back to CRM</button>
+      </div>
+      <div id="cq-card" style="width:100%;max-width:560px;">
+        <!-- Contact info -->
+        <div style="background:white;border:1px solid var(--bdr);border-radius:12px;padding:28px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+            <div class="av av-b" style="width:52px;height:52px;font-size:18px;" id="cq-initials"></div>
+            <div>
+              <div style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:500;" id="cq-name"></div>
+              <div style="font-size:13px;color:var(--ink-m);" id="cq-campaign"></div>
+            </div>
+            <div style="margin-left:auto;text-align:right;">
+              <div id="cq-c7link"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+            <div style="padding:12px;background:var(--cream);border-radius:8px;">
+              <div style="font-size:11px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Phone</div>
+              <div style="font-size:16px;font-weight:500;" id="cq-phone">—</div>
+            </div>
+            <div style="padding:12px;background:var(--cream);border-radius:8px;">
+              <div style="font-size:11px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Email</div>
+              <div style="font-size:14px;" id="cq-email">—</div>
+            </div>
+          </div>
+          <div id="cq-history" style="font-size:12px;color:var(--ink-m);border-top:1px solid var(--bdr);padding-top:12px;"></div>
+        </div>
+        <!-- Quick log buttons -->
+        <div style="background:white;border:1px solid var(--bdr);border-radius:12px;padding:20px;">
+          <div style="font-size:12px;color:var(--ink-m);margin-bottom:12px;text-transform:uppercase;letter-spacing:.08em;">Log outcome</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <button class="cq-btn" onclick="quickLog('vm')" style="background:var(--w-bg);color:var(--w-tx);border:1px solid var(--w-tx);border-radius:8px;padding:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">📞 Left voicemail</button>
+            <button class="cq-btn" onclick="quickLog('noanswer')" style="background:var(--i-bg);color:var(--i-tx);border:1px solid var(--i-tx);border-radius:8px;padding:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">🔇 No answer</button>
+            <button class="cq-btn" onclick="quickLog('reached')" style="background:var(--s-bg);color:var(--s-tx);border:1px solid var(--s-tx);border-radius:8px;padding:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">✓ Reached</button>
+            <button class="cq-btn" onclick="quickLog('nosale')" style="background:var(--d-bg);color:var(--d-tx);border:1px solid var(--d-tx);border-radius:8px;padding:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">✗ Not interested</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="cq-notes" class="fi" placeholder="Optional note..." style="flex:1;" />
+            <button class="btn" onclick="skipContact()" style="white-space:nowrap;">Skip →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Queue sidebar -->
+    <div style="width:260px;background:white;border-left:1px solid var(--bdr);overflow-y:auto;flex-shrink:0;">
+      <div style="padding:14px;border-bottom:1px solid var(--bdr);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);">Up next</div>
+      <div id="cq-sidebar"></div>
+    </div>
   </div>
 </div>
 
@@ -1907,6 +1986,142 @@ function openDeclineTicket(){
   if(linkEl)linkEl.style.display='block';
   openModal('ticket-modal');
   setTimeout(()=>document.getElementById('tm-customer-search').focus(),200);
+}
+
+// ---- Call Queue ----
+let CQ={queue:[],idx:0};
+
+function openCallQueue(){
+  // Populate campaign filter
+  const sel=document.getElementById('cq-camp-filter');
+  sel.innerHTML='<option value="">All campaigns</option>';
+  S.campaigns.forEach(c=>{
+    const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);
+  });
+  buildQueue();
+  document.getElementById('call-queue-overlay').style.display='flex';
+}
+
+function closeCallQueue(){
+  document.getElementById('call-queue-overlay').style.display='none';
+  renderAll();
+}
+
+function buildQueue(){
+  const sort=document.getElementById('cq-sort').value;
+  const campFilter=document.getElementById('cq-camp-filter').value;
+  let contacts=[...S.contacts];
+  if(campFilter)contacts=contacts.filter(c=>c.campId===campFilter);
+  // Exclude already sold
+  contacts=contacts.filter(c=>!c.attempts||!c.attempts.some(a=>a.outcome==='sold'));
+
+  contacts.sort((a,b)=>{
+    const aLast=a.attempts&&a.attempts.length?a.attempts[a.attempts.length-1].date:'';
+    const bLast=b.attempts&&b.attempts.length?b.attempts[b.attempts.length-1].date:'';
+    if(sort==='never'){
+      // Never contacted first (empty date), then oldest date
+      if(!aLast&&bLast)return -1;
+      if(aLast&&!bLast)return 1;
+      return aLast.localeCompare(bLast);
+    } else if(sort==='oldest'){
+      return aLast.localeCompare(bLast);
+    } else {
+      // By campaign then oldest
+      const ac=S.campaigns.find(x=>x.id===a.campId);
+      const bc=S.campaigns.find(x=>x.id===b.campId);
+      const cmp=(ac?ac.name:'').localeCompare(bc?bc.name:'');
+      if(cmp!==0)return cmp;
+      return aLast.localeCompare(bLast);
+    }
+  });
+
+  CQ.queue=contacts;
+  CQ.idx=0;
+  showQueueCard();
+}
+
+function showQueueCard(){
+  const total=CQ.queue.length;
+  const remaining=total-CQ.idx;
+  document.getElementById('cq-progress').textContent=CQ.idx+' of '+total+' contacts · '+remaining+' remaining';
+
+  if(CQ.idx>=total){
+    document.getElementById('cq-card').style.display='none';
+    document.getElementById('cq-empty').style.display='block';
+    document.getElementById('cq-sidebar').innerHTML='';
+    return;
+  }
+  document.getElementById('cq-card').style.display='block';
+  document.getElementById('cq-empty').style.display='none';
+
+  const c=CQ.queue[CQ.idx];
+  const camp=S.campaigns.find(x=>x.id===c.campId);
+  const initials=((c.first||'')[0]||'')+((c.last||'')[0]||'');
+  document.getElementById('cq-initials').textContent=initials;
+  document.getElementById('cq-name').textContent=c.first+' '+c.last;
+  document.getElementById('cq-campaign').textContent=camp?camp.name:'No campaign';
+  document.getElementById('cq-phone').textContent=c.phone||'—';
+  document.getElementById('cq-email').textContent=c.email||'—';
+  document.getElementById('cq-notes').value='';
+
+  // C7 link
+  const c7el=document.getElementById('cq-c7link');
+  if(c.c7id){
+    c7el.innerHTML='<a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:12px;color:var(--burg);text-decoration:none;border:1px solid var(--bdr-s);border-radius:5px;padding:4px 10px;">View in C7 ↗</a>';
+  } else { c7el.innerHTML=''; }
+
+  // History
+  const attempts=c.attempts||[];
+  const histEl=document.getElementById('cq-history');
+  if(!attempts.length){
+    histEl.textContent='No previous contact.';
+  } else {
+    const last=attempts[attempts.length-1];
+    histEl.innerHTML='<span style="color:var(--ink);">'+attempts.length+' attempt'+(attempts.length!==1?'s':'')+'</span> · Last: '+last.date+' · '+outcomeLabel(last.outcome)+(last.notes?' · "'+last.notes+'"':'');
+  }
+
+  // Sidebar — next 8 contacts
+  const sidebar=document.getElementById('cq-sidebar');
+  sidebar.innerHTML='';
+  CQ.queue.slice(CQ.idx+1,CQ.idx+9).forEach((contact,i)=>{
+    const d=document.createElement('div');
+    d.style.cssText='padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:13px;cursor:pointer;';
+    d.onmouseover=()=>d.style.background='var(--burg-f)';
+    d.onmouseout=()=>d.style.background='white';
+    d.onclick=()=>{CQ.idx=CQ.idx+1+i;showQueueCard();};
+    const lastAtt=(contact.attempts||[]);
+    const lastDate=lastAtt.length?lastAtt[lastAtt.length-1].date:'Never';
+    d.innerHTML='<div style="font-weight:500;">'+contact.first+' '+contact.last+'</div>'
+      +'<div style="font-size:11px;color:var(--ink-f);margin-top:2px;">'+lastDate+'</div>';
+    sidebar.appendChild(d);
+  });
+  if(CQ.queue.length-CQ.idx-1>8){
+    const more=document.createElement('div');
+    more.style.cssText='padding:10px 14px;font-size:11px;color:var(--ink-f);';
+    more.textContent='+'+(CQ.queue.length-CQ.idx-9)+' more';
+    sidebar.appendChild(more);
+  }
+}
+
+async function quickLog(outcome){
+  const c=CQ.queue[CQ.idx];if(!c)return;
+  const notes=document.getElementById('cq-notes').value.trim();
+  const id=uid();const createdAt=today();
+  const date=today();
+  const attempt={id,contactId:c.id,method:'Phone call',date,outcome,notes,sales:[],assignedBy:S.cu,createdAt};
+  try{
+    await sheetsAppend('Attempts!A:I',[[id,c.id,'Phone call',date,outcome,notes,JSON.stringify([]),S.cu,createdAt]]);
+    c.attempts=c.attempts||[];
+    c.attempts.push(attempt);
+    showToast(outcomeLabel(outcome)+' logged');
+    CQ.idx++;
+    showQueueCard();
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+function skipContact(){
+  CQ.idx++;
+  showQueueCard();
 }
 
 // ---- Export ----
