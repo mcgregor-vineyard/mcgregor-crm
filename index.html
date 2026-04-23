@@ -1899,57 +1899,55 @@ async function fetchDeclinedShipments(){
   const w=CONFIG.C7_WORKER_URL;
   const base='https://api.commerce7.com/v1';
 
-  // Step 1: get all clubs to find subscription club IDs
-  const clubRes=await fetch(w+'?url='+encodeURIComponent(base+'/club?limit=50'),{headers});
-  if(!clubRes.ok)throw new Error('Could not fetch clubs: '+clubRes.status);
-  const clubData=await clubRes.json();
-  const clubs=(clubData.clubs||[]);
-  if(!clubs.length)throw new Error('No clubs found on this account');
+  // First find what valid query params club-membership accepts by fetching with no filter
+  // Then filter client-side for declined payment status
+  const url=base+'/club-membership?limit=50&page=1';
+  const res=await fetch(w+'?url='+encodeURIComponent(url),{headers});
+  if(!res.ok){
+    const body=await res.text();
+    throw new Error('club-membership fetch failed: '+res.status+' '+body.slice(0,200));
+  }
+  const data=await res.json();
+  const memberships=data.clubMemberships||data.memberships||[];
+  const total=data.total||memberships.length;
 
-  const log=[];
-  const allDeclined=[];
-
-  for(const club of clubs){
-    const clubId=club.id;
-    const clubTitle=club.title||clubId;
-    // Try both subscription-shipment and club-shipment under this club ID
-    const paths=[
-      base+'/club/'+clubId+'/subscription-shipment?paymentStatus=Declined&limit=100',
-      base+'/club/'+clubId+'/shipment?paymentStatus=Declined&limit=100',
-      base+'/club-membership?clubId='+clubId+'&paymentStatus=Declined&limit=100',
-    ];
-    for(const url of paths){
-      try{
-        const res=await fetch(w+'?url='+encodeURIComponent(url),{headers});
-        const body=await res.text();
-        const shortPath=url.replace(base+'/','').replace(clubId,'[id]');
-        log.push(shortPath+' → '+res.status+' '+body.slice(0,100));
-        if(res.status===200){
-          const data=JSON.parse(body);
-          const arrayKey=Object.keys(data).find(k=>Array.isArray(data[k]));
-          if(!arrayKey)continue;
-          const items=data[arrayKey];
-          const declined=items.filter(s=>{
-            const ps=(s.paymentStatus||s.status||'').toLowerCase();
-            return ps.includes('declin');
-          });
-          if(declined.length){
-            declined.forEach(s=>{s._clubTitle=clubTitle;});
-            allDeclined.push(...declined);
-          }
-          // Found a working path — no need to try other paths for this club
-          break;
-        }
-      }catch(e){log.push(url.slice(-40)+' → '+e.message);}
-    }
+  // Log the structure of the first record so we know the field names
+  if(memberships.length){
+    console.log('Membership sample keys:',Object.keys(memberships[0]).join(', '));
+    console.log('Sample membership:',JSON.stringify(memberships[0]).slice(0,400));
   }
 
-  if(allDeclined.length>0||log.some(l=>l.includes('→ 200'))){
-    console.log('Decline sync complete. Found:',allDeclined.length,'declined. Log:\n'+log.join('\n'));
-    return allDeclined;
+  // Fetch all pages
+  let all=[...memberships];
+  const perPage=50;
+  const totalPages=Math.ceil(total/perPage);
+  for(let p=2;p<=Math.min(totalPages,20);p++){
+    const r=await fetch(w+'?url='+encodeURIComponent(base+'/club-membership?limit=50&page='+p),{headers});
+    if(!r.ok)break;
+    const d=await r.json();
+    const items=d.clubMemberships||d.memberships||[];
+    all.push(...items);
+    if(items.length<perPage)break;
   }
 
-  throw new Error('No working endpoint found for any club. Log:\n'+log.join('\n'));
+  // Filter for declined — check all possible field names
+  const declined=all.filter(m=>{
+    const fields=[m.paymentStatus,m.status,m.declineStatus,m.creditCardStatus,m.lastPaymentStatus,m.shipmentPaymentStatus];
+    return fields.some(f=>f&&f.toString().toLowerCase().includes('declin'));
+  });
+
+  console.log('Total memberships:',all.length,'Declined:',declined.length);
+  if(!declined.length&&all.length){
+    // Show all unique status values to help identify correct field
+    const statusValues=new Set(all.map(m=>JSON.stringify({
+      paymentStatus:m.paymentStatus,
+      status:m.status,
+      declineStatus:m.declineStatus,
+      creditCardStatus:m.creditCardStatus
+    })));
+    console.log('Unique status combos:',[...statusValues].slice(0,5).join(' | '));
+  }
+  return declined;
 }
 
 async function syncDeclinedShipments(){
@@ -1959,7 +1957,7 @@ async function syncDeclinedShipments(){
   try{
     const shipments=await fetchDeclinedShipments();
     if(!shipments.length){
-      setDeclinesStatus('No declined club shipments found in Commerce7.','ok');
+      setDeclinesStatus('No declined club memberships found. Check browser console (F12) for field names — the correct status field may need adjustment.','ok');
       return;
     }
     let created=0,skipped=0;
