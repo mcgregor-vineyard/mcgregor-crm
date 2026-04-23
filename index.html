@@ -581,7 +581,8 @@ select.fi{cursor:pointer;}
             <div class="av av-b" style="width:52px;height:52px;font-size:18px;" id="cq-initials"></div>
             <div>
               <div style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:500;" id="cq-name"></div>
-              <div style="font-size:13px;color:var(--ink-m);" id="cq-campaign"></div>
+              <div id="cq-campaign-badge" style="display:inline-block;margin-top:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;"></div>
+              <div style="font-size:12px;color:var(--ink-m);margin-top:4px;" id="cq-camp-desc"></div>
             </div>
             <div style="margin-left:auto;text-align:right;">
               <div id="cq-c7link"></div>
@@ -607,6 +608,7 @@ select.fi{cursor:pointer;}
             <button class="cq-btn" onclick="quickLog('noanswer')" style="background:var(--i-bg);color:var(--i-tx);border:1px solid var(--i-tx);border-radius:8px;padding:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">🔇 No answer</button>
             <button class="cq-btn" onclick="quickLog('reached')" style="background:var(--s-bg);color:var(--s-tx);border:1px solid var(--s-tx);border-radius:8px;padding:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">✓ Reached</button>
             <button class="cq-btn" onclick="quickLog('nosale')" style="background:var(--d-bg);color:var(--d-tx);border:1px solid var(--d-tx);border-radius:8px;padding:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">✗ Not interested</button>
+            <button class="cq-btn" onclick="quickLog('email-sent')" style="background:#EFF6FF;color:#1E3A8A;border:1px solid #2563EB;border-radius:8px;padding:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;grid-column:span 2;">✉ Sent email</button>
           </div>
           <div style="display:flex;gap:8px;">
             <input type="text" id="cq-notes" class="fi" placeholder="Optional note..." style="flex:1;" />
@@ -797,6 +799,20 @@ KGp83R3Cm4HG0H0o3zOQLQ==
 // ============================================================
 
 const TEAM=[{name:'Dan Jimerson',init:'DJ',cls:'av-b'},{name:'Mike DeGaetano',init:'MD',cls:'av-g'},{name:'Ellen Quibell',init:'EQ',cls:'av-t'}];
+const CAMP_COLORS=[
+  {bg:'#F3E8FF',border:'#A855F7',text:'#6B21A8'},  // purple
+  {bg:'#FEF3C7',border:'#D97706',text:'#92400E'},  // amber
+  {bg:'#DCFCE7',border:'#16A34A',text:'#14532D'},  // green
+  {bg:'#E0F2FE',border:'#0284C7',text:'#0C4A6E'},  // sky
+  {bg:'#FFE4E6',border:'#E11D48',text:'#881337'},  // rose
+  {bg:'#F0FDF4',border:'#059669',text:'#064E3B'},  // emerald
+  {bg:'#FFF7ED',border:'#EA580C',text:'#7C2D12'},  // orange
+  {bg:'#EFF6FF',border:'#2563EB',text:'#1E3A8A'},  // blue
+];
+function getCampColor(campId){
+  const idx=S.campaigns.findIndex(c=>c.id===campId);
+  return idx>=0?CAMP_COLORS[idx%CAMP_COLORS.length]:{bg:'var(--cream)',border:'var(--bdr)',text:'var(--ink-m)'};
+}
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
 const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders'};
 
@@ -902,8 +918,21 @@ async function loadFromSheets(){
   }
 }
 
-function safeJSON(s){try{return JSON.parse(s||'[]');}catch{return[];}}
-
+function phoneLink(phone){
+  if(!phone)return '—';
+  return '<a href="tel:'+phone+'" style="color:var(--ink);text-decoration:none;">'+phone+'</a>'
+    +' <span title="Copy" onclick="copyToClipboard(\''+phone+'\')" style="cursor:pointer;opacity:.5;font-size:11px;">⧉</span>';
+}
+function emailLink(email){
+  if(!email)return '—';
+  return '<a href="mailto:'+email+'" style="color:var(--ink);text-decoration:none;">'+email+'</a>'
+    +' <span title="Copy" onclick="copyToClipboard(\''+email+'\')" style="cursor:pointer;opacity:.5;font-size:11px;">⧉</span>';
+}
+function copyToClipboard(text){
+  navigator.clipboard.writeText(text).then(()=>showToast('Copied to clipboard')).catch(()=>{
+    const el=document.createElement('textarea');el.value=text;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);showToast('Copied');
+  });
+}
 async function syncAll(){
   document.getElementById('sync-btn').disabled=true;
   await loadFromSheets();
@@ -985,11 +1014,23 @@ function updateCounts(){
 function renderSidebar(){
   const el=document.getElementById('camp-sidebar');el.innerHTML='';
   const all=document.createElement('button');all.className='fbtn'+(S.activeCamp===null?' on':'');all.textContent='All campaigns';
-  all.onclick=()=>{S.activeCamp=null;renderAll();document.querySelectorAll('#camp-sidebar .fbtn').forEach(b=>b.classList.remove('on'));all.classList.add('on');};
+  all.onclick=()=>{S.activeCamp=null;closeCampDetail();renderAll();document.querySelectorAll('#camp-sidebar .fbtn').forEach(b=>b.classList.remove('on'));all.classList.add('on');};
   el.appendChild(all);
-  S.campaigns.forEach(c=>{
-    const b=document.createElement('button');b.className='fbtn'+(S.activeCamp===c.id?' on':'');b.textContent=c.name;b.style.fontSize='12px';
-    b.onclick=()=>{S.activeCamp=c.id;renderAll();document.querySelectorAll('#camp-sidebar .fbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');};
+  S.campaigns.forEach((c,i)=>{
+    const col=CAMP_COLORS[i%CAMP_COLORS.length];
+    const b=document.createElement('button');
+    b.className='fbtn'+(S.activeCamp===c.id?' on':'');
+    b.style.cssText='font-size:12px;border-left:3px solid '+col.border+';padding-left:7px;';
+    if(S.activeCamp===c.id){b.style.background=col.bg;b.style.color=col.text;}
+    b.onmouseover=()=>{b.style.background=col.bg;b.style.color=col.text;};
+    b.onmouseout=()=>{if(S.activeCamp!==c.id){b.style.background='';b.style.color='';}};
+    b.innerHTML='<span>'+c.name+'</span>';
+    b.onclick=()=>{
+      document.querySelectorAll('#camp-sidebar .fbtn').forEach(x=>{x.classList.remove('on');x.style.background='';x.style.color='';});
+      b.classList.add('on');b.style.background=col.bg;b.style.color=col.text;
+      sv('campaigns');
+      openCampDetail(c.id);
+    };
     el.appendChild(b);
   });
 }
@@ -999,15 +1040,17 @@ function renderCampaigns(){
   document.getElementById('camp-detail').style.display='none';
   el.style.display='block';
   if(!S.campaigns.length){el.innerHTML='<div class="empty">No campaigns yet. Create one to get started.</div>';return;}
-  S.campaigns.forEach(c=>{
+  S.campaigns.forEach((c,i)=>{
+    const col=CAMP_COLORS[i%CAMP_COLORS.length];
     const contacts=S.contacts.filter(x=>x.campId===c.id);
     const sold=contacts.filter(x=>x.attempts&&x.attempts.some(a=>a.outcome==='sold')).length;
     const att=contacts.reduce((s,x)=>s+(x.attempts?x.attempts.length:0),0);
     const rev=contacts.reduce((s,x)=>s+getContactRevenue(x),0);
     const pct=contacts.length?Math.round(sold/contacts.length*100):0;
     const div=document.createElement('div');div.className='camp-card';div.style.cursor='pointer';
-    div.onmouseenter=()=>div.style.borderColor='var(--burg-l)';
-    div.onmouseleave=()=>div.style.borderColor='var(--bdr)';
+    div.style.borderLeft='4px solid '+col.border;
+    div.onmouseenter=()=>div.style.borderColor=col.border;
+    div.onmouseleave=()=>div.style.borderColor=col.border;
     div.onclick=(e)=>{if(!e.target.closest('button'))openCampDetail(c.id);};
     div.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
@@ -1065,8 +1108,8 @@ function openCampDetail(campId){
     const tr=document.createElement('tr');tr.style.cursor='pointer';tr.onclick=()=>showContactDetail(contact.id);
     tr.innerHTML=`
       <td><div style="display:flex;align-items:center;gap:7px;"><div class="av ${m.cls}">${((contact.first||'')[0]||'')+((contact.last||'')[0]||'')}</div><span style="font-weight:500;">${contact.first} ${contact.last}</span></div></td>
-      <td style="color:var(--ink-m);font-size:12px;">${contact.phone||'—'}</td>
-      <td style="color:var(--ink-m);font-size:12px;">${contact.email||'—'}</td>
+      <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(contact.phone)}</td>
+      <td style="font-size:12px;" onclick="event.stopPropagation();">${emailLink(contact.email)}</td>
       <td style="text-align:center;">${(contact.attempts||[]).length}</td>
       <td>${outcomeBadge(lo)}</td>
       <td style="font-size:12px;color:var(--ink-m);">${lastDate}</td>
@@ -1094,8 +1137,8 @@ function renderContacts(){
     const tr=document.createElement('tr');tr.style.cursor='pointer';tr.onclick=()=>showContactDetail(c.id);
     tr.innerHTML=`
       <td><div style="display:flex;align-items:center;gap:7px;"><div class="av ${m.cls}">${((c.first||'')[0]||'')+((c.last||'')[0]||'')}</div><span style="font-weight:500;">${c.first} ${c.last}</span></div></td>
-      <td style="color:var(--ink-m);font-size:12px;">${c.phone||'—'}</td>
-      <td style="color:var(--ink-m);font-size:12px;">${c.email||'—'}</td>
+      <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(c.phone)}</td>
+      <td style="font-size:12px;" onclick="event.stopPropagation();">${emailLink(c.email)}</td>
       <td style="font-size:12px;">${camp?camp.name:'—'}</td>
       <td style="text-align:center;">${(c.attempts||[]).length}</td>
       <td>${outcomeBadge(lo)}</td>
@@ -1181,8 +1224,8 @@ function showContactDetail(id){
   html+='<div class="av av-b" style="width:40px;height:40px;font-size:14px;">'+initials+'</div>';
   html+='<div><div style="font-weight:500;font-size:15px;">'+c.first+' '+c.last+'</div><div style="font-size:12px;color:var(--ink-m);">'+(c.city||'')+'</div></div></div>';
   html+='<div style="margin-bottom:12px;">';
-  if(c.phone)html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Phone </span>'+c.phone+'</div>';
-  if(c.email)html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Email </span>'+c.email+'</div>';
+  if(c.phone)html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Phone </span>'+phoneLink(c.phone)+'</div>';
+  if(c.email)html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Email </span>'+emailLink(c.email)+'</div>';
   html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Campaign </span>'+(camp?camp.name:'—')+'</div>';
   html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Assigned </span>'+m.name+'</div>';
   if(rev>0)html+='<div style="font-size:12px;"><span style="color:var(--ink-m);">Revenue </span><span style="color:var(--burg);font-family:\'Cormorant Garamond\',serif;font-size:15px;">'+fmt$(rev)+'</span></div>';
@@ -2056,12 +2099,20 @@ function showQueueCard(){
 
   const c=CQ.queue[CQ.idx];
   const camp=S.campaigns.find(x=>x.id===c.campId);
+  const col=getCampColor(c.campId);
   const initials=((c.first||'')[0]||'')+((c.last||'')[0]||'');
   document.getElementById('cq-initials').textContent=initials;
   document.getElementById('cq-name').textContent=c.first+' '+c.last;
-  document.getElementById('cq-campaign').textContent=camp?camp.name:'No campaign';
-  document.getElementById('cq-phone').textContent=c.phone||'—';
-  document.getElementById('cq-email').textContent=c.email||'—';
+  // Campaign badge with color
+  const badge=document.getElementById('cq-campaign-badge');
+  badge.textContent=camp?camp.name:'No campaign';
+  badge.style.cssText='display:inline-block;margin-top:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;background:'+col.bg+';color:'+col.text+';border:1px solid '+col.border+';';
+  // Campaign description
+  const descEl=document.getElementById('cq-camp-desc');
+  descEl.textContent=camp&&camp.desc?camp.desc:'';
+  // Clickable phone and email
+  document.getElementById('cq-phone').innerHTML=c.phone?'<a href="tel:'+c.phone+'" style="color:var(--ink);text-decoration:none;font-size:16px;font-weight:500;">'+c.phone+'</a> <span title="Copy" onclick="copyToClipboard(\''+c.phone+'\')" style="cursor:pointer;opacity:.5;font-size:12px;">⧉</span>':'—';
+  document.getElementById('cq-email').innerHTML=c.email?'<a href="mailto:'+c.email+'" style="color:var(--ink);text-decoration:none;">'+c.email+'</a> <span title="Copy" onclick="copyToClipboard(\''+c.email+'\')" style="cursor:pointer;opacity:.5;font-size:12px;">⧉</span>':'—';
   document.getElementById('cq-notes').value='';
 
   // C7 link
@@ -2084,8 +2135,9 @@ function showQueueCard(){
   const sidebar=document.getElementById('cq-sidebar');
   sidebar.innerHTML='';
   CQ.queue.slice(CQ.idx+1,CQ.idx+9).forEach((contact,i)=>{
+    const col=getCampColor(contact.campId);
     const d=document.createElement('div');
-    d.style.cssText='padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:13px;cursor:pointer;';
+    d.style.cssText='padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:13px;cursor:pointer;border-left:3px solid '+col.border+';';
     d.onmouseover=()=>d.style.background='var(--burg-f)';
     d.onmouseout=()=>d.style.background='white';
     d.onclick=()=>{CQ.idx=CQ.idx+1+i;showQueueCard();};
