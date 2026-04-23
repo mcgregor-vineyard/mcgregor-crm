@@ -552,6 +552,10 @@ select.fi{cursor:pointer;}
     <div class="mhdr"><div class="mtitle" id="tm-title">New ticket</div><button class="mcls" onclick="closeModal('ticket-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="tm-id" />
+      <div id="decline-c7-link" style="display:none;margin-bottom:12px;padding:8px 12px;background:var(--d-bg);border-radius:6px;font-size:12px;">
+        <span style="color:var(--d-tx);font-weight:500;">⚠ View declined shipments in Commerce7 → </span>
+        <a href="https://mcgregor-vineyard.admin.platform.commerce7.com/club/subscription-shipment?systemNote=Yes&status=Active" target="_blank" style="color:var(--d-tx);font-weight:600;">Open declined shipments list ↗</a>
+      </div>
       <div class="fr"><label class="fl">Subject *</label><input type="text" class="fi" id="tm-subject" placeholder="Brief description of the issue" /></div>
       <div class="f2">
         <div class="fr"><label class="fl">Type</label>
@@ -1578,6 +1582,8 @@ function openNewTicket(customerId,customerName){
   document.getElementById('tm-customer-phone').value='';
   document.getElementById('tm-customer-dropdown').style.display='none';
   document.getElementById('tm-customer-info').style.display='none';
+  const linkEl=document.getElementById('decline-c7-link');
+  if(linkEl)linkEl.style.display='none';
   openModal('ticket-modal');
 }
 
@@ -1896,8 +1902,10 @@ function openDeclineTicket(){
   document.getElementById('tm-customer-phone').value='';
   document.getElementById('tm-customer-dropdown').style.display='none';
   document.getElementById('tm-customer-info').style.display='none';
+  // Show declined shipments link
+  const linkEl=document.getElementById('decline-c7-link');
+  if(linkEl)linkEl.style.display='block';
   openModal('ticket-modal');
-  // Focus the customer search so they can start typing immediately
   setTimeout(()=>document.getElementById('tm-customer-search').focus(),200);
 }
 
