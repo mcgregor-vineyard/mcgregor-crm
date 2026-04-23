@@ -269,12 +269,10 @@ select.fi{cursor:pointer;}
             </select>
           </div>
           <div style="display:flex;gap:8px;">
-            <button class="btn" id="check-resolved-btn" onclick="checkResolvedDeclines()" title="Re-check Commerce7 and resolve tickets where payment is no longer declined">↻ Check resolved</button>
-            <button class="btn" id="sync-declines-btn" onclick="syncDeclinedShipments()" title="Fetch declined club shipments from Commerce7 and create tickets">⬇ Sync declines</button>
+            <button class="btn" onclick="openDeclineTicket()" style="border-color:var(--d-tx);color:var(--d-tx);">⚠ Club payment decline</button>
             <button class="btn btnp" onclick="openNewTicket()">+ New ticket</button>
           </div>
         </div>
-        <div id="declines-status" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;"></div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
           <div class="dsc"><div class="dsn" id="tk-open">0</div><div class="dsl">Open</div></div>
           <div class="dsc"><div class="dsn" id="tk-inprog">0</div><div class="dsl">In progress</div></div>
@@ -1879,192 +1877,28 @@ async function toggleReminder(id){
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
-// ---- Club Decline Sync ----
-const DECLINE_TICKET_TYPE='Club membership issue';
-const DECLINE_TICKET_SUBJECT_PREFIX='Club shipment payment declined';
-
-function setDeclinesStatus(msg,type='info'){
-  const el=document.getElementById('declines-status');
-  if(!el)return;
-  el.style.display='block';
-  el.style.background=type==='ok'?'var(--s-bg)':type==='err'?'var(--d-bg)':'var(--i-bg)';
-  el.style.color=type==='ok'?'var(--s-tx)':type==='err'?'var(--d-tx)':'var(--i-tx)';
-  el.textContent=msg;
-}
-
-async function fetchDeclinedShipments(){
-  if(!CONFIG.C7_WORKER_URL)throw new Error('C7_WORKER_URL not set');
-  const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
-  const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-  const w=CONFIG.C7_WORKER_URL;
-  const base='https://api.commerce7.com/v1';
-
-  // Step 1: get all clubs and find the two target club IDs
-  const clubRes=await fetch(w+'?url='+encodeURIComponent(base+'/club?limit=50'),{headers});
-  if(!clubRes.ok)throw new Error('Could not fetch clubs: '+clubRes.status);
-  const clubData=await clubRes.json();
-  const targetNames=['McGregor Vineyard Wine Club','McGregor Vineyard Library Wine Club'];
-  const targetClubs=(clubData.clubs||[]).filter(c=>targetNames.includes(c.title));
-  if(!targetClubs.length)throw new Error('Could not find target clubs. Found: '+(clubData.clubs||[]).map(c=>c.title).join(', '));
-  const clubIds=targetClubs.map(c=>c.id);
-  console.log('Target clubs:',targetClubs.map(c=>c.title+' ('+c.id+')').join(', '));
-
-  // Step 2: fetch active memberships for only these two clubs
-  const declined=[];
-  for(const clubId of clubIds){
-    const clubTitle=targetClubs.find(c=>c.id===clubId).title;
-    let page=1;const perPage=50;let hasMore=true;
-    while(hasMore){
-      await new Promise(r=>setTimeout(r,700)); // rate limit safety
-      const url=base+'/club-membership?clubId='+clubId+'&status=Active&limit='+perPage+'&page='+page;
-      const res=await fetch(w+'?url='+encodeURIComponent(url),{headers});
-      if(!res.ok){
-        const b=await res.text();
-        throw new Error('Membership fetch failed (club '+clubTitle+' p'+page+'): '+res.status+' '+b.slice(0,100));
-      }
-      const data=await res.json();
-      const memberships=data.clubMemberships||[];
-      const total=data.total||0;
-
-      // Log first record's subscription field for debugging
-      if(page===1&&memberships.length){
-        const m=memberships[0];
-        console.log('Club:',clubTitle,'Total active:',total);
-        console.log('subscription field:',JSON.stringify(m.subscription).slice(0,300));
-        console.log('tenderTypes:',JSON.stringify(m.tenderTypes).slice(0,200));
-        console.log('onHolds:',JSON.stringify(m.onHolds).slice(0,200));
-      }
-
-      for(const m of memberships){
-        // Check subscription object for decline status
-        const sub=m.subscription||{};
-        const isDeclined=
-          sub.paymentStatus==='Declined'||
-          sub.status==='Declined'||
-          sub.lastPaymentStatus==='Declined'||
-          sub.declineStatus==='Declined'||
-          m.paymentDeclined===true||
-          (m.tenderTypes||[]).some(t=>t.status==='Declined'||t.paymentStatus==='Declined');
-
-        if(isDeclined){
-          const cust=m.customer||{};
-          declined.push({
-            id:m.id,
-            customerId:m.customerId,
-            customerName:(cust.firstName||'')+(cust.lastName?' '+cust.lastName:''),
-            customerEmail:(cust.emails&&cust.emails[0])?cust.emails[0].email:'',
-            customerPhone:(cust.phones&&cust.phones[0])?cust.phones[0].phone:'',
-            clubTitle
-          });
-        }
-      }
-      hasMore=page*perPage<total;
-      page++;
-      if(memberships.length<perPage)hasMore=false;
-    }
-  }
-
-  console.log('Total declined found:',declined.length);
-  return declined;
-}
-
-async function syncDeclinedShipments(){
-  const btn=document.getElementById('sync-declines-btn');
-  btn.textContent='Syncing...';btn.disabled=true;
-  setDeclinesStatus('Fetching declined shipments from Commerce7...','info');
-  try{
-    const shipments=await fetchDeclinedShipments();
-    if(!shipments.length){
-      setDeclinesStatus('No declined club memberships found. Check browser console (F12) for field names — the correct status field may need adjustment.','ok');
-      return;
-    }
-    let created=0,skipped=0;
-    for(const s of shipments){
-      const customerId=s.customerId||'';
-      const customerName=(s.customer&&(s.customer.firstName+' '+s.customer.lastName))||s.customerName||'Unknown member';
-      const customerEmail=(s.customer&&s.customer.emails&&s.customer.emails[0])?s.customer.emails[0].email:'';
-      const customerPhone=(s.customer&&s.customer.phones&&s.customer.phones[0])?s.customer.phones[0].phone:'';
-      const shipmentId=s.id||'';
-      // Check if ticket already exists for this shipment
-      const exists=S.tickets.some(t=>
-        t.type===DECLINE_TICKET_TYPE&&
-        t.status!=='Resolved'&&
-        (t.refShipmentId===shipmentId||(t.customerId===customerId&&t.subject.startsWith(DECLINE_TICKET_SUBJECT_PREFIX)))
-      );
-      if(exists){skipped++;continue;}
-      // Create ticket
-      const id=uid();const createdAt=today();
-      const ticket={
-        id,
-        subject:DECLINE_TICKET_SUBJECT_PREFIX+(customerName?' — '+customerName:''),
-        type:DECLINE_TICKET_TYPE,
-        priority:'High',
-        status:'Open',
-        customerId,
-        customerName,
-        customerEmail,
-        customerPhone,
-        orderNo:'',
-        assignee:-1,
-        createdAt,
-        refShipmentId:shipmentId
-      };
-      await sheetsAppend('Tickets!A:L',[[id,ticket.subject,ticket.type,ticket.priority,ticket.status,ticket.customerId,ticket.customerName,ticket.orderNo,ticket.assignee,createdAt,ticket.customerEmail,ticket.customerPhone]]);
-      // Add initial note
-      const msgId=uid();
-      const note='Automatic ticket: Club shipment payment declined in Commerce7.'+(s.clubTitle?' Club: '+s.clubTitle:'')+(s.total?' Amount: '+fmt$(Math.round(s.total)/100):'');
-      await sheetsAppend('TicketMessages!A:G',[[msgId,id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System',createdAt,'']]);
-      S.tickets.push(ticket);
-      S.ticketMsgs.push({id:msgId,ticketId:id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',createdAt,method:''});
-      created++;
-    }
-    setDeclinesStatus('Done — '+created+' new ticket'+(created!==1?'s':'')+' created, '+skipped+' already existed.','ok');
-    renderTickets();updateCounts();
-  }catch(e){
-    setDeclinesStatus('Error: '+e.message,'err');
-  }finally{
-    btn.textContent='⬇ Sync declines';btn.disabled=false;
-  }
-}
-
-async function checkResolvedDeclines(){
-  const btn=document.getElementById('check-resolved-btn');
-  btn.textContent='Checking...';btn.disabled=true;
-  setDeclinesStatus('Checking Commerce7 for resolved declines...','info');
-  try{
-    const shipments=await fetchDeclinedShipments();
-    const stillDeclinedIds=new Set(shipments.map(s=>s.id));
-    const stillDeclinedCustomerIds=new Set(shipments.map(s=>s.customerId).filter(Boolean));
-    // Find open decline tickets
-    const openDeclineTickets=S.tickets.filter(t=>
-      t.type===DECLINE_TICKET_TYPE&&
-      t.status!=='Resolved'&&
-      t.subject.startsWith(DECLINE_TICKET_SUBJECT_PREFIX)
-    );
-    let resolved=0;
-    for(const t of openDeclineTickets){
-      // Resolve if customer no longer has a declined shipment
-      const stillDeclined=t.refShipmentId
-        ?stillDeclinedIds.has(t.refShipmentId)
-        :stillDeclinedCustomerIds.has(t.customerId);
-      if(!stillDeclined){
-        t.status='Resolved';
-        await updateTicketInSheet(t);
-        // Add auto-resolution message
-        const msgId=uid();const createdAt=today();
-        const note='Auto-resolved: Payment decline cleared in Commerce7.';
-        await sheetsAppend('TicketMessages!A:G',[[msgId,t.id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System',createdAt,'']]);
-        S.ticketMsgs.push({id:msgId,ticketId:t.id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',createdAt,method:''});
-        resolved++;
-      }
-    }
-    setDeclinesStatus('Done — '+resolved+' ticket'+(resolved!==1?'s':'')+' auto-resolved.','ok');
-    renderTickets();updateCounts();
-  }catch(e){
-    setDeclinesStatus('Error: '+e.message,'err');
-  }finally{
-    btn.textContent='↻ Check resolved';btn.disabled=false;
-  }
+// ---- Club Decline Tickets ----
+function openDeclineTicket(){
+  // Pre-fill the new ticket modal with decline defaults
+  document.getElementById('tm-id').value='';
+  document.getElementById('tm-title').textContent='New ticket';
+  document.getElementById('tm-subject').value='Club shipment payment declined';
+  document.getElementById('tm-type').value='Club membership issue';
+  document.getElementById('tm-priority').value='High';
+  document.getElementById('tm-status').value='Open';
+  document.getElementById('tm-order').value='';
+  document.getElementById('tm-note').value='Club shipment payment declined. Please contact member to update payment method.';
+  document.getElementById('tm-assignee').value='-1';
+  document.getElementById('tm-customer-search').value='';
+  document.getElementById('tm-customer-id').value='';
+  document.getElementById('tm-customer-name').value='';
+  document.getElementById('tm-customer-email').value='';
+  document.getElementById('tm-customer-phone').value='';
+  document.getElementById('tm-customer-dropdown').style.display='none';
+  document.getElementById('tm-customer-info').style.display='none';
+  openModal('ticket-modal');
+  // Focus the customer search so they can start typing immediately
+  setTimeout(()=>document.getElementById('tm-customer-search').focus(),200);
 }
 
 // ---- Export ----
