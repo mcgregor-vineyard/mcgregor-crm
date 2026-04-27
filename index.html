@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.107</div></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.108</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -2345,17 +2345,17 @@ async function loadUnfulfilledCount(o){
     el.textContent=count+' order'+(count!==1?'s':'');
     el.style.background=count>0?'var(--d-bg)':'var(--s-bg)';
     el.style.color=count>0?'var(--d-tx)':'var(--s-tx)';
-    // Calculate and store oldest order date from live C7 data
+    // Update oldest order age in the row
     if(unfulfilled.length){
       const dates=unfulfilled.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
       const oldest=dates[0]||'';
-      if(oldest&&oldest!==o.oldestOrderDate){
+      if(oldest){
         o.oldestOrderDate=oldest;
-        // Update age display in row
         const ageDays=orderAgeDays(oldest);
-        const ageEl=el.closest('tr')?.querySelector('td:nth-child(5)');
-        if(ageEl&&ageDays!==null){
-          ageEl.innerHTML='<span style="font-size:12px;font-weight:500;color:'+(ageDays>=180?'var(--d-tx)':ageDays>=90?'var(--w-tx)':'var(--ink-m)')+';">'+ageDays+'d</span>';
+        const row=el.closest('tr');
+        if(row&&ageDays!==null){
+          const ageCell=row.cells[4];
+          if(ageCell)ageCell.innerHTML='<span style="font-size:12px;font-weight:500;color:'+(ageDays>=180?'var(--d-tx)':ageDays>=90?'var(--w-tx)':'var(--ink-m)')+';">'+ageDays+'d</span>';
         }
       }
     }
@@ -2535,14 +2535,16 @@ async function loadOrderThreadOrders(o){
       return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs===''||fs==='not_fulfilled';
     });
     if(!orders.length){panel.innerHTML='<div style="font-size:12px;padding:8px 10px;background:var(--s-bg);color:var(--s-tx);border-radius:6px;">✓ No unfulfilled orders found</div>';return;}
-    // Calculate total bottles across all unfulfilled orders
-    let totalBottles=0;
+    // Calculate totals across all unfulfilled orders
+    let totalBottles=0;let totalCost=0;
     let html='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:8px;">Unfulfilled orders ('+orders.length+')</div>';
     html+='<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
     orders.forEach(ord=>{
       const paidDate=(ord.orderPaidDate||ord.createdAt||'').slice(0,10);
       const ageDays=paidDate?Math.floor((Date.now()-new Date(paidDate).getTime())/(1000*60*60*24)):null;
-      const total=ord.total!=null?fmt$(ord.total/100):'';
+      const ordCost=ord.total!=null?ord.total/100:0;
+      totalCost+=ordCost;
+      const total=ordCost>0?fmt$(ordCost):'';
       const channel=ord.channel||ord.orderChannel||'';
       let ordBottles=0;
       const items=(ord.orderItems||[]).map(i=>{
@@ -2566,13 +2568,12 @@ async function loadOrderThreadOrders(o){
         +'</div></div>';
     });
     html+='</div>';
-    // Bottle summary
-    if(totalBottles>0){
-      html+='<div style="padding:10px 14px;background:var(--burg-f);border-radius:7px;border:1px solid var(--bdr-s);display:flex;align-items:center;justify-content:space-between;">'
-        +'<span style="font-size:13px;font-weight:500;color:var(--burg);">Total unfulfilled bottles</span>'
-        +'<span style="font-size:22px;font-weight:600;color:var(--burg);">'+totalBottles+'</span>'
-        +'</div>';
-    }
+    // Summary bar
+    html+='<div style="padding:12px 16px;background:var(--burg-f);border-radius:7px;border:1px solid var(--bdr-s);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">'
+      +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Orders</div><div style="font-size:22px;font-weight:600;color:var(--burg);">'+orders.length+'</div></div>'
+      +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Bottles</div><div style="font-size:22px;font-weight:600;color:var(--burg);">'+totalBottles+'</div></div>'
+      +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Total value</div><div style="font-size:22px;font-weight:600;color:var(--burg);">'+fmt$(totalCost)+'</div></div>'
+      +'</div>';
     panel.innerHTML=html;
     o.syncedAt=today();
   }catch(e){panel.innerHTML='<div style="font-size:12px;color:var(--d-tx);">Error loading orders: '+e.message+'</div>';}
