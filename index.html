@@ -2752,19 +2752,21 @@ async function syncOutstandingOrders(){
       if(!byCustomer[cid])byCustomer[cid]={customerId:cid,customerName:(ord.customer&&((ord.customer.firstName||'')+' '+(ord.customer.lastName||'')).trim())||'Unknown',customerEmail:(ord.customer&&ord.customer.emails&&ord.customer.emails[0])?ord.customer.emails[0].email:'',customerPhone:(ord.customer&&ord.customer.phones&&ord.customer.phones[0])?ord.customer.phones[0].phone:'',orders:[]};
       byCustomer[cid].orders.push(ord);
     });
-    let created=0,skipped=0;
+    let created=0,skippedAge=0,skippedDupe=0;
     // Filter to customers with orders 180+ days old
     const cutoffDate=new Date(Date.now()-180*24*60*60*1000).toISOString().slice(0,10);
     const newCustRows=[];const newMsgRows=[];
+    console.log('Customers with unfulfilled orders:',Object.keys(byCustomer).length,'Cutoff date (180d):',cutoffDate);
     for(const cid of Object.keys(byCustomer)){
       const cust=byCustomer[cid];
       // Find oldest paid date
       const dates=cust.orders.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
       const oldestDate=dates[0]||'';
+      console.log('Customer:',cust.customerName,'oldestDate:',oldestDate,'cutoff:',cutoffDate,'passes:',(oldestDate&&oldestDate<=cutoffDate));
       // Only include if oldest order is 180+ days old
-      if(oldestDate&&oldestDate>cutoffDate){skipped++;continue;}
+      if(oldestDate&&oldestDate>cutoffDate){skippedAge++;continue;}
       const exists=S.orderCustomers.some(o=>o.customerId===cid&&o.status!=='Resolved');
-      if(exists){skipped++;continue;}
+      if(exists){skippedDupe++;continue;}
       const id=uid();const createdAt=today();
       const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:'',pickupDate:'',oldestOrderDate:oldestDate};
       const msgId=uid();const note=cust.orders.length+' unfulfilled order'+(cust.orders.length!==1?'s':'')+' found in Commerce7 (oldest: '+oldestDate+').';
@@ -2778,7 +2780,7 @@ async function syncOutstandingOrders(){
     if(newCustRows.length)await sheetsAppend('OrderCustomers!A:L',newCustRows);
     if(newMsgRows.length)await sheetsAppend('OrderMessages!A:G',newMsgRows);
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
-    statusEl.textContent='Done — '+created+' customer'+(created!==1?'s':'')+' added, '+skipped+' already tracked.';
+    statusEl.textContent='Done — '+created+' new customer'+(created!==1?'s':'')+' added'+(skippedAge?' · '+skippedAge+' under 180 days':'')+(skippedDupe?' · '+skippedDupe+' already tracked':'')+'.';
     renderOrders();
   }catch(e){statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';statusEl.textContent='Error: '+e.message;}
   finally{btn.textContent='⬇ Sync from C7';btn.disabled=false;}
