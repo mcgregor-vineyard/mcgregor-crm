@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.5);letter-spacing:.05em;margin-top:1px;">v0.100</div></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.101</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -332,7 +332,7 @@ select.fi{cursor:pointer;}
         <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;margin-bottom:8px;">Active</div>
         <div class="tbl-wrap" style="margin-bottom:24px;">
           <table class="tbl" style="table-layout:auto;">
-            <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Unfulfilled</th><th>Pickup date</th><th>Status</th><th>Last followup</th><th>Msgs</th><th></th></tr></thead>
+            <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Unfulfilled</th><th>Order age</th><th>Promised pickup</th><th>Status</th><th>Last followup</th><th>Msgs</th><th></th></tr></thead>
             <tbody id="orders-tbody"></tbody>
           </table>
         </div>
@@ -621,7 +621,7 @@ select.fi{cursor:pointer;}
           </select>
         </div>
       </div>
-      <div class="fr"><label class="fl">Pickup commitment date</label>
+      <div class="fr"><label class="fl">Promised pickup date</label>
         <input type="date" class="fi" id="ocm-pickup-date" />
         <div style="font-size:11px;color:var(--ink-f);margin-top:3px;">If set, a reminder will be created automatically in the Reminders tab.</div>
       </div>
@@ -658,7 +658,7 @@ select.fi{cursor:pointer;}
         </select>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 12px;background:var(--cream);border-radius:7px;">
-        <div style="font-size:12px;color:var(--ink-m);white-space:nowrap;">📅 Pickup commitment:</div>
+        <div style="font-size:12px;color:var(--ink-m);white-space:nowrap;">📅 Promised pickup:</div>
         <input type="date" class="fi" id="ot-pickup-date" style="flex:1;" onchange="updatePickupDate()" />
         <span id="ot-pickup-status" style="font-size:11px;color:var(--ink-f);"></span>
       </div>
@@ -941,7 +941,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev/',
+  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -1071,7 +1071,7 @@ async function ensureSheets(){
   if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:L1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone']]);
   if(needed.includes('TicketMessages'))await sheetsUpdate('TicketMessages!A1:G1',[['ID','TicketID','Message','Author','AuthorName','CreatedAt','Method']]);
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
-  if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:K1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate']]);
+  if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:L1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate']]);
   if(needed.includes('OrderMessages'))await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
 }
 
@@ -1091,7 +1091,7 @@ async function loadFromSheets(){
     S.tickets=ticketRows.filter(r=>r[0]).map(r=>({id:r[0],subject:r[1]||'',type:r[2]||'',priority:r[3]||'Normal',status:r[4]||'Open',customerId:r[5]||'',customerName:r[6]||'',orderNo:r[7]||'',assignee:parseInt(r[8])||0,createdAt:r[9]||'',customerEmail:r[10]||'',customerPhone:r[11]||''}));
     S.ticketMsgs=ticketMsgRows.filter(r=>r[0]).map(r=>({id:r[0],ticketId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||'',method:r[6]||''}));
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
-    S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||''}));
+    S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||''}));
     S.orderMsgs=orderMsgRows.filter(r=>r[0]).map(r=>({id:r[0],orderCustomerId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
     renderAll();
@@ -2279,13 +2279,24 @@ function renderOrders(){
   if(rc)rc.textContent='('+resolvedList.length+')';
 }
 
+function orderAgeDays(dateStr){
+  if(!dateStr)return null;
+  const d=new Date(dateStr);if(isNaN(d))return null;
+  return Math.floor((Date.now()-d.getTime())/(1000*60*60*24));
+}
+
 function buildOrderRow(o,showStatus){
   const msgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id);
+  const humanMsgs=msgs.filter(m=>!(m.message&&m.message.match(/^\d+ unfulfilled order/)&&m.method===''));
   const lastMsg=msgs.length?msgs[msgs.length-1]:null;
   const m=TEAM[o.assignee]||null;
   const assigneeHtml=m
     ?'<div style="display:flex;align-items:center;gap:5px;"><div class="av '+m.cls+'" style="width:16px;height:16px;font-size:7px;">'+m.init+'</div></div>'
     :'<span style="font-size:11px;color:var(--ink-f);">—</span>';
+  const ageDays=orderAgeDays(o.oldestOrderDate);
+  const ageHtml=ageDays!==null
+    ?'<span style="font-size:12px;font-weight:500;color:'+(ageDays>=180?'var(--d-tx)':ageDays>=90?'var(--w-tx)':'var(--ink-m)')+';">'+ageDays+'d</span>'
+    :'<span style="font-size:12px;color:var(--ink-f);">—</span>';
   const tr=document.createElement('tr');tr.style.cursor='pointer';tr.onclick=()=>openOrderThread(o.id);
   if(showStatus){
     const pd=o.pickupDate||'';
@@ -2295,10 +2306,11 @@ function buildOrderRow(o,showStatus){
       <td style="font-size:12px;" onclick="event.stopPropagation();">${emailLink(o.customerEmail)}</td>
       <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(o.customerPhone)}</td>
       <td><span id="ord-count-${o.id}" class="bdg" style="background:var(--w-bg);color:var(--w-tx);">...</span></td>
+      <td>${ageHtml}</td>
       <td style="font-size:12px;">${pdDisplay}</td>
       <td><span class="bdg ${TICKET_STATUS_COLORS[o.status]||'bdg-g'}">${o.status}</span></td>
       <td style="font-size:12px;color:var(--ink-m);">${lastMsg?lastMsg.createdAt:o.createdAt}</td>
-      <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${msgs.length}</span></td>
+      <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${humanMsgs.length}</span></td>
       <td>${assigneeHtml}</td>`;
   } else {
     tr.innerHTML=`
@@ -2307,10 +2319,9 @@ function buildOrderRow(o,showStatus){
       <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(o.customerPhone)}</td>
       <td><span class="bdg bdg-s">Resolved</span></td>
       <td style="font-size:12px;color:var(--ink-m);">${lastMsg?lastMsg.createdAt:o.createdAt}</td>
-      <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${msgs.length} msg${msgs.length!==1?'s':''}</span></td>
+      <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${humanMsgs.length}</span></td>
       <td>${assigneeHtml}</td>`;
   }
-  // Async load unfulfilled order count
   if(o.customerId&&showStatus)loadUnfulfilledCount(o);
   return tr;
 }
@@ -2435,7 +2446,7 @@ async function saveOrderCustomer(){
   const pickupDate=document.getElementById('ocm-pickup-date').value||'';
   const o={id,customerId:document.getElementById('ocm-customer-id').value,customerName:name.trim(),customerEmail:document.getElementById('ocm-customer-email').value,customerPhone:document.getElementById('ocm-customer-phone').value,status:document.getElementById('ocm-status').value,assignee:parseInt(document.getElementById('ocm-assignee').value),createdAt,syncedAt:'',notes:document.getElementById('ocm-note').value,pickupDate};
   try{
-    await sheetsAppend('OrderCustomers!A:K',[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate]]);
+    await sheetsAppend('OrderCustomers!A:L',[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate,o.oldestOrderDate||'']]);
     S.orderCustomers.push(o);
     if(o.notes){
       const msgId=uid();
@@ -2453,13 +2464,15 @@ async function openOrderThread(id){
   S.activeOrderId=id;
   const o=S.orderCustomers.find(x=>x.id===id);if(!o)return;
   document.getElementById('ot-title').textContent=o.customerName||'Order followup';
-  document.getElementById('ot-meta').textContent='Added '+o.createdAt;
-  // Customer info
-  let custHtml='';
-  if(o.customerName)custHtml+='<span style="font-weight:500;">'+o.customerName+'</span>';
-  if(o.customerEmail)custHtml+=' &nbsp;·&nbsp; <a href="mailto:'+o.customerEmail+'" style="color:var(--ink);">'+o.customerEmail+'</a>';
-  if(o.customerPhone)custHtml+=' &nbsp;·&nbsp; <a href="tel:'+o.customerPhone+'" style="color:var(--ink);">'+o.customerPhone+'</a>';
+  document.getElementById('ot-meta').textContent='Added '+o.createdAt+(o.oldestOrderDate?' · Oldest order: '+o.oldestOrderDate:'');
+  // Prominent customer info
+  let custHtml='<div style="font-family:\'Cormorant Garamond\',serif;font-size:20px;font-weight:600;color:var(--burg);margin-bottom:6px;">'+o.customerName+'</div>';
+  custHtml+='<div style="display:flex;gap:16px;flex-wrap:wrap;">';
+  if(o.customerEmail)custHtml+='<div style="font-size:13px;"><span style="color:var(--ink-f);">✉ </span><a href="mailto:'+o.customerEmail+'" style="color:var(--ink);">'+o.customerEmail+'</a> <span onclick="copyToClipboard(\''+o.customerEmail+'\')" style="cursor:pointer;opacity:.5;font-size:11px;">⧉</span></div>';
+  if(o.customerPhone)custHtml+='<div style="font-size:13px;"><span style="color:var(--ink-f);">📞 </span><a href="tel:'+o.customerPhone+'" style="color:var(--ink);">'+o.customerPhone+'</a> <span onclick="copyToClipboard(\''+o.customerPhone+'\')" style="cursor:pointer;opacity:.5;font-size:11px;">⧉</span></div>';
+  custHtml+='</div>';
   document.getElementById('ot-customer-info').innerHTML=custHtml;
+  document.getElementById('ot-customer-info').style.cssText='font-size:13px;padding:10px 12px;background:var(--burg-f);border-radius:7px;margin-top:6px;display:block;';
   // C7 link
   const c7link=document.getElementById('ot-c7link');
   if(o.customerId){c7link.href='https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+o.customerId;c7link.style.display='inline';}
@@ -2497,30 +2510,51 @@ async function loadOrderThreadOrders(o){
     if(!res.ok){panel.innerHTML='<div style="font-size:12px;color:var(--d-tx);">Could not load orders ('+res.status+')</div>';return;}
     const data=await res.json();
     const allOrders=data.orders||[];
-    // Log fulfillment status values to console for debugging
-    const statuses=[...new Set(allOrders.map(o=>o.fulfillmentStatus))];
-    console.log('Order fulfillment statuses for this customer:',statuses);
     // Filter to unfulfilled only
-    const orders=allOrders.filter(o=>{
-      const fs=(o.fulfillmentStatus||'').toLowerCase();
+    const orders=allOrders.filter(ord=>{
+      const fs=(ord.fulfillmentStatus||'').toLowerCase();
       return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs===''||fs==='not_fulfilled';
     });
     if(!orders.length){panel.innerHTML='<div style="font-size:12px;padding:8px 10px;background:var(--s-bg);color:var(--s-tx);border-radius:6px;">✓ No unfulfilled orders found</div>';return;}
+    // Calculate total bottles across all unfulfilled orders
+    let totalBottles=0;
     let html='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:8px;">Unfulfilled orders ('+orders.length+')</div>';
-    html+='<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:4px;">';
+    html+='<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
     orders.forEach(ord=>{
-      const items=(ord.orderItems||[]).map(i=>i.productTitle+(i.quantity>1?' ×'+i.quantity:'')).join(', ');
+      const paidDate=(ord.orderPaidDate||ord.createdAt||'').slice(0,10);
+      const ageDays=paidDate?Math.floor((Date.now()-new Date(paidDate).getTime())/(1000*60*60*24)):null;
       const total=ord.total!=null?fmt$(ord.total/100):'';
-      const date=ord.createdAt?(ord.createdAt||'').slice(0,10):'';
-      html+='<div style="padding:8px 10px;background:var(--d-bg);border-radius:6px;border-left:3px solid var(--d-tx);">'
-        +'<div style="display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:500;color:var(--d-tx);">Order #'+(ord.orderNumber||ord.id)+'</span><span style="font-size:12px;color:var(--ink-m);">'+date+'</span></div>'
-        +(items?'<div style="font-size:12px;color:var(--ink-m);margin-top:3px;">'+items+'</div>':'')
-        +(total?'<div style="font-size:12px;font-weight:500;color:var(--ink);margin-top:2px;">'+total+'</div>':'')
-        +'</div>';
+      const channel=ord.channel||ord.orderChannel||'';
+      let ordBottles=0;
+      const items=(ord.orderItems||[]).map(i=>{
+        const qty=parseInt(i.quantity)||0;
+        ordBottles+=qty;
+        totalBottles+=qty;
+        return i.productTitle+(qty>1?' ×'+qty:'');
+      }).join(', ');
+      html+='<div style="padding:10px 12px;background:var(--d-bg);border-radius:6px;border-left:3px solid var(--d-tx);">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+        +'<span style="font-size:13px;font-weight:500;color:var(--d-tx);">Order #'+(ord.orderNumber||ord.id)+'</span>'
+        +'<div style="text-align:right;font-size:11px;color:var(--ink-m);">'
+        +(paidDate?'Paid: '+paidDate:'')
+        +(ageDays!==null?' · <span style="color:'+(ageDays>=180?'var(--d-tx)':'var(--ink-m)')+';">'+ageDays+'d old</span>':'')
+        +'</div></div>'
+        +(items?'<div style="font-size:12px;color:var(--ink-m);margin-top:4px;">'+items+'</div>':'')
+        +'<div style="display:flex;gap:12px;margin-top:5px;font-size:12px;">'
+        +(ordBottles?'<span style="font-weight:500;color:var(--ink);">🍾 '+ordBottles+' bottle'+(ordBottles!==1?'s':'')+'</span>':'')
+        +(channel?'<span style="color:var(--ink-m);">'+channel+'</span>':'')
+        +(total?'<span style="font-weight:500;color:var(--ink);">'+total+'</span>':'')
+        +'</div></div>';
     });
     html+='</div>';
+    // Bottle summary
+    if(totalBottles>0){
+      html+='<div style="padding:10px 14px;background:var(--burg-f);border-radius:7px;border:1px solid var(--bdr-s);display:flex;align-items:center;justify-content:space-between;">'
+        +'<span style="font-size:13px;font-weight:500;color:var(--burg);">Total unfulfilled bottles</span>'
+        +'<span style="font-size:22px;font-weight:600;color:var(--burg);">'+totalBottles+'</span>'
+        +'</div>';
+    }
     panel.innerHTML=html;
-    // Update synced time
     o.syncedAt=today();
   }catch(e){panel.innerHTML='<div style="font-size:12px;color:var(--d-tx);">Error loading orders: '+e.message+'</div>';}
 }
@@ -2608,7 +2642,7 @@ async function updateOrderInSheet(o){
   try{
     const allRows=await sheetsGet('OrderCustomers!A2:K');
     const rowIdx=allRows.findIndex(r=>r[0]===o.id);
-    if(rowIdx>=0)await sheetsUpdate('OrderCustomers!A'+(rowIdx+2)+':K'+(rowIdx+2),[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate||'']]);
+    if(rowIdx>=0)await sheetsUpdate('OrderCustomers!A'+(rowIdx+2)+':L'+(rowIdx+2),[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate||'',o.oldestOrderDate||'']]);
   }catch(e){showToast('Error saving: '+e.message,'err');}
 }
 
@@ -2661,22 +2695,29 @@ async function syncOutstandingOrders(){
       byCustomer[cid].orders.push(ord);
     });
     let created=0,skipped=0;
+    // Filter to customers with orders 180+ days old
+    const cutoffDate=new Date(Date.now()-180*24*60*60*1000).toISOString().slice(0,10);
     const custRows=[];const msgRows=[];
     for(const cid of Object.keys(byCustomer)){
       const cust=byCustomer[cid];
+      // Find oldest paid date
+      const dates=cust.orders.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
+      const oldestDate=dates[0]||'';
+      // Only include if oldest order is 180+ days old
+      if(oldestDate&&oldestDate>cutoffDate){skipped++;continue;}
       const exists=S.orderCustomers.some(o=>o.customerId===cid&&o.status!=='Resolved');
       if(exists){skipped++;continue;}
       const id=uid();const createdAt=today();
-      const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:'',pickupDate:''};
-      const msgId=uid();const note=cust.orders.length+' unfulfilled order'+(cust.orders.length!==1?'s':'')+' found in Commerce7.';
-      custRows.push([o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate]);
+      const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:'',pickupDate:'',oldestOrderDate:oldestDate};
+      const msgId=uid();const note=cust.orders.length+' unfulfilled order'+(cust.orders.length!==1?'s':'')+' found in Commerce7 (oldest: '+oldestDate+').';
+      custRows.push([o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate,o.oldestOrderDate]);
       msgRows.push([msgId,id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System','',createdAt]);
       S.orderCustomers.push(o);
       S.orderMsgs.push({id:msgId,orderCustomerId:id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',method:'',createdAt});
       created++;
     }
     // Write all rows in two batch calls
-    if(custRows.length)await sheetsAppend('OrderCustomers!A:K',custRows);
+    if(custRows.length)await sheetsAppend('OrderCustomers!A:L',custRows);
     if(msgRows.length)await sheetsAppend('OrderMessages!A:G',msgRows);
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
     statusEl.textContent='Done — '+created+' customer'+(created!==1?'s':'')+' added, '+skipped+' already tracked.';
