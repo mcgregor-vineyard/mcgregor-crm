@@ -2321,7 +2321,7 @@ async function loadUnfulfilledCount(o){
   try{
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&fulfillmentStatus=Not+Fulfilled&limit=50';
+    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&fulfillmentStatus=Not%20Fulfilled&limit=50';
     const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
     if(!res.ok){el.textContent='—';return;}
     const data=await res.json();
@@ -2492,7 +2492,7 @@ async function loadOrderThreadOrders(o){
   try{
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&fulfillmentStatus=Not+Fulfilled&limit=50';
+    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&fulfillmentStatus=Not%20Fulfilled&limit=50';
     const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
     if(!res.ok){panel.innerHTML='<div style="font-size:12px;color:var(--d-tx);">Could not load orders ('+res.status+')</div>';return;}
     const data=await res.json();
@@ -2626,7 +2626,7 @@ async function syncOutstandingOrders(){
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
     // Fetch orders with Not Fulfilled status
-    const url='https://api.commerce7.com/v1/order?fulfillmentStatus=Not+Fulfilled&limit=100';
+    const url='https://api.commerce7.com/v1/order?fulfillmentStatus=Not%20Fulfilled&limit=100';
     const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
     if(!res.ok)throw new Error('API error '+res.status);
     const data=await res.json();
