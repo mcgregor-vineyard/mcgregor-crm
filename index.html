@@ -1833,7 +1833,7 @@ async function lookupOrder(){
     const res=await fetch(url,{headers:{'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'}});
     if(!res.ok)throw new Error('API error '+res.status);
     const data=await res.json();
-    const orders=data.orders||[];
+    const orders=(data.orders||[]).filter(o=>{const fs=(o.fulfillmentStatus||'').toLowerCase();return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='';});
     if(!orders.length)throw new Error('Order #'+orderNum+' not found in Commerce7');
     // Fetch full order by ID to get complete product details
     const orderId=orders[0].id;
@@ -2321,11 +2321,11 @@ async function loadUnfulfilledCount(o){
   try{
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&fulfillmentStatus=Not%20Fulfilled&limit=50';
+    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&limit=50';
     const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
     if(!res.ok){el.textContent='—';return;}
     const data=await res.json();
-    const count=(data.orders||[]).length;
+    const count=(data.orders||[]).filter(o=>{const fs=(o.fulfillmentStatus||'').toLowerCase();return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='';}).length;
     el.textContent=count+' unfulfilled';
     el.style.background=count>0?'var(--d-bg)':'var(--s-bg)';
     el.style.color=count>0?'var(--d-tx)':'var(--s-tx)';
@@ -2492,7 +2492,7 @@ async function loadOrderThreadOrders(o){
   try{
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&fulfillmentStatus=Not%20Fulfilled&limit=50';
+    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&limit=50';
     const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
     if(!res.ok){panel.innerHTML='<div style="font-size:12px;color:var(--d-tx);">Could not load orders ('+res.status+')</div>';return;}
     const data=await res.json();
@@ -2625,12 +2625,20 @@ async function syncOutstandingOrders(){
   try{
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    // Fetch orders with Not Fulfilled status
-    const url='https://api.commerce7.com/v1/order?fulfillmentStatus=Not%20Fulfilled&limit=100';
+    // Fetch recent orders and filter client-side — Commerce7 422s on fulfillmentStatus filter
+    const url='https://api.commerce7.com/v1/order?limit=100&orderPaidDate=gt:2023-01-01';
     const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
-    if(!res.ok)throw new Error('API error '+res.status);
+    if(!res.ok){const b=await res.text();throw new Error('API error '+res.status+' '+b.slice(0,150));}
     const data=await res.json();
-    const orders=data.orders||[];
+    const allOrders=data.orders||[];
+    // Log unique fulfillment status values for debugging
+    const statuses=[...new Set(allOrders.map(o=>o.fulfillmentStatus))];
+    console.log('Fulfillment status values found:',statuses);
+    // Filter to unfulfilled orders client-side
+    const orders=allOrders.filter(o=>{
+      const fs=(o.fulfillmentStatus||'').toLowerCase();
+      return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='';
+    });
     if(!orders.length){statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';statusEl.textContent='No unfulfilled orders found in Commerce7.';return;}
     // Group by customer
     const byCustomer={};
