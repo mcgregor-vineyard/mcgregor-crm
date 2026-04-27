@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.114</div></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.115</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1084,7 +1084,7 @@ async function ensureSheets(){
   if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:L1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone']]);
   if(needed.includes('TicketMessages'))await sheetsUpdate('TicketMessages!A1:G1',[['ID','TicketID','Message','Author','AuthorName','CreatedAt','Method']]);
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
-  if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:L1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate']]);
+  if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:M1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate','UnfulfilledCount']]);
   if(needed.includes('OrderMessages'))await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
 }
 
@@ -1095,7 +1095,7 @@ async function loadFromSheets(){
     const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows]=await Promise.all([
       sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:J'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:H'),
-      sheetsGet('OrderCustomers!A2:J'),sheetsGet('OrderMessages!A2:G')
+      sheetsGet('OrderCustomers!A2:M'),sheetsGet('OrderMessages!A2:G')
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',attempts:[]}));
@@ -1104,7 +1104,7 @@ async function loadFromSheets(){
     S.tickets=ticketRows.filter(r=>r[0]).map(r=>({id:r[0],subject:r[1]||'',type:r[2]||'',priority:r[3]||'Normal',status:r[4]||'Open',customerId:r[5]||'',customerName:r[6]||'',orderNo:r[7]||'',assignee:parseInt(r[8])||0,createdAt:r[9]||'',customerEmail:r[10]||'',customerPhone:r[11]||''}));
     S.ticketMsgs=ticketMsgRows.filter(r=>r[0]).map(r=>({id:r[0],ticketId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||'',method:r[6]||''}));
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
-    S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||''}));
+    S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1}));
     S.orderMsgs=orderMsgRows.filter(r=>r[0]).map(r=>({id:r[0],orderCustomerId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
     renderAll();
@@ -2394,6 +2394,11 @@ function buildOrderRow(o,showStatus){
     ?'<span style="font-size:12px;font-weight:500;color:'+(ageDays>=180?'var(--d-tx)':ageDays>=90?'var(--w-tx)':'var(--ink-m)')+';">'+ageDays+'d</span>'
     :'<span style="font-size:12px;color:var(--ink-f);">—</span>';
   const tr=document.createElement('tr');tr.style.cursor='pointer';tr.onclick=()=>openOrderThread(o.id);
+  // Show cached count immediately, queue background refresh
+  const cachedCount=o.unfulfilledCount;
+  const countDisplay=cachedCount>=0
+    ?'<span id="ord-count-'+o.id+'" class="bdg" style="background:'+(cachedCount>0?'var(--d-bg)':'var(--s-bg)')+';color:'+(cachedCount>0?'var(--d-tx)':'var(--s-tx)')+';">'+cachedCount+' order'+(cachedCount!==1?'s':'')+'</span>'
+    :'<span id="ord-count-'+o.id+'" class="bdg" style="background:var(--w-bg);color:var(--w-tx);">...</span>';
   if(showStatus){
     const pd=o.pickupDate||'';
     const pdDisplay=pd?(pd<today()?'<span style="color:var(--d-tx);font-weight:500;">⚠ '+pd+'</span>':pd):'<span style="color:var(--ink-f);">—</span>';
@@ -2401,7 +2406,7 @@ function buildOrderRow(o,showStatus){
       <td style="font-weight:500;">${o.customerName||'—'}</td>
       <td style="font-size:12px;" onclick="event.stopPropagation();">${emailLink(o.customerEmail)}</td>
       <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(o.customerPhone)}</td>
-      <td><span id="ord-count-${o.id}" class="bdg" style="background:var(--w-bg);color:var(--w-tx);">...</span></td>
+      <td>${countDisplay}</td>
       <td>${ageHtml}</td>
       <td style="font-size:12px;">${pdDisplay}</td>
       <td><span class="bdg ${TICKET_STATUS_COLORS[o.status]||'bdg-g'}">${o.status}</span></td>
@@ -2418,7 +2423,7 @@ function buildOrderRow(o,showStatus){
       <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${humanMsgs.length}</span></td>
       <td>${assigneeHtml}</td>`;
   }
-  if(o.customerId&&showStatus)queueUnfulfilledCount(o);
+  if(o.customerId&&showStatus&&o.unfulfilledCount<0)queueUnfulfilledCount(o);
   return tr;
 }
 
@@ -2462,6 +2467,9 @@ async function loadUnfulfilledCount(o){
       el2.textContent=count+' order'+(count!==1?'s':'');
       el2.style.background=count>0?'var(--d-bg)':'var(--s-bg)';
       el2.style.color=count>0?'var(--d-tx)':'var(--s-tx)';
+      // Cache count and save to sheet
+      o.unfulfilledCount=count;
+      await updateOrderInSheet(o);
       // Update oldest order age
       if(unfulfilled.length){
         const dates=unfulfilled.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
@@ -2584,7 +2592,7 @@ async function saveOrderCustomer(){
   const pickupDate=document.getElementById('ocm-pickup-date').value||'';
   const o={id,customerId:document.getElementById('ocm-customer-id').value,customerName:name.trim(),customerEmail:document.getElementById('ocm-customer-email').value,customerPhone:document.getElementById('ocm-customer-phone').value,status:document.getElementById('ocm-status').value,assignee:parseInt(document.getElementById('ocm-assignee').value),createdAt,syncedAt:'',notes:document.getElementById('ocm-note').value,pickupDate};
   try{
-    await sheetsAppend('OrderCustomers!A:L',[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate,o.oldestOrderDate||'']]);
+    await sheetsAppend('OrderCustomers!A:M',[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate,o.oldestOrderDate||'','']]);
     S.orderCustomers.push(o);
     if(o.notes){
       const msgId=uid();
@@ -2643,7 +2651,7 @@ async function loadOrderThreadOrders(o){
   try{
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    // Step 1: get order list
+    // Step 1: get order list fast
     const listRes=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent('https://api.commerce7.com/v1/order?customerId='+o.customerId+'&limit=50'),{headers});
     if(!listRes.ok){panel.innerHTML='<div style="font-size:12px;color:var(--d-tx);">Could not load orders ('+listRes.status+')</div>';return;}
     const listData=await listRes.json();
@@ -2658,55 +2666,88 @@ async function loadOrderThreadOrders(o){
         +'</div>';
       return;
     }
-    panel.innerHTML='<div style="font-size:12px;color:var(--ink-m);">Loading details for '+unfulfilledList.length+' orders...</div>';
-    // Step 2: fetch each order individually to get orderItems
-    const orders=[];
+    // Step 2: render immediately from list data (no bottle counts yet)
+    function renderOrderPanel(orders,loadingBottles){
+      let totalCost=0;let totalBottles=0;
+      let html='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:8px;">Unfulfilled orders ('+orders.length+')'+(loadingBottles?' <span style=\"font-size:10px;color:var(--ink-f);\">(loading bottle counts...)</span>':'')+'</div>';
+      html+='<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
+      orders.forEach((ord,idx)=>{
+        const paidDate=(ord.orderPaidDate||ord.createdAt||'').slice(0,10);
+        const ageDays=paidDate?Math.floor((Date.now()-new Date(paidDate).getTime())/(1000*60*60*24)):null;
+        const ordCost=ord.total!=null?ord.total/100:0;
+        totalCost+=ordCost;
+        const channel=ord.channel||ord.orderChannel||'';
+        const rawItems=ord.orderItems||ord.items||ord.lineItems||ord.products||[];
+        let ordBottles=0;
+        const items=rawItems.map(i=>{
+          const qty=parseInt(i.quantity)||0;
+          ordBottles+=qty;totalBottles+=qty;
+          return i.productTitle+(qty>1?' ×'+qty:'');
+        }).join(', ');
+        html+='<div style="padding:10px 12px;background:var(--d-bg);border-radius:6px;border-left:3px solid var(--d-tx);" id="ord-detail-'+ord.id+'">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+          +'<span style="font-size:13px;font-weight:500;color:var(--d-tx);">Order #'+(ord.orderNumber||ord.id)+'</span>'
+          +'<div style="text-align:right;font-size:11px;color:var(--ink-m);">'
+          +(paidDate?'Paid: '+paidDate:'')
+          +(ageDays!==null?' · <span style="color:'+(ageDays>=180?'var(--d-tx)':'var(--ink-m)')+';">'+ageDays+'d old</span>':'')
+          +'</div></div>'
+          +(items?'<div style="font-size:12px;color:var(--ink-m);margin-top:4px;">'+items+'</div>':'<div id="ord-items-'+ord.id+'" style="font-size:12px;color:var(--ink-f);margin-top:4px;">'+(loadingBottles?'Loading items...':'—')+'</div>')
+          +'<div style="display:flex;gap:12px;margin-top:5px;font-size:12px;" id="ord-meta-'+ord.id+'">'
+          +(ordBottles?'<span style="font-weight:500;color:var(--ink);">🍾 '+ordBottles+' bottle'+(ordBottles!==1?'s':'')+'</span>':'')
+          +(channel?'<span style="color:var(--ink-m);">'+channel+'</span>':'')
+          +(ordCost>0?'<span style="font-weight:500;color:var(--ink);">'+fmt$(ordCost)+'</span>':'')
+          +'</div></div>';
+      });
+      html+='</div>';
+      html+='<div id="ord-summary-bar" style="padding:12px 16px;background:var(--burg-f);border-radius:7px;border:1px solid var(--bdr-s);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">'
+        +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Orders</div><div style="font-size:22px;font-weight:600;color:var(--burg);">'+orders.length+'</div></div>'
+        +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Bottles</div><div style="font-size:22px;font-weight:600;color:var(--burg);" id="total-bottles-display">'+(loadingBottles?'...':totalBottles)+'</div></div>'
+        +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Total value</div><div style="font-size:22px;font-weight:600;color:var(--burg);">'+fmt$(totalCost)+'</div></div>'
+        +'</div>';
+      return html;
+    }
+    // Render immediately with list data
+    panel.innerHTML=renderOrderPanel(unfulfilledList,true);
+    // Step 3: fetch individual order details in background for bottle counts
+    let totalBottles=0;
     for(const ord of unfulfilledList){
       try{
         const dr=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent('https://api.commerce7.com/v1/order/'+ord.id),{headers});
-        orders.push(dr.ok?await dr.json():ord);
-      }catch(e){orders.push(ord);}
-      await new Promise(r=>setTimeout(r,150)); // gentle rate limiting
+        if(dr.ok){
+          const detail=await dr.json();
+          const rawItems=detail.orderItems||detail.items||detail.lineItems||detail.products||[];
+          if(rawItems.length){
+            let ordBottles=0;
+            const itemText=rawItems.map(i=>{
+              const qty=parseInt(i.quantity)||0;
+              ordBottles+=qty;totalBottles+=qty;
+              return i.productTitle+(qty>1?' ×'+qty:'');
+            }).join(', ');
+            // Update this order's items and bottle count in-place
+            const itemsEl=document.getElementById('ord-items-'+ord.id);
+            if(itemsEl)itemsEl.innerHTML=itemText;
+            const metaEl=document.getElementById('ord-meta-'+ord.id);
+            if(metaEl){
+              const channel=detail.channel||detail.orderChannel||'';
+              const ordCost=detail.total!=null?detail.total/100:0;
+              metaEl.innerHTML=(ordBottles?'<span style="font-weight:500;color:var(--ink);">🍾 '+ordBottles+' bottle'+(ordBottles!==1?'s':'')+'</span>':'')
+                +(channel?'<span style="color:var(--ink-m);">'+channel+'</span>':'')
+                +(ordCost>0?'<span style="font-weight:500;color:var(--ink);">'+fmt$(ordCost)+'</span>':'');
+            }
+            // Update total bottle count in summary bar
+            const btEl=document.getElementById('total-bottles-display');
+            if(btEl)btEl.textContent=totalBottles;
+          }
+        }
+      }catch(e){}
+      await new Promise(r=>setTimeout(r,150));
     }
-    // Calculate totals
-    let totalBottles=0;let totalCost=0;
-    let html='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:8px;">Unfulfilled orders ('+orders.length+')</div>';
-    html+='<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
-    orders.forEach(ord=>{
-      const paidDate=(ord.orderPaidDate||ord.createdAt||'').slice(0,10);
-      const ageDays=paidDate?Math.floor((Date.now()-new Date(paidDate).getTime())/(1000*60*60*24)):null;
-      const ordCost=ord.total!=null?ord.total/100:0;
-      totalCost+=ordCost;
-      const channel=ord.channel||ord.orderChannel||'';
-      let ordBottles=0;
-      const rawItems=ord.orderItems||ord.items||ord.lineItems||ord.products||[];
-      if(rawItems.length===0)console.log('No items on order',ord.id,'keys:',Object.keys(ord).join(','));
-      const items=rawItems.map(i=>{
-        const qty=parseInt(i.quantity)||0;
-        ordBottles+=qty;totalBottles+=qty;
-        return i.productTitle+(qty>1?' \xd7'+qty:'');
-      }).join(', ');
-      html+='<div style="padding:10px 12px;background:var(--d-bg);border-radius:6px;border-left:3px solid var(--d-tx);">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-        +'<span style="font-size:13px;font-weight:500;color:var(--d-tx);">Order #'+(ord.orderNumber||ord.id)+'</span>'
-        +'<div style="text-align:right;font-size:11px;color:var(--ink-m);">'
-        +(paidDate?'Paid: '+paidDate:'')
-        +(ageDays!==null?' · <span style="color:'+(ageDays>=180?'var(--d-tx)':'var(--ink-m)')+';">'+ageDays+'d old</span>':'')
-        +'</div></div>'
-        +(items?'<div style="font-size:12px;color:var(--ink-m);margin-top:4px;">'+items+'</div>':'')
-        +'<div style="display:flex;gap:12px;margin-top:5px;font-size:12px;">'
-        +(ordBottles?'<span style="font-weight:500;color:var(--ink);">🍾 '+ordBottles+' bottle'+(ordBottles!==1?'s':'')+'</span>':'')
-        +(channel?'<span style="color:var(--ink-m);">'+channel+'</span>':'')
-        +(ordCost>0?'<span style="font-weight:500;color:var(--ink);">'+fmt$(ordCost)+'</span>':'')
-        +'</div></div>';
-    });
-    html+='</div>';
-    html+='<div style="padding:12px 16px;background:var(--burg-f);border-radius:7px;border:1px solid var(--bdr-s);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">'
-      +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Orders</div><div style="font-size:22px;font-weight:600;color:var(--burg);">'+orders.length+'</div></div>'
-      +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Bottles</div><div style="font-size:22px;font-weight:600;color:var(--burg);">'+totalBottles+'</div></div>'
-      +'<div><div style="font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Total value</div><div style="font-size:22px;font-weight:600;color:var(--burg);">'+fmt$(totalCost)+'</div></div>'
-      +'</div>';
-    panel.innerHTML=html;
+    // Update header to remove "loading" note
+    const panel2=document.getElementById('ot-orders-panel');
+    if(panel2){
+      const hdr=panel2.querySelector('div');
+      if(hdr&&hdr.textContent.includes('loading bottle'))hdr.innerHTML='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);">Unfulfilled orders ('+unfulfilledList.length+')</div>';
+    }
     o.syncedAt=today();
   }catch(e){panel.innerHTML='<div style="font-size:12px;color:var(--d-tx);">Error: '+e.message+'</div>';}
 }
@@ -2793,7 +2834,7 @@ async function updateOrderInSheet(o){
   try{
     const allRows=await sheetsGet('OrderCustomers!A2:K');
     const rowIdx=allRows.findIndex(r=>r[0]===o.id);
-    if(rowIdx>=0)await sheetsUpdate('OrderCustomers!A'+(rowIdx+2)+':L'+(rowIdx+2),[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate||'',o.oldestOrderDate||'']]);
+    if(rowIdx>=0)await sheetsUpdate('OrderCustomers!A'+(rowIdx+2)+':M'+(rowIdx+2),[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate||'',o.oldestOrderDate||'',o.unfulfilledCount!==undefined?o.unfulfilledCount:'']]);
   }catch(e){showToast('Error saving: '+e.message,'err');}
 }
 
@@ -2817,7 +2858,7 @@ async function clearOrderData(){
     await sheetsUpdate('OrderCustomers!A1:L1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate']]);
     await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
     // Clear any data rows that exist
-    const custRows=await sheetsGet('OrderCustomers!A2:L');
+    const custRows=await sheetsGet('OrderCustomers!A2:M');
     if(custRows.length){
       const blanks=custRows.map(()=>['','','','','','','','','','','','']);
       await sheetsUpdate('OrderCustomers!A2:L'+(custRows.length+1),blanks);
@@ -2849,7 +2890,7 @@ async function syncOutstandingOrders(){
   try{
     // Always reload from sheet first to get true current state
     const [custRows,msgRows]=await Promise.all([
-      sheetsGet('OrderCustomers!A2:L'),
+      sheetsGet('OrderCustomers!A2:M'),
       sheetsGet('OrderMessages!A2:G')
     ]);
     S.orderCustomers=custRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||''}));
