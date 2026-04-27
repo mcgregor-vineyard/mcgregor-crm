@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.109</div></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.110</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -333,7 +333,18 @@ select.fi{cursor:pointer;}
         <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;margin-bottom:8px;">Active</div>
         <div class="tbl-wrap" style="margin-bottom:24px;">
           <table class="tbl" style="table-layout:auto;">
-            <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Total orders</th><th>Oldest order age</th><th>Promised pickup</th><th>Status</th><th>Last followup</th><th>Msgs</th><th></th></tr></thead>
+            <thead><tr>
+              <th onclick="sortOrders('customerName')" style="cursor:pointer;user-select:none;">Customer <span id="sort-customerName"></span></th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th onclick="sortOrders('orderCount')" style="cursor:pointer;user-select:none;">Total orders <span id="sort-orderCount"></span></th>
+              <th onclick="sortOrders('oldestOrderDate')" style="cursor:pointer;user-select:none;">Oldest order age <span id="sort-oldestOrderDate">▲</span></th>
+              <th onclick="sortOrders('pickupDate')" style="cursor:pointer;user-select:none;">Promised pickup <span id="sort-pickupDate"></span></th>
+              <th onclick="sortOrders('status')" style="cursor:pointer;user-select:none;">Status <span id="sort-status"></span></th>
+              <th onclick="sortOrders('lastFollowup')" style="cursor:pointer;user-select:none;">Last followup <span id="sort-lastFollowup"></span></th>
+              <th onclick="sortOrders('msgs')" style="cursor:pointer;user-select:none;">Msgs <span id="sort-msgs"></span></th>
+              <th></th>
+            </tr></thead>
             <tbody id="orders-tbody"></tbody>
           </table>
         </div>
@@ -942,7 +953,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
+  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev/',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -994,7 +1005,7 @@ function getCampColor(campId){
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
 const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages'};
 
-let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],orderCustomers:[],orderMsgs:[],filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null};
+let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],orderCustomers:[],orderMsgs:[],filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
 
 function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function today(){return new Date().toISOString().slice(0,10);}
@@ -2241,6 +2252,16 @@ async function deleteTicketPrompt(){
 }
 
 // ---- Outstanding Orders ----
+function sortOrders(col){
+  if(S.orderSort.col===col){
+    S.orderSort.dir=S.orderSort.dir==='asc'?'desc':'asc';
+  } else {
+    S.orderSort.col=col;
+    S.orderSort.dir='asc';
+  }
+  renderOrders();
+}
+
 function renderOrders(){
   const f=(document.getElementById('order-status-filter')||{}).value||'all';
   const open=S.orderCustomers.filter(o=>o.status==='Open').length;
@@ -2255,11 +2276,31 @@ function renderOrders(){
   let resolvedList=S.orderCustomers.filter(o=>o.status==='Resolved');
   if(f!=='all'){active=active.filter(o=>o.status===f);resolvedList=resolvedList.filter(o=>o.status===f);}
 
-  // Sort active: oldest last followup first
+  // Apply current sort
+  const {col,dir}=S.orderSort;
+  const mult=dir==='asc'?1:-1;
   active.sort((a,b)=>{
-    const aLast=S.orderMsgs.filter(m=>m.orderCustomerId===a.id).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,a.createdAt);
-    const bLast=S.orderMsgs.filter(m=>m.orderCustomerId===b.id).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,b.createdAt);
-    return aLast.localeCompare(bLast);
+    let av,bv;
+    if(col==='customerName'){av=a.customerName||'';bv=b.customerName||'';}
+    else if(col==='oldestOrderDate'){av=a.oldestOrderDate||'9999';bv=b.oldestOrderDate||'9999';}
+    else if(col==='pickupDate'){av=a.pickupDate||'9999';bv=b.pickupDate||'9999';}
+    else if(col==='status'){av=a.status||'';bv=b.status||'';}
+    else if(col==='lastFollowup'){
+      av=S.orderMsgs.filter(m=>m.orderCustomerId===a.id).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,a.createdAt);
+      bv=S.orderMsgs.filter(m=>m.orderCustomerId===b.id).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,b.createdAt);
+    }
+    else if(col==='msgs'){
+      av=S.orderMsgs.filter(m=>m.orderCustomerId===a.id).length;
+      bv=S.orderMsgs.filter(m=>m.orderCustomerId===b.id).length;
+    }
+    else{av=a.oldestOrderDate||'9999';bv=b.oldestOrderDate||'9999';}
+    if(av<bv)return -1*mult;if(av>bv)return 1*mult;return 0;
+  });
+
+  // Update sort indicators
+  ['customerName','orderCount','oldestOrderDate','pickupDate','status','lastFollowup','msgs'].forEach(c=>{
+    const el=document.getElementById('sort-'+c);
+    if(el)el.textContent=col===c?(dir==='asc'?'▲':'▽'):'';
   });
 
   const tbody=document.getElementById('orders-tbody');
