@@ -317,6 +317,7 @@ select.fi{cursor:pointer;}
             </select>
           </div>
           <div style="display:flex;gap:8px;">
+            <button class="btn" onclick="clearOrderData()" style="color:var(--d-tx);border-color:var(--d-tx);">✕ Clear all</button>
             <button class="btn" id="sync-orders-btn" onclick="syncOutstandingOrders()">⬇ Sync from C7</button>
             <button class="btn btnp" onclick="openNewOrderCustomer()">+ Add customer</button>
           </div>
@@ -332,7 +333,7 @@ select.fi{cursor:pointer;}
         <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;margin-bottom:8px;">Active</div>
         <div class="tbl-wrap" style="margin-bottom:24px;">
           <table class="tbl" style="table-layout:auto;">
-            <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Unfulfilled</th><th>Order age</th><th>Promised pickup</th><th>Status</th><th>Last followup</th><th>Msgs</th><th></th></tr></thead>
+            <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Total orders</th><th>Oldest order age</th><th>Promised pickup</th><th>Status</th><th>Last followup</th><th>Msgs</th><th></th></tr></thead>
             <tbody id="orders-tbody"></tbody>
           </table>
         </div>
@@ -2336,10 +2337,28 @@ async function loadUnfulfilledCount(o){
     const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
     if(!res.ok){el.textContent='—';return;}
     const data=await res.json();
-    const count=(data.orders||[]).filter(o=>{const fs=(o.fulfillmentStatus||'').toLowerCase();return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='';}).length;
-    el.textContent=count+' unfulfilled';
+    const unfulfilled=(data.orders||[]).filter(ord=>{
+      const fs=(ord.fulfillmentStatus||'').toLowerCase();
+      return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs===''||fs==='not_fulfilled';
+    });
+    const count=unfulfilled.length;
+    el.textContent=count+' order'+(count!==1?'s':'');
     el.style.background=count>0?'var(--d-bg)':'var(--s-bg)';
     el.style.color=count>0?'var(--d-tx)':'var(--s-tx)';
+    // Calculate and store oldest order date from live C7 data
+    if(unfulfilled.length){
+      const dates=unfulfilled.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
+      const oldest=dates[0]||'';
+      if(oldest&&oldest!==o.oldestOrderDate){
+        o.oldestOrderDate=oldest;
+        // Update age display in row
+        const ageDays=orderAgeDays(oldest);
+        const ageEl=el.closest('tr')?.querySelector('td:nth-child(5)');
+        if(ageEl&&ageDays!==null){
+          ageEl.innerHTML='<span style="font-size:12px;font-weight:500;color:'+(ageDays>=180?'var(--d-tx)':ageDays>=90?'var(--w-tx)':'var(--ink-m)')+';">'+ageDays+'d</span>';
+        }
+      }
+    }
   }catch(e){el.textContent='—';}
 }
 
@@ -2653,6 +2672,37 @@ async function deleteOrderCustomerPrompt(){
   S.orderMsgs=S.orderMsgs.filter(m=>m.orderCustomerId!==id);
   closeModal('order-thread-modal');renderOrders();
   showToast('Deleted — remove from Google Sheet manually');
+}
+
+async function clearOrderData(){
+  if(!confirm('Clear ALL order customers and messages? This cannot be undone.'))return;
+  const statusEl=document.getElementById('orders-sync-status');
+  statusEl.style.display='block';
+  statusEl.style.background='var(--i-bg)';statusEl.style.color='var(--i-tx)';
+  statusEl.textContent='Clearing order data...';
+  try{
+    // Clear data from sheets — overwrite with just the header rows
+    await sheetsUpdate('OrderCustomers!A1:L1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate']]);
+    await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
+    // Clear any data rows that exist
+    const custRows=await sheetsGet('OrderCustomers!A2:L');
+    if(custRows.length){
+      const blanks=custRows.map(()=>['','','','','','','','','','','','']);
+      await sheetsUpdate('OrderCustomers!A2:L'+(custRows.length+1),blanks);
+    }
+    const msgRows=await sheetsGet('OrderMessages!A2:G');
+    if(msgRows.length){
+      const blanks=msgRows.map(()=>['','','','','','','']);
+      await sheetsUpdate('OrderMessages!A2:G'+(msgRows.length+1),blanks);
+    }
+    S.orderCustomers=[];S.orderMsgs=[];
+    renderOrders();
+    statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
+    statusEl.textContent='All order data cleared.';
+  }catch(e){
+    statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';
+    statusEl.textContent='Error clearing: '+e.message;
+  }
 }
 
 // Sync outstanding orders from C7
