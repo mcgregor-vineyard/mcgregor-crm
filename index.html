@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.110</div></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.112</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -318,6 +318,7 @@ select.fi{cursor:pointer;}
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn" onclick="clearOrderData()" style="color:var(--d-tx);border-color:var(--d-tx);">✕ Clear all</button>
+            <button class="btn" id="check-orders-resolved-btn" onclick="checkOrdersResolved()">↻ Check resolved</button>
             <button class="btn" id="sync-orders-btn" onclick="syncOutstandingOrders()">⬇ Sync from C7</button>
             <button class="btn btnp" onclick="openNewOrderCustomer()">+ Add customer</button>
           </div>
@@ -953,7 +954,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev/',
+  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -2263,6 +2264,7 @@ function sortOrders(col){
 }
 
 function renderOrders(){
+  _countQueue=_countQueue.filter(()=>false); // clear pending queue on re-render
   const f=(document.getElementById('order-status-filter')||{}).value||'all';
   const open=S.orderCustomers.filter(o=>o.status==='Open').length;
   const inprog=S.orderCustomers.filter(o=>o.status==='In Progress').length;
@@ -2364,43 +2366,67 @@ function buildOrderRow(o,showStatus){
       <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${humanMsgs.length}</span></td>
       <td>${assigneeHtml}</td>`;
   }
-  if(o.customerId&&showStatus)setTimeout(()=>loadUnfulfilledCount(o),50);
+  if(o.customerId&&showStatus)queueUnfulfilledCount(o);
   return tr;
 }
 
+// Sequential queue for unfulfilled count lookups to avoid rate limiting
+let _countQueue=[];let _countRunning=false;
+function queueUnfulfilledCount(o){
+  _countQueue.push(o);
+  if(!_countRunning)processCountQueue();
+}
+async function processCountQueue(){
+  _countRunning=true;
+  while(_countQueue.length){
+    const o=_countQueue.shift();
+    await loadUnfulfilledCount(o);
+    await new Promise(r=>setTimeout(r,300)); // 300ms between requests
+  }
+  _countRunning=false;
+}
+
 async function loadUnfulfilledCount(o){
-  const el=document.getElementById('ord-count-'+o.id);if(!el)return;
+  const el=document.getElementById('ord-count-'+o.id);
+  if(!el)return; // row no longer in DOM, skip
   if(!CONFIG.C7_WORKER_URL){el.textContent='—';return;}
-  try{
-    const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
-    const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    const url='https://api.commerce7.com/v1/order?customerId='+o.customerId+'&limit=50';
-    const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
-    if(!res.ok){el.textContent='—';return;}
-    const data=await res.json();
-    const unfulfilled=(data.orders||[]).filter(ord=>{
-      const fs=(ord.fulfillmentStatus||'').toLowerCase();
-      return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs===''||fs==='not_fulfilled';
-    });
-    const count=unfulfilled.length;
-    el.textContent=count+' order'+(count!==1?'s':'');
-    el.style.background=count>0?'var(--d-bg)':'var(--s-bg)';
-    el.style.color=count>0?'var(--d-tx)':'var(--s-tx)';
-    // Update oldest order age in the row
-    if(unfulfilled.length){
-      const dates=unfulfilled.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
-      const oldest=dates[0]||'';
-      if(oldest){
-        o.oldestOrderDate=oldest;
-        const ageDays=orderAgeDays(oldest);
-        const row=el.closest('tr');
-        if(row&&ageDays!==null){
-          const ageCell=row.cells[4];
-          if(ageCell)ageCell.innerHTML='<span style="font-size:12px;font-weight:500;color:'+(ageDays>=180?'var(--d-tx)':ageDays>=90?'var(--w-tx)':'var(--ink-m)')+';">'+ageDays+'d</span>';
+  // Retry up to 3 times on failure
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
+      const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
+      const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent('https://api.commerce7.com/v1/order?customerId='+o.customerId+'&limit=50'),{headers});
+      if(res.status===429){await new Promise(r=>setTimeout(r,2000));continue;} // back off on rate limit
+      if(!res.ok){el.textContent='—';return;}
+      const data=await res.json();
+      const unfulfilled=(data.orders||[]).filter(ord=>{
+        const fs=(ord.fulfillmentStatus||'').toLowerCase();
+        return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs===''||fs==='not_fulfilled';
+      });
+      const count=unfulfilled.length;
+      // Re-fetch element in case DOM was re-rendered
+      const el2=document.getElementById('ord-count-'+o.id);
+      if(!el2)return;
+      el2.textContent=count+' order'+(count!==1?'s':'');
+      el2.style.background=count>0?'var(--d-bg)':'var(--s-bg)';
+      el2.style.color=count>0?'var(--d-tx)':'var(--s-tx)';
+      // Update oldest order age
+      if(unfulfilled.length){
+        const dates=unfulfilled.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
+        const oldest=dates[0]||'';
+        if(oldest){
+          o.oldestOrderDate=oldest;
+          const ageDays=orderAgeDays(oldest);
+          const row=el2.closest('tr');
+          if(row&&ageDays!==null){
+            const ageCell=row.cells[4];
+            if(ageCell)ageCell.innerHTML='<span style="font-size:12px;font-weight:500;color:'+(ageDays>=180?'var(--d-tx)':ageDays>=90?'var(--w-tx)':'var(--ink-m)')+';">'+ageDays+'d</span>';
+          }
         }
       }
-    }
-  }catch(e){el.textContent='—';}
+      return; // success
+    }catch(e){if(attempt===2){const el2=document.getElementById('ord-count-'+o.id);if(el2)el2.textContent='—';}}
+  }
 }
 
 function toggleOrdersResolved(){
@@ -2573,7 +2599,13 @@ async function loadOrderThreadOrders(o){
       const fs=(ord.fulfillmentStatus||'').toLowerCase();
       return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs===''||fs==='not_fulfilled';
     });
-    if(!unfulfilledList.length){panel.innerHTML='<div style="font-size:12px;padding:8px 10px;background:var(--s-bg);color:var(--s-tx);border-radius:6px;">✓ No unfulfilled orders found</div>';return;}
+    if(!unfulfilledList.length){
+      panel.innerHTML='<div style="padding:10px 12px;background:var(--s-bg);border-radius:6px;display:flex;align-items:center;justify-content:space-between;">'
+        +'<span style="font-size:12px;color:var(--s-tx);">✓ No unfulfilled orders found in Commerce7</span>'
+        +'<button class="btn" style="font-size:11px;padding:3px 10px;color:var(--s-tx);border-color:var(--s-tx);" onclick="autoResolveOrderCustomer()">Mark as resolved</button>'
+        +'</div>';
+      return;
+    }
     panel.innerHTML='<div style="font-size:12px;color:var(--ink-m);">Loading details for '+unfulfilledList.length+' orders...</div>';
     // Step 2: fetch each order individually to get orderItems
     const orders=[];
@@ -2846,6 +2878,70 @@ async function syncOutstandingOrders(){
     renderOrders();
   }catch(e){statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';statusEl.textContent='Error: '+e.message;}
   finally{btn.textContent='⬇ Sync from C7';btn.disabled=false;}
+}
+
+async function autoResolveOrderCustomer(){
+  const o=S.orderCustomers.find(x=>x.id===S.activeOrderId);if(!o)return;
+  o.status='Resolved';
+  document.getElementById('ot-status').value='Resolved';
+  await updateOrderInSheet(o);
+  // Add auto note
+  const msgId=uid();const createdAt=today();
+  const note='Auto-resolved: all orders fulfilled in Commerce7.';
+  await sheetsAppend('OrderMessages!A:G',[[msgId,o.id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System','',createdAt]]);
+  S.orderMsgs.push({id:msgId,orderCustomerId:o.id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',method:'',createdAt});
+  renderOrderMessages(o.id);
+  renderOrders();
+  showToast(o.customerName+' marked as resolved');
+}
+
+async function checkOrdersResolved(){
+  if(!CONFIG.C7_WORKER_URL){showToast('C7_WORKER_URL not set','err');return;}
+  const btn=document.getElementById('check-orders-resolved-btn');
+  btn.textContent='Checking...';btn.disabled=true;
+  const statusEl=document.getElementById('orders-sync-status');
+  statusEl.style.display='block';
+  statusEl.style.background='var(--i-bg)';statusEl.style.color='var(--i-tx)';
+  const active=S.orderCustomers.filter(o=>o.status!=='Resolved'&&o.customerId);
+  statusEl.textContent='Checking '+active.length+' customers...';
+  const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
+  const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
+  let resolved=0;let updated=0;
+  try{
+    for(let i=0;i<active.length;i++){
+      const o=active[i];
+      statusEl.textContent='Checking '+(i+1)+' of '+active.length+': '+o.customerName+'...';
+      try{
+        const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent('https://api.commerce7.com/v1/order?customerId='+o.customerId+'&limit=50'),{headers});
+        if(!res.ok)continue;
+        const data=await res.json();
+        const unfulfilled=(data.orders||[]).filter(ord=>{
+          const fs=(ord.fulfillmentStatus||'').toLowerCase();
+          return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs===''||fs==='not_fulfilled';
+        });
+        if(unfulfilled.length===0){
+          // All fulfilled — auto-resolve
+          o.status='Resolved';
+          await updateOrderInSheet(o);
+          const msgId=uid();const createdAt=today();
+          const note='Auto-resolved: all orders fulfilled in Commerce7.';
+          await sheetsAppend('OrderMessages!A:G',[[msgId,o.id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System','',createdAt]]);
+          S.orderMsgs.push({id:msgId,orderCustomerId:o.id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',method:'',createdAt});
+          resolved++;
+        } else {
+          // Update oldest order date if changed
+          const dates=unfulfilled.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
+          const oldest=dates[0]||'';
+          if(oldest&&oldest!==o.oldestOrderDate){o.oldestOrderDate=oldest;await updateOrderInSheet(o);updated++;}
+        }
+      }catch(e){/* skip individual errors */}
+      await new Promise(r=>setTimeout(r,400));
+    }
+    renderOrders();
+    statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
+    statusEl.textContent='Done — '+resolved+' customer'+(resolved!==1?'s':'')+' auto-resolved'+(updated?' · '+updated+' order dates updated':'')+'.';}
+  catch(e){statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';statusEl.textContent='Error: '+e.message;}
+  finally{btn.textContent='↻ Check resolved';btn.disabled=false;}
 }
 
 // ---- Reminders ----
