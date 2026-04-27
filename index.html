@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.5);letter-spacing:.05em;margin-top:1px;">v0.100</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -2653,21 +2653,23 @@ async function syncOutstandingOrders(){
       byCustomer[cid].orders.push(ord);
     });
     let created=0,skipped=0;
+    const custRows=[];const msgRows=[];
     for(const cid of Object.keys(byCustomer)){
       const cust=byCustomer[cid];
-      // Skip if already tracking this customer
       const exists=S.orderCustomers.some(o=>o.customerId===cid&&o.status!=='Resolved');
       if(exists){skipped++;continue;}
       const id=uid();const createdAt=today();
-      const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:''};
-      await sheetsAppend('OrderCustomers!A:J',[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes]]);
-      // Add auto note
+      const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:'',pickupDate:''};
       const msgId=uid();const note=cust.orders.length+' unfulfilled order'+(cust.orders.length!==1?'s':'')+' found in Commerce7.';
-      await sheetsAppend('OrderMessages!A:G',[[msgId,id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System','',createdAt]]);
+      custRows.push([o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate]);
+      msgRows.push([msgId,id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System','',createdAt]);
       S.orderCustomers.push(o);
       S.orderMsgs.push({id:msgId,orderCustomerId:id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',method:'',createdAt});
       created++;
     }
+    // Write all rows in two batch calls
+    if(custRows.length)await sheetsAppend('OrderCustomers!A:K',custRows);
+    if(msgRows.length)await sheetsAppend('OrderMessages!A:G',msgRows);
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
     statusEl.textContent='Done — '+created+' customer'+(created!==1?'s':'')+' added, '+skipped+' already tracked.';
     renderOrders();
