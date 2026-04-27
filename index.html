@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.113</div></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.114</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -171,20 +171,20 @@ select.fi{cursor:pointer;}
     </div>
     <div>
       <div class="sl">Filter contacts</div>
-      <button class="fbtn on" onclick="setF('all',this)">All contacts <span class="fc" id="fc-all">0</span></button>
-      <button class="fbtn" onclick="setF('pending',this)">Not contacted <span class="fc" id="fc-pending">0</span></button>
-      <button class="fbtn" onclick="setF('reached',this)">Reached <span class="fc" id="fc-reached">0</span></button>
-      <button class="fbtn" onclick="setF('vm',this)">Voicemail <span class="fc" id="fc-vm">0</span></button>
-      <button class="fbtn" onclick="setF('noanswer',this)">No answer <span class="fc" id="fc-noanswer">0</span></button>
-      <button class="fbtn" onclick="setF('sold',this)">Sold <span class="fc" id="fc-sold">0</span></button>
-      <button class="fbtn" onclick="setF('nosale',this)">No sale <span class="fc" id="fc-nosale">0</span></button>
+      <button class="fbtn on" onclick="sv('contacts');setF('all',this)">All contacts <span class="fc" id="fc-all">0</span></button>
+      <button class="fbtn" onclick="sv('contacts');setF('pending',this)">Not contacted <span class="fc" id="fc-pending">0</span></button>
+      <button class="fbtn" onclick="sv('contacts');setF('reached',this)">Reached <span class="fc" id="fc-reached">0</span></button>
+      <button class="fbtn" onclick="sv('contacts');setF('vm',this)">Voicemail <span class="fc" id="fc-vm">0</span></button>
+      <button class="fbtn" onclick="sv('contacts');setF('noanswer',this)">No answer <span class="fc" id="fc-noanswer">0</span></button>
+      <button class="fbtn" onclick="sv('contacts');setF('sold',this)">Sold <span class="fc" id="fc-sold">0</span></button>
+      <button class="fbtn" onclick="sv('contacts');setF('nosale',this)">No sale <span class="fc" id="fc-nosale">0</span></button>
     </div>
     <div>
       <div class="sl">Ticket status</div>
-      <button class="fbtn on" id="tf-all" onclick="setTF('all',this)">All tickets <span class="fc" id="tfc-all">0</span></button>
-      <button class="fbtn" id="tf-open" onclick="setTF('Open',this)">Open <span class="fc" id="tfc-open">0</span></button>
-      <button class="fbtn" id="tf-inprog" onclick="setTF('In Progress',this)">In progress <span class="fc" id="tfc-inprog">0</span></button>
-      <button class="fbtn" id="tf-resolved" onclick="setTF('Resolved',this)">Resolved <span class="fc" id="tfc-resolved">0</span></button>
+      <button class="fbtn on" id="tf-all" onclick="sv('tickets');setTF('all',this)">All tickets <span class="fc" id="tfc-all">0</span></button>
+      <button class="fbtn" id="tf-open" onclick="sv('tickets');setTF('Open',this)">Open <span class="fc" id="tfc-open">0</span></button>
+      <button class="fbtn" id="tf-inprog" onclick="sv('tickets');setTF('In Progress',this)">In progress <span class="fc" id="tfc-inprog">0</span></button>
+      <button class="fbtn" id="tf-resolved" onclick="sv('tickets');setTF('Resolved',this)">Resolved <span class="fc" id="tfc-resolved">0</span></button>
     </div>
     <div>
       <div class="sl">Campaigns</div>
@@ -222,6 +222,7 @@ select.fi{cursor:pointer;}
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
                 <button class="btn" style="font-size:12px;" onclick="openEditCamp()">✎ Edit</button>
+                <button class="btn" style="font-size:12px;color:var(--ink-m);" onclick="archiveCampaign(S.activeCamp,true)">⊘ Archive</button>
                 <button class="btn btnp" style="font-size:11px;padding:3px 10px;" onclick="openImportForCamp(S.activeCamp)">+ Add contacts</button>
                 <button class="btn" onclick="closeCampDetail()" style="font-size:12px;">← Back</button>
               </div>
@@ -267,7 +268,6 @@ select.fi{cursor:pointer;}
               <option>Club membership issue</option>
               <option>General inquiry</option>
               <option>Event special request</option>
-              <option>Overdue order pickup</option>
               <option>Credit card update</option>
               <option>Other</option>
             </select>
@@ -1078,7 +1078,7 @@ async function ensureSheets(){
     body:JSON.stringify({requests:needed.map(title=>({addSheet:{properties:{title}}}))})
   });
   // Add headers
-  if(needed.includes('Campaigns'))await sheetsUpdate('Campaigns!A1:F1',[['ID','Name','Start','End','Description','CreatedAt']]);
+  if(needed.includes('Campaigns'))await sheetsUpdate('Campaigns!A1:G1',[['ID','Name','Start','End','Description','CreatedAt','Archived']]);
   if(needed.includes('Contacts'))await sheetsUpdate('Contacts!A1:J1',[['ID','CampaignID','First','Last','Phone','Email','City','Assignee','CreatedAt','C7ID']]);
   if(needed.includes('Attempts'))await sheetsUpdate('Attempts!A1:I1',[['ID','ContactID','Method','Date','Outcome','Notes','Sales','AssignedBy','CreatedAt']]);
   if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:L1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone']]);
@@ -1093,11 +1093,11 @@ async function loadFromSheets(){
   try{
     await ensureSheets();
     const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows]=await Promise.all([
-      sheetsGet('Campaigns!A2:F'),sheetsGet('Contacts!A2:J'),sheetsGet('Attempts!A2:I'),
+      sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:J'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:H'),
       sheetsGet('OrderCustomers!A2:J'),sheetsGet('OrderMessages!A2:G')
     ]);
-    S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||''}));
+    S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',attempts:[]}));
     const attempts=attemptRows.filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',method:r[2]||'',date:r[3]||'',outcome:r[4]||'',notes:r[5]||'',sales:safeJSON(r[6]),assignedBy:parseInt(r[7])||0,createdAt:r[8]||''}));
     S.contacts.forEach(c=>{c.attempts=attempts.filter(a=>a.contactId===c.id);});
@@ -1211,13 +1211,16 @@ function updateCounts(){
 function renderSidebar(){
   const el=document.getElementById('camp-sidebar');el.innerHTML='';
   const all=document.createElement('button');all.className='fbtn'+(S.activeCamp===null?' on':'');all.textContent='All campaigns';
-  all.onclick=()=>{S.activeCamp=null;closeCampDetail();renderAll();document.querySelectorAll('#camp-sidebar .fbtn').forEach(b=>b.classList.remove('on'));all.classList.add('on');};
+  all.onclick=()=>{S.activeCamp=null;closeCampDetail();sv('campaigns');document.querySelectorAll('#camp-sidebar .fbtn').forEach(b=>{b.classList.remove('on');b.style.background='';b.style.color='';});all.classList.add('on');};
   el.appendChild(all);
-  S.campaigns.forEach((c,i)=>{
-    const col=CAMP_COLORS[i%CAMP_COLORS.length];
+  const active=S.campaigns.filter(c=>!c.archived);
+  const archived=S.campaigns.filter(c=>c.archived);
+  active.forEach((c,i)=>{
+    const col=CAMP_COLORS[S.campaigns.indexOf(c)%CAMP_COLORS.length];
+    const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:4px;';
     const b=document.createElement('button');
     b.className='fbtn'+(S.activeCamp===c.id?' on':'');
-    b.style.cssText='font-size:12px;border-left:3px solid '+col.border+';padding-left:7px;';
+    b.style.cssText='font-size:12px;border-left:3px solid '+col.border+';padding-left:7px;flex:1;text-align:left;';
     if(S.activeCamp===c.id){b.style.background=col.bg;b.style.color=col.text;}
     b.onmouseover=()=>{b.style.background=col.bg;b.style.color=col.text;};
     b.onmouseout=()=>{if(S.activeCamp!==c.id){b.style.background='';b.style.color='';}};
@@ -1225,19 +1228,68 @@ function renderSidebar(){
     b.onclick=()=>{
       document.querySelectorAll('#camp-sidebar .fbtn').forEach(x=>{x.classList.remove('on');x.style.background='';x.style.color='';});
       b.classList.add('on');b.style.background=col.bg;b.style.color=col.text;
-      sv('campaigns');
-      openCampDetail(c.id);
+      sv('campaigns');openCampDetail(c.id);
     };
-    el.appendChild(b);
+    // Archive button
+    const archBtn=document.createElement('button');
+    archBtn.title='Archive campaign';
+    archBtn.style.cssText='background:none;border:none;cursor:pointer;color:var(--ink-f);font-size:11px;padding:2px 4px;flex-shrink:0;';
+    archBtn.textContent='⊘';
+    archBtn.onmouseover=()=>archBtn.style.color='var(--d-tx)';
+    archBtn.onmouseout=()=>archBtn.style.color='var(--ink-f)';
+    archBtn.onclick=(e)=>{e.stopPropagation();archiveCampaign(c.id,true);};
+    row.appendChild(b);row.appendChild(archBtn);
+    el.appendChild(row);
   });
+  if(archived.length){
+    const sep=document.createElement('div');
+    sep.style.cssText='font-size:10px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px;padding:0 4px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;';
+    sep.innerHTML='<span>Archived ('+archived.length+')</span><span id="arch-toggle" style="font-size:9px;">▼</span>';
+    const archList=document.createElement('div');archList.id='arch-list';archList.style.display='none';
+    sep.onclick=()=>{
+      const hidden=archList.style.display==='none';
+      archList.style.display=hidden?'block':'none';
+      document.getElementById('arch-toggle').textContent=hidden?'▲':'▼';
+    };
+    archived.forEach(c=>{
+      const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:4px;';
+      const b=document.createElement('button');
+      b.className='fbtn';b.style.cssText='font-size:11px;flex:1;text-align:left;opacity:.6;';
+      b.textContent=c.name;
+      b.onclick=()=>{sv('campaigns');openCampDetail(c.id);};
+      const unarchBtn=document.createElement('button');
+      unarchBtn.title='Unarchive';
+      unarchBtn.style.cssText='background:none;border:none;cursor:pointer;color:var(--ink-f);font-size:11px;padding:2px 4px;flex-shrink:0;';
+      unarchBtn.textContent='↩';
+      unarchBtn.onclick=(e)=>{e.stopPropagation();archiveCampaign(c.id,false);};
+      row.appendChild(b);row.appendChild(unarchBtn);
+      archList.appendChild(row);
+    });
+    el.appendChild(sep);el.appendChild(archList);
+  }
+}
+
+async function archiveCampaign(campId,archive){
+  const c=S.campaigns.find(x=>x.id===campId);if(!c)return;
+  if(archive&&!confirm('Archive "'+c.name+'"? It will be hidden from the campaign list but results will still appear in Reports.'))return;
+  c.archived=archive;
+  try{
+    const allRows=await sheetsGet('Campaigns!A2:G');
+    const rowIdx=allRows.findIndex(r=>r[0]===campId);
+    if(rowIdx>=0)await sheetsUpdate('Campaigns!G'+(rowIdx+2),[[archive?'true':'false']]);
+    if(S.activeCamp===campId){closeCampDetail();}
+    renderAll();
+    showToast(archive?c.name+' archived':'Campaign restored');
+  }catch(e){showToast('Error: '+e.message,'err');}
 }
 
 function renderCampaigns(){
   const el=document.getElementById('camps-list');el.innerHTML='';
   document.getElementById('camp-detail').style.display='none';
   el.style.display='block';
-  if(!S.campaigns.length){el.innerHTML='<div class="empty">No campaigns yet. Create one to get started.</div>';return;}
-  S.campaigns.forEach((c,i)=>{
+  const visible=S.campaigns.filter(c=>!c.archived);
+  if(!visible.length){el.innerHTML='<div class="empty">No campaigns yet. Create one to get started.</div>';return;}
+  visible.forEach((c,i)=>{
     const col=CAMP_COLORS[i%CAMP_COLORS.length];
     const contacts=S.contacts.filter(x=>x.campId===c.id);
     const sold=contacts.filter(x=>x.attempts&&x.attempts.some(a=>a.outcome==='sold')).length;
@@ -1350,10 +1402,10 @@ async function saveEditCamp(){
   c.end=document.getElementById('ecm-end').value;
   c.desc=document.getElementById('ecm-desc').value;
   try{
-    const allRows=await sheetsGet('Campaigns!A2:F');
+    const allRows=await sheetsGet('Campaigns!A2:G');
     const rowIdx=allRows.findIndex(r=>r[0]===id);
     if(rowIdx>=0){
-      await sheetsUpdate('Campaigns!A'+(rowIdx+2)+':F'+(rowIdx+2),[[c.id,c.name,c.start,c.end,c.desc,c.createdAt]]);
+      await sheetsUpdate('Campaigns!A'+(rowIdx+2)+':G'+(rowIdx+2),[[c.id,c.name,c.start,c.end,c.desc,c.createdAt,c.archived?'true':'false']]);
     }
     closeModal('edit-camp-modal');
     renderAll();
@@ -1512,7 +1564,7 @@ async function saveCamp(){
   const id=uid();const createdAt=today();
   const camp={id,name,start:document.getElementById('cm-start').value,end:document.getElementById('cm-end').value,desc:document.getElementById('cm-desc').value,createdAt};
   try{
-    await sheetsAppend('Campaigns!A:F',[[id,camp.name,camp.start,camp.end,camp.desc,createdAt]]);
+    await sheetsAppend('Campaigns!A:G',[[id,camp.name,camp.start,camp.end,camp.desc,createdAt,'false']]);
     S.campaigns.push(camp);renderAll();closeModal('camp-modal');showToast('Campaign saved');
   }catch(e){showToast('Error saving: '+e.message,'err');}
 }
