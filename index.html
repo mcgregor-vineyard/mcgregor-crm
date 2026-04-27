@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.105</div></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.107</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -2540,7 +2540,7 @@ async function loadOrderThreadOrders(o){
     let html='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:8px;">Unfulfilled orders ('+orders.length+')</div>';
     html+='<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
     orders.forEach(ord=>{
-      const paidDate=(ord.orderPaidDate||ord.paidDate||ord.datePaid||ord.placedAt||ord.purchasedAt||ord.orderDate||ord.createdAt||'').slice(0,10);
+      const paidDate=(ord.orderPaidDate||ord.createdAt||'').slice(0,10);
       const ageDays=paidDate?Math.floor((Date.now()-new Date(paidDate).getTime())/(1000*60*60*24)):null;
       const total=ord.total!=null?fmt$(ord.total/100):'';
       const channel=ord.channel||ord.orderChannel||'';
@@ -2726,19 +2726,21 @@ async function syncOutstandingOrders(){
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
     // Fetch orders paginated — max 50 per page, filter client-side
+    const cutoffDate=new Date(Date.now()-180*24*60*60*1000).toISOString().slice(0,10);
     let allOrders=[];let page=1;let hasMore=true;
     while(hasMore){
-      const url='https://api.commerce7.com/v1/order?limit=50&page='+page;
+      const url='https://api.commerce7.com/v1/order?limit=50&page='+page+'&orderPaidDate=lt:'+cutoffDate+'T23:59:59.000Z';
       const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
       if(!res.ok){const b=await res.text();throw new Error('API error '+res.status+' '+b.slice(0,150));}
       const data=await res.json();
       const batch=data.orders||[];
       allOrders=allOrders.concat(batch);
-      hasMore=batch.length===50&&allOrders.length<2000;
+      hasMore=batch.length===50&&allOrders.length<5000;
       page++;
       if(hasMore)await new Promise(r=>setTimeout(r,600));
-      statusEl.textContent='Fetching orders... '+allOrders.length+' so far';
+      statusEl.textContent='Fetching old orders... '+allOrders.length+' so far';
     }
+    console.log('Orders older than 180 days:',allOrders.length);
     // Log first order's date fields to find correct field name
     if(allOrders.length){
       const sample=allOrders[0];
@@ -2768,22 +2770,15 @@ async function syncOutstandingOrders(){
       byCustomer[cid].orders.push(ord);
     });
     let created=0,skippedAge=0,skippedDupe=0;
-    // Filter to customers with orders 180+ days old
-    const cutoffDate=new Date(Date.now()-180*24*60*60*1000).toISOString().slice(0,10);
     const newCustRows=[];const newMsgRows=[];
-    console.log('Customers with unfulfilled orders:',Object.keys(byCustomer).length,'Cutoff date (180d):',cutoffDate);
+    console.log('Customers with unfulfilled orders older than 180 days:',Object.keys(byCustomer).length);
     for(const cid of Object.keys(byCustomer)){
       const cust=byCustomer[cid];
-      // Find oldest paid date
       const dates=cust.orders.map(ord=>{
-        // Try all possible date field names Commerce7 might use
-        const d=ord.orderPaidDate||ord.paidDate||ord.datePaid||ord.placedAt||ord.purchasedAt||ord.orderDate||ord.createdAt||'';
+        const d=ord.orderPaidDate||ord.createdAt||'';
         return d.slice(0,10);
       }).filter(Boolean).sort();
       const oldestDate=dates[0]||'';
-      console.log('Customer:',cust.customerName,'oldestDate:',oldestDate,'cutoff:',cutoffDate,'passes:',(oldestDate&&oldestDate<=cutoffDate));
-      // Only include if oldest order is 180+ days old
-      if(oldestDate&&oldestDate>cutoffDate){skippedAge++;continue;}
       const exists=S.orderCustomers.some(o=>o.customerId===cid&&o.status!=='Resolved');
       if(exists){skippedDupe++;continue;}
       const id=uid();const createdAt=today();
@@ -2799,7 +2794,7 @@ async function syncOutstandingOrders(){
     if(newCustRows.length)await sheetsAppend('OrderCustomers!A:L',newCustRows);
     if(newMsgRows.length)await sheetsAppend('OrderMessages!A:G',newMsgRows);
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
-    statusEl.textContent='Done — '+created+' new customer'+(created!==1?'s':'')+' added'+(skippedAge?' · '+skippedAge+' under 180 days':'')+(skippedDupe?' · '+skippedDupe+' already tracked':'')+'.';
+    statusEl.textContent='Done — '+created+' new customer'+(created!==1?'s':'')+' added'+(skippedDupe?' · '+skippedDupe+' already tracked':'')+'.';
     renderOrders();
   }catch(e){statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';statusEl.textContent='Error: '+e.message;}
   finally{btn.textContent='⬇ Sync from C7';btn.disabled=false;}
