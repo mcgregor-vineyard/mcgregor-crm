@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.112</div></div>
+    <div class="logo">McGregor Vineyard <span>Campaigns</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.113</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1846,7 +1846,7 @@ async function lookupOrder(){
     const res=await fetch(url,{headers:{'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'}});
     if(!res.ok)throw new Error('API error '+res.status);
     const data=await res.json();
-    const orders=(data.orders||[]).filter(o=>{const fs=(o.fulfillmentStatus||'').toLowerCase();return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='';});
+    const orders=(data.orders||[]);
     if(!orders.length)throw new Error('Order #'+orderNum+' not found in Commerce7');
     // Fetch full order by ID to get complete product details
     const orderId=orders[0].id;
