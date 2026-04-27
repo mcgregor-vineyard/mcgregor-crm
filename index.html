@@ -941,7 +941,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
+  C7_WORKER_URL: 'Error: API error 422 {"statusCode":422,"type":"validationError","message":"Limit must be 50 or less"}',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -2625,16 +2625,21 @@ async function syncOutstandingOrders(){
   try{
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    // Fetch recent orders and filter client-side — Commerce7 422s on fulfillmentStatus filter
-    const url='https://api.commerce7.com/v1/order?limit=100&orderPaidDate=gt:2023-01-01';
-    const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
-    if(!res.ok){const b=await res.text();throw new Error('API error '+res.status+' '+b.slice(0,150));}
-    const data=await res.json();
-    const allOrders=data.orders||[];
-    // Log unique fulfillment status values for debugging
+    // Fetch orders paginated — max 50 per page, filter client-side
+    let allOrders=[];let page=1;let hasMore=true;
+    while(hasMore){
+      const url='https://api.commerce7.com/v1/order?limit=50&page='+page+'&orderPaidDate=gt:2023-01-01';
+      const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
+      if(!res.ok){const b=await res.text();throw new Error('API error '+res.status+' '+b.slice(0,150));}
+      const data=await res.json();
+      const batch=data.orders||[];
+      allOrders=allOrders.concat(batch);
+      hasMore=batch.length===50&&allOrders.length<500;
+      page++;
+      if(hasMore)await new Promise(r=>setTimeout(r,600));
+    }
     const statuses=[...new Set(allOrders.map(o=>o.fulfillmentStatus))];
-    console.log('Fulfillment status values found:',statuses);
-    // Filter to unfulfilled orders client-side
+    console.log('Fulfillment statuses:',statuses,'Total orders:',allOrders.length);
     const orders=allOrders.filter(o=>{
       const fs=(o.fulfillmentStatus||'').toLowerCase();
       return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='';
