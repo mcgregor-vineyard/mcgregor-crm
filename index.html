@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor <span>Connect</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.120</div></div>
+    <div class="logo">McGregor <span>Connect</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.121</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -3515,7 +3515,7 @@ function renderActivityLog(){
         if(repFilter!=='all'&&String(a.assignedBy)!==repFilter)return;
         const camp=S.campaigns.find(x=>x.id===c.campId);
         events.push({
-          ts:a.createdAt||a.date||'',
+          ts:a.createdAt||'',
           type:'attempt',
           icon:'📞',
           color:'var(--i-bg)',
@@ -3606,7 +3606,7 @@ function renderActivityLog(){
     S.reminders.forEach(r=>{
       if(repFilter!=='all'&&String(r.assignee)!==repFilter)return;
       events.push({
-        ts:r.id||'',
+        ts:(()=>{const ms=parseInt((r.id||'x0').slice(1));return ms?new Date(ms).toISOString():''})(),
         type:'reminder',
         icon:'🔔',
         color:'var(--s-bg)',
