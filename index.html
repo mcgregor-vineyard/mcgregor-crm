@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.132</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.133</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4359,16 +4359,21 @@ async function c7SyncTicketOpened(ticket){
   if(!ticket.customerId)return;
   // Resolve actual C7 customer ID — ticket.customerId may be an internal contact ID
   let c7Id=ticket.customerId;
-  // Check if this looks like an internal ID (not a UUID from C7) by checking contacts
   const contact=S.contacts.find(c=>c.id===ticket.customerId);
+  console.log('C7 ticket sync — ticket.customerId:',ticket.customerId,'contact found:',!!contact,'contact.c7id:',contact?.c7id);
   if(contact&&contact.c7id)c7Id=contact.c7id;
-  if(!c7Id)return;
+  // Also try matching by c7id directly (ticket opened from C7 customer search)
+  if(!contact){
+    const byC7=S.contacts.find(c=>c.c7id===ticket.customerId);
+    if(byC7)c7Id=byC7.c7id;
+  }
+  if(!c7Id||c7Id.startsWith('x')){console.warn('C7 ticket sync — no valid C7 ID found, skipping');return;}
   const content='[McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
   try{
     const data=await c7Req('POST','/customer/'+c7Id+'/flag',{content});
     if(data&&data.id){
       ticket.c7FlagId=data.id;
-      ticket.c7CustomerId=c7Id; // store resolved ID for removal later
+      ticket.c7CustomerId=c7Id;
       console.log('C7 ticket flag added:',data.id,'for customer:',c7Id);
     }
   }catch(e){console.warn('C7 ticket flag failed:',e.message);}
@@ -4376,11 +4381,10 @@ async function c7SyncTicketOpened(ticket){
 
 // Called when a ticket is resolved — remove its C7 flag
 async function c7SyncTicketResolved(ticket){
-  // Use stored c7CustomerId if available, otherwise resolve
   let c7Id=ticket.c7CustomerId||ticket.customerId;
-  const contact=S.contacts.find(c=>c.id===c7Id);
+  const contact=S.contacts.find(c=>c.id===c7Id||c.c7id===c7Id);
   if(contact&&contact.c7id)c7Id=contact.c7id;
-  if(!c7Id)return;
+  if(!c7Id||c7Id.startsWith('x'))return;
   const prefix='[McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
   await c7RemoveFlagsByPrefix(c7Id,prefix);
 }
@@ -4399,9 +4403,9 @@ async function c7SyncAttemptLogged(contact,attempt){
 
 async function c7SyncTicketMessage(ticket,msg){
   let c7Id=ticket.c7CustomerId||ticket.customerId;
-  const contact=S.contacts.find(c=>c.id===c7Id);
+  const contact=S.contacts.find(c=>c.id===c7Id||c.c7id===c7Id);
   if(contact&&contact.c7id)c7Id=contact.c7id;
-  if(!c7Id)return;
+  if(!c7Id||c7Id.startsWith('x'))return;
   const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
   let noteText='[McGregor Connect] Ticket "'+ticket.subject+'" — '+msg.createdAt;
   if(msg.method)noteText+=' ('+msg.method+')';
