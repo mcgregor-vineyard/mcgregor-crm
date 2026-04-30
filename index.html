@@ -137,7 +137,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.127</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.128</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1358,8 +1358,9 @@ async function loadFromSheets(){
     S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
-    renderAll();
+    try{renderAll();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
   }catch(e){
+    console.error('loadFromSheets error:',e);
     setSyncBar('err','Could not connect to Google Sheets: '+e.message);
   }
 }
@@ -1721,10 +1722,10 @@ function renderReports(){
   const contactsTotal=days?baseContacts.filter(c=>(c.attempts||[]).some(a=>!cutoff||a.date>=cutoff)).length:baseContacts.length;
   const conv=contactsTotal?Math.round(contactsWithSale.length/contactsTotal*100):0;
   const avg=contactsWithSale.length?Math.round(rev/contactsWithSale.length):0;
-  document.getElementById('rp-rev').textContent=fmt$(rev);
-  document.getElementById('rp-sold').textContent=contactsWithSale.length;
-  document.getElementById('rp-conv').textContent=conv+'%';
-  document.getElementById('rp-avg').textContent=fmt$(avg);
+  (document.getElementById('rp-rev')||{}).textContent=fmt$(rev);
+  (document.getElementById('rp-sold')||{}).textContent=contactsWithSale.length;
+  (document.getElementById('rp-conv')||{}).textContent=conv+'%';
+  (document.getElementById('rp-avg')||{}).textContent=fmt$(avg);
   const ldr=document.getElementById('leaderboard');ldr.innerHTML='';
   TEAM.map((t,i)=>{
     const mine=baseContacts.filter(c=>c.assignee===i);
@@ -1741,9 +1742,10 @@ function renderReports(){
   baseContacts.forEach(c=>{const lo=getLastOutcome(c);outCounts[lo]=(outCounts[lo]||0)+1;});
   const oKeys=Object.keys(outCounts),oVals=Object.values(outCounts),oColors=oKeys.map(k=>OUT_COLORS[k]||'#B4B2A9');
   if(S.outChart)S.outChart.destroy();
-  const octx=document.getElementById('outcome-chart').getContext('2d');
+  const _octxEl=document.getElementById('outcome-chart');if(!_octxEl)return;
+  const octx=_octxEl.getContext('2d');
   S.outChart=new Chart(octx,{type:'doughnut',data:{labels:oKeys.map(outcomeLabel),datasets:[{data:oVals,backgroundColor:oColors,borderWidth:2,borderColor:'white'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'55%'}});
-  document.getElementById('outcome-legend').innerHTML=oKeys.map((k,i)=>`<span style="display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:2px;background:${oColors[i]};"></span>${outcomeLabel(k)} (${oVals[i]})</span>`).join('');
+  (document.getElementById('outcome-legend')||{}).innerHTML=oKeys.map((k,i)=>`<span style="display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:2px;background:${oColors[i]};"></span>${outcomeLabel(k)} (${oVals[i]})</span>`).join('');
   const wineMap={};
   S.contacts.forEach(c=>(c.attempts||[]).forEach(a=>{
     if(!a.sales||!a.sales.length)return;
@@ -1767,7 +1769,8 @@ function renderReports(){
   if(!Object.keys(wineMap).length)wtbody.innerHTML='<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--ink-m);">No sales recorded yet.</td></tr>';
   const campRevs=S.campaigns.map(c=>({name:c.name,rev:S.contacts.filter(x=>x.campId===c.id).reduce((s,x)=>s+getContactRevenue(x),0)}));
   if(S.campChart)S.campChart.destroy();
-  const cctx=document.getElementById('camp-chart').getContext('2d');
+  const _cctxEl=document.getElementById('camp-chart');if(!_cctxEl)return;
+  const cctx=_cctxEl.getContext('2d');
   S.campChart=new Chart(cctx,{type:'bar',data:{labels:campRevs.map(c=>c.name),datasets:[{label:'Revenue',data:campRevs.map(c=>c.rev),backgroundColor:'#6B1E2E',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'$'+v.toLocaleString()},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}});
 }
 
@@ -2657,10 +2660,10 @@ function renderOrders(){
   const open=S.orderCustomers.filter(o=>o.status==='Open').length;
   const inprog=S.orderCustomers.filter(o=>o.status==='In Progress').length;
   const resolved=S.orderCustomers.filter(o=>o.status==='Resolved').length;
-  document.getElementById('ord-open').textContent=open;
-  document.getElementById('ord-inprog').textContent=inprog;
-  document.getElementById('ord-resolved').textContent=resolved;
-  document.getElementById('ord-total').textContent=S.orderCustomers.length;
+  (document.getElementById('ord-open')||{}).textContent=open;
+  (document.getElementById('ord-inprog')||{}).textContent=inprog;
+  (document.getElementById('ord-resolved')||{}).textContent=resolved;
+  (document.getElementById('ord-total')||{}).textContent=S.orderCustomers.length;
 
   let active=S.orderCustomers.filter(o=>o.status!=='Resolved');
   let resolvedList=S.orderCustomers.filter(o=>o.status==='Resolved');
@@ -3839,10 +3842,10 @@ function renderOutreach(){
   const open=S.outreach.filter(o=>o.status==='Open').length;
   const inprog=S.outreach.filter(o=>o.status==='In Progress').length;
   const resolved=S.outreach.filter(o=>o.status==='Resolved').length;
-  document.getElementById('or-open').textContent=open;
-  document.getElementById('or-inprog').textContent=inprog;
-  document.getElementById('or-resolved').textContent=resolved;
-  document.getElementById('or-total').textContent=S.outreach.length;
+  (document.getElementById('or-open')||{}).textContent=open;
+  (document.getElementById('or-inprog')||{}).textContent=inprog;
+  (document.getElementById('or-resolved')||{}).textContent=resolved;
+  (document.getElementById('or-total')||{}).textContent=S.outreach.length;
   let list=[...S.outreach];
   if(typeF)list=list.filter(o=>o.type===typeF);
   if(statusF==='active')list=list.filter(o=>o.status!=='Resolved');
