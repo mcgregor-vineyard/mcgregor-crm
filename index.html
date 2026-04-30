@@ -81,6 +81,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);f
 .av-g{background:var(--gold);}
 .av-t{background:#0F6E56;}
 .av-bl{background:#185FA5;}
+.av-r{background:#7B3F00;}
 .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(28,20,16,.5);z-index:100;align-items:flex-start;justify-content:center;padding-top:60px;}
 .modal-backdrop.op{display:flex;}
 .modal{background:white;border-radius:10px;width:520px;max-width:95vw;z-index:2;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
@@ -137,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.129</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.131</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -151,7 +152,7 @@ select.fi{cursor:pointer;}
   <div class="usr">
     <div class="uav" id="cuav">DJ</div>
     <select id="cusel" style="background:white;color:var(--burg);border:none;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;outline:none;border-radius:5px;padding:4px 8px;font-weight:500;" onchange="setCU(this.value)">
-      <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option>
+      <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option>
     </select>
     <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;" onclick="openMyTasks()">✓ My tasks</button>
     <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;" onclick="openActivityLog()">📋 Activity</button>
@@ -587,7 +588,7 @@ select.fi{cursor:pointer;}
       <div class="fr"><label class="fl">Assign to</label>
         <select class="fi" id="co-assign">
           <option value="-1">Unassigned</option>
-          <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option>
+          <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option>
         </select>
       </div>
       <div class="fr"><label class="fl">Add reason <span style="color:var(--ink-f);font-weight:400;">(optional)</span></label><input type="text" class="fi" id="co-reason" placeholder="e.g. Referred by John, Previous customer, Walk-in" /></div>
@@ -677,6 +678,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
+            <option value="3">John McGregor</option>
           </select>
         </div>
       </div>
@@ -714,6 +716,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
+          <option value="3">John McGregor</option>
         </select>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 12px;background:var(--cream);border-radius:7px;">
@@ -761,6 +764,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
+            <option value="3">John McGregor</option>
           </select>
         </div>
       </div>
@@ -916,6 +920,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
+            <option value="3">John McGregor</option>
           </select>
         </div>
       </div>
@@ -953,6 +958,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
+          <option value="3">John McGregor</option>
         </select>
         <button class="btn" style="font-size:12px;color:var(--s-tx);border-color:var(--s-tx);" onclick="resolveOutreach()">✓ Resolve</button>
         <div style="display:flex;align-items:center;gap:6px;flex:1;">
@@ -1004,6 +1010,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
+          <option value="3">John McGregor</option>
         </select>
       </div>
       <button class="mcls" onclick="closeModal('activity-modal')">✕</button>
@@ -1122,6 +1129,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
+            <option value="3">John McGregor</option>
           </select>
         </div>
         <div class="fr"><label class="fl">Status</label>
@@ -1160,6 +1168,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
+          <option value="3">John McGregor</option>
         </select>
       </div>
       <div id="thread-messages" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
@@ -1234,7 +1243,7 @@ KGp83R3Cm4HG0H0o3zOQLQ==
 };
 // ============================================================
 
-const TEAM=[{name:'Dan Jimerson',init:'DJ',cls:'av-b'},{name:'Mike DeGaetano',init:'MD',cls:'av-g'},{name:'Ellen Quibell',init:'EQ',cls:'av-t'}];
+const TEAM=[{name:'Dan Jimerson',init:'DJ',cls:'av-b'},{name:'Mike DeGaetano',init:'MD',cls:'av-g'},{name:'Ellen Quibell',init:'EQ',cls:'av-t'},{name:'John McGregor',init:'JM',cls:'av-r'}];
 const CAMP_COLORS=[
   {bg:'#F3E8FF',border:'#A855F7',text:'#6B21A8'},  // purple
   {bg:'#FEF3C7',border:'#D97706',text:'#92400E'},  // amber
@@ -1536,6 +1545,8 @@ async function archiveCampaign(campId,archive){
     if(S.activeCamp===campId){closeCampDetail();}
     renderAll();
     showToast(archive?c.name+' archived':'Campaign restored');
+    // Remove C7 flags for all contacts in this campaign
+    if(archive)c7SyncCampaignArchived(c).catch(()=>{});
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -2094,6 +2105,9 @@ async function confirmImport(){
       await sheetsAppend('Contacts!A:K',rows);
       S.contacts.push(...toAdd);renderAll();closeModal('import-modal');
       showToast(toAdd.length+' contact'+(toAdd.length>1?'s':'')+' added');
+      // Add C7 campaign flag in background
+      const camp=S.campaigns.find(x=>x.id===campId);
+      if(camp)toAdd.forEach(c=>{if(c.c7id)c7SyncContactAddedToCampaign(c,camp).catch(()=>{});});
     }catch(e){showToast('Error: '+e.message,'err');}
     finally{btn.textContent='Add to campaign';btn.disabled=false;}
     return;
@@ -2135,6 +2149,9 @@ async function confirmImport(){
     S.contacts.push(...toAdd);renderAll();closeModal('import-modal');
     const matchMsg=withEmail.length?' ('+matched+' matched to Commerce7)':'';
     showToast(toAdd.length+' contact'+(toAdd.length>1?'s':'')+' added'+matchMsg);
+    // Add C7 campaign flag in background
+    const camp=S.campaigns.find(x=>x.id===campId);
+    if(camp)toAdd.forEach(c=>{if(c.c7id)c7SyncContactAddedToCampaign(c,camp).catch(()=>{});});
   }catch(e){showToast('Error: '+e.message,'err');}
   finally{btn.textContent='Add to campaign';btn.disabled=false;document.getElementById('file-input').value='';}
 }
@@ -2285,6 +2302,8 @@ async function saveAttempt(){
     renderAll();
     closeModal('attempt-modal');
     showToast('Attempt logged');
+    // Sync to C7 in background
+    c7SyncAttemptLogged(c,attempt).catch(()=>{});
     // Return to wherever we were
     if(S.activeCamp){
       sv('campaigns');
@@ -2530,6 +2549,8 @@ async function saveTicket(){
       S.ticketMsgs.push(msg);
     }
     renderAll();closeModal('ticket-modal');showToast('Ticket created');
+    // Add C7 flag and note in background
+    c7SyncTicketOpened(ticket).catch(()=>{});
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -2604,15 +2625,25 @@ async function addThreadMessage(){
     renderThreadMessages(S.activeTicketId);
     renderTickets();
     showToast('Message added');
+    // Sync note to C7 in background
+    if(t)c7SyncTicketMessage(t,newMsg).catch(()=>{});
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
 async function updateTicketStatus(){
   const newStatus=document.getElementById('thread-status').value;
   const t=S.tickets.find(x=>x.id===S.activeTicketId);if(!t)return;
+  const wasResolved=t.status==='Resolved';
   t.status=newStatus;
   await updateTicketInSheet(t);
   renderTickets();
+  // Sync C7 flag — add when opened/active, remove when resolved
+  if(newStatus==='Resolved'&&!wasResolved){
+    c7SyncTicketResolved(t).catch(()=>{});
+  } else if(newStatus!=='Resolved'&&wasResolved){
+    // Re-add flag if un-resolving
+    c7SyncTicketOpened(t).catch(()=>{});
+  }
 }
 
 async function updateTicketAssignee(){
@@ -3124,6 +3155,7 @@ async function addOrderMessage(){
     if(o&&o.status==='Open'){o.status='In Progress';document.getElementById('ot-status').value='In Progress';await updateOrderInSheet(o);}
     document.getElementById('ot-new-msg').value='';document.getElementById('ot-method').value='';
     renderOrderMessages(S.activeOrderId);renderOrders();showToast('Note added');
+    if(o)c7SyncOrderMessage(o,newMsg).catch(()=>{});
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -4041,11 +4073,13 @@ async function addOutreachMessage(){
   const id=uid();const createdAt=today();
   try{
     await sheetsAppend('OutreachMessages!A:G',[[id,S.activeOutreachId,displayMsg,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'',method,createdAt]]);
-    S.outreachMsgs.push({id,outreachId:S.activeOutreachId,message:displayMsg,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'',method,createdAt});
+    const newMsg={id,outreachId:S.activeOutreachId,message:displayMsg,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'',method,createdAt};
+    S.outreachMsgs.push(newMsg);
     const o=S.outreach.find(x=>x.id===S.activeOutreachId);
     if(o&&o.status==='Open'){o.status='In Progress';document.getElementById('ort-status').value='In Progress';await updateOutreachInSheet(o);}
     document.getElementById('ort-new-msg').value='';document.getElementById('ort-method').value='';
     renderOutreachMessages(S.activeOutreachId);renderOutreach();showToast('Message added');
+    if(o)c7SyncOutreachMessage(o,newMsg).catch(()=>{});
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -4237,6 +4271,152 @@ async function deleteAttempt(){
     else if(document.getElementById('detail-panel').classList.contains('open'))showContactDetail(cid);
     showToast('Attempt deleted');
   }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+// ---- Commerce7 Flags & Notes ----
+async function c7Req(method,path,body){
+  if(!CONFIG.C7_WORKER_URL)return null;
+  const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
+  const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
+  const url=CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent('https://api.commerce7.com/v1'+path);
+  const opts={method,headers};
+  if(body)opts.body=JSON.stringify(body);
+  const res=await fetch(url,opts);
+  if(!res.ok)throw new Error('C7 error '+res.status+' on '+method+' '+path);
+  const txt=await res.text();
+  return txt?JSON.parse(txt):null;
+}
+
+// Add a flag to a C7 customer — returns the flag id
+async function c7AddFlag(customerId,content){
+  if(!customerId)return null;
+  try{
+    const data=await c7Req('POST','/customer/'+customerId+'/flag',{content});
+    return data&&data.id?data.id:null;
+  }catch(e){console.warn('C7 flag add failed:',e.message);return null;}
+}
+
+// Delete a flag from a C7 customer
+async function c7DeleteFlag(customerId,flagId){
+  if(!customerId||!flagId)return;
+  try{await c7Req('DELETE','/customer/'+customerId+'/flag/'+flagId);}
+  catch(e){console.warn('C7 flag delete failed:',e.message);}
+}
+
+// Add a note to a C7 customer
+async function c7AddNote(customerId,content){
+  if(!customerId)return null;
+  try{
+    const data=await c7Req('POST','/customer/'+customerId+'/note',{content});
+    return data&&data.id?data.id:null;
+  }catch(e){console.warn('C7 note add failed:',e.message);return null;}
+}
+
+// Get customer flags and find one matching a prefix
+async function c7FindFlag(customerId,prefix){
+  if(!customerId)return null;
+  try{
+    const data=await c7Req('GET','/customer/'+customerId,null);
+    const flags=(data&&data.flags)||[];
+    const match=flags.find(f=>f.content&&f.content.startsWith(prefix));
+    return match||null;
+  }catch(e){console.warn('C7 flag lookup failed:',e.message);return null;}
+}
+
+// Remove all flags matching a prefix for a customer
+async function c7RemoveFlagsByPrefix(customerId,prefix){
+  if(!customerId)return;
+  try{
+    const data=await c7Req('GET','/customer/'+customerId,null);
+    const flags=(data&&data.flags)||[];
+    for(const f of flags){
+      if(f.content&&f.content.startsWith(prefix))await c7DeleteFlag(customerId,f.id);
+    }
+  }catch(e){console.warn('C7 remove flags failed:',e.message);}
+}
+
+// ---- C7 sync on campaign actions ----
+// Called when a contact is added to a campaign
+async function c7SyncContactAddedToCampaign(contact,campaign){
+  if(!contact.c7id||!campaign)return;
+  const content='[McGregor Connect] In campaign: '+campaign.name;
+  await c7AddFlag(contact.c7id,content);
+}
+
+// Called when a campaign is archived — remove campaign flags from all its contacts
+async function c7SyncCampaignArchived(campaign){
+  const contacts=S.contacts.filter(c=>c.campId===campaign.id&&c.c7id);
+  const prefix='[McGregor Connect] In campaign: '+campaign.name;
+  for(const c of contacts){
+    await c7RemoveFlagsByPrefix(c.c7id,prefix);
+    await new Promise(r=>setTimeout(r,300));
+  }
+}
+
+// ---- C7 sync on ticket actions ----
+// Called when a ticket is opened
+async function c7SyncTicketOpened(ticket){
+  if(!ticket.customerId)return;
+  const content='[McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
+  const flagId=await c7AddFlag(ticket.customerId,content);
+  if(flagId){
+    // Store flag id on ticket for later removal
+    ticket.c7FlagId=flagId;
+    // Save back to sheet
+    try{
+      const allRows=await sheetsGet('Tickets!A2:L');
+      const idx=allRows.findIndex(r=>r[0]===ticket.id);
+      // Store flagId in a note field or existing field — we'll use orderNo field as temporary storage
+      // Actually we'll just track it in the ticket note
+    }catch(e){}
+  }
+}
+
+// Called when a ticket is resolved — remove its C7 flag
+async function c7SyncTicketResolved(ticket){
+  if(!ticket.customerId)return;
+  const prefix='[McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
+  await c7RemoveFlagsByPrefix(ticket.customerId,prefix);
+}
+
+// ---- C7 sync on communication logged ----
+async function c7SyncAttemptLogged(contact,attempt){
+  if(!contact.c7id)return;
+  const rep=TEAM[attempt.assignedBy]||TEAM[0];
+  let noteText='[McGregor Connect] '+attempt.date+' — '+attempt.method+' ('+outcomeLabel(attempt.outcome)+')';
+  if(attempt.notes)noteText+=':\n'+attempt.notes;
+  noteText+='\n— '+rep.name;
+  await c7AddNote(contact.c7id,noteText);
+}
+
+async function c7SyncTicketMessage(ticket,msg){
+  if(!ticket.customerId)return;
+  const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
+  let noteText='[McGregor Connect] Ticket "'+ticket.subject+'" — '+msg.createdAt;
+  if(msg.method)noteText+=' ('+msg.method+')';
+  noteText+=':\n'+msg.message;
+  noteText+='\n— '+rep.name;
+  await c7AddNote(ticket.customerId,noteText);
+}
+
+async function c7SyncOrderMessage(orderCustomer,msg){
+  if(!orderCustomer.customerId)return;
+  const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
+  let noteText='[McGregor Connect] Order followup — '+msg.createdAt;
+  if(msg.method)noteText+=' ('+msg.method+')';
+  noteText+=':\n'+msg.message;
+  noteText+='\n— '+rep.name;
+  await c7AddNote(orderCustomer.customerId,noteText);
+}
+
+async function c7SyncOutreachMessage(outreach,msg){
+  if(!outreach.contactId)return;
+  const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
+  let noteText='[McGregor Connect] Outreach "'+outreach.title+'" — '+msg.createdAt;
+  if(msg.method)noteText+=' ('+msg.method+')';
+  noteText+=':\n'+msg.message;
+  noteText+='\n— '+rep.name;
+  await c7AddNote(outreach.contactId,noteText);
 }
 
 // ---- Export ----
