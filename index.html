@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.135</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.136</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4287,20 +4287,31 @@ async function c7Req(method,path,body){
   return txt?JSON.parse(txt):null;
 }
 
-// Add a flag to a C7 customer — returns the flag id
+// Add a flag to a C7 customer via PUT /customer/:id with updated flags array
 async function c7AddFlag(customerId,content){
   if(!customerId)return null;
   try{
-    const data=await c7Req('POST','/customer/'+customerId+'/flag',{content});
-    return data&&data.id?data.id:null;
+    // First get current customer to read existing flags
+    const customer=await c7Req('GET','/customer/'+customerId,null);
+    const existing=(customer&&customer.flags)||[];
+    // Check not already flagged with same content
+    if(existing.some(f=>f.content===content))return existing.find(f=>f.content===content).id||'exists';
+    const newFlags=[...existing,{content}];
+    const updated=await c7Req('PUT','/customer/'+customerId,{flags:newFlags});
+    const added=updated&&updated.flags&&updated.flags.find(f=>f.content===content);
+    console.log('C7 flag added:',added);
+    return added?added.id:null;
   }catch(e){console.warn('C7 flag add failed:',e.message);return null;}
 }
 
-// Delete a flag from a C7 customer
+// Delete a specific flag from a C7 customer
 async function c7DeleteFlag(customerId,flagId){
   if(!customerId||!flagId)return;
-  try{await c7Req('DELETE','/customer/'+customerId+'/flag/'+flagId);}
-  catch(e){console.warn('C7 flag delete failed:',e.message);}
+  try{
+    const customer=await c7Req('GET','/customer/'+customerId,null);
+    const remaining=((customer&&customer.flags)||[]).filter(f=>f.id!==flagId);
+    await c7Req('PUT','/customer/'+customerId,{flags:remaining});
+  }catch(e){console.warn('C7 flag delete failed:',e.message);}
 }
 
 // Add a note to a C7 customer
@@ -4327,11 +4338,9 @@ async function c7FindFlag(customerId,prefix){
 async function c7RemoveFlagsByPrefix(customerId,prefix){
   if(!customerId)return;
   try{
-    const data=await c7Req('GET','/customer/'+customerId,null);
-    const flags=(data&&data.flags)||[];
-    for(const f of flags){
-      if(f.content&&f.content.startsWith(prefix))await c7DeleteFlag(customerId,f.id);
-    }
+    const customer=await c7Req('GET','/customer/'+customerId,null);
+    const remaining=((customer&&customer.flags)||[]).filter(f=>!(f.content&&f.content.startsWith(prefix)));
+    await c7Req('PUT','/customer/'+customerId,{flags:remaining});
   }catch(e){console.warn('C7 remove flags failed:',e.message);}
 }
 
@@ -4384,7 +4393,7 @@ async function c7SyncTicketMessage(ticket,msg){
   let noteText='[McGregor Connect] Ticket "'+ticket.subject+'" — '+msg.createdAt;
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=':\n'+msg.message+'\n— '+rep.name;
-  try{await c7Req('POST','/customer/'+c7Id+'/note',{content:noteText});}
+  try{const _nd=await c7Req('POST','/customer/'+c7Id+'/note',{content:noteText,type:'Note'});console.log('C7 note added:',_nd&&_nd.id);}
   catch(e){console.warn('C7 ticket note failed:',e.message);}
 }
 
