@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.139</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.140</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4289,39 +4289,42 @@ async function c7Req(method,path,body,v2){
 }
 
 // Add a flag to a C7 customer via PUT /customer/:id with updated flags array
+// Add a "flag" as a v1 note with a distinctive prefix
 async function c7AddFlag(customerId,content){
   if(!customerId)return null;
   try{
-    const data=await c7Req('POST','/note',{customerId,content,type:'Flag',noteDate:new Date().toISOString()},true);
-    console.log('C7 flag added:',data&&data.id);
+    const noteContent='🚩 '+content;
+    const data=await c7Req('POST','/customer/'+customerId+'/note',{content:noteContent});
+    console.log('C7 flag note added:',data&&data.id);
     return data&&data.id?data.id:null;
   }catch(e){console.warn('C7 flag add failed:',e.message);return null;}
 }
 
-// Delete a flag by note ID
+// Delete a flag note by ID
 async function c7DeleteFlag(customerId,flagId){
-  if(!flagId)return;
-  try{await c7Req('DELETE','/note/'+flagId,null,true);}
+  if(!customerId||!flagId)return;
+  try{await c7Req('DELETE','/customer/'+customerId+'/note/'+flagId,null);}
   catch(e){console.warn('C7 flag delete failed:',e.message);}
 }
 
-// Add a note to a C7 customer using v2 endpoint
+// Add a regular note to a C7 customer
 async function c7AddNote(customerId,content){
   if(!customerId)return null;
   try{
-    const data=await c7Req('POST','/note',{customerId,content,type:'Note',noteDate:new Date().toISOString()},true);
+    const data=await c7Req('POST','/customer/'+customerId+'/note',{content});
     return data&&data.id?data.id:null;
   }catch(e){console.warn('C7 note add failed:',e.message);return null;}
 }
 
-// Remove all flags matching a prefix for a customer
+// Remove all flag notes matching a prefix for a customer
 async function c7RemoveFlagsByPrefix(customerId,prefix){
   if(!customerId)return;
   try{
-    const data=await c7Req('GET','/note?customerId='+customerId+'&type=Flag&limit=50',null,true);
-    const flags=(data&&(data.notes||data))||[];
-    for(const f of flags){
-      if(f.content&&f.content.startsWith(prefix))await c7DeleteFlag(customerId,f.id);
+    const data=await c7Req('GET','/customer/'+customerId+'/note',null);
+    const notes=(data&&(data.notes||data))||[];
+    for(const n of notes){
+      if(n.content&&(n.content.startsWith('🚩 '+prefix)||n.content.startsWith(prefix)))
+        await c7DeleteFlag(customerId,n.id);
     }
   }catch(e){console.warn('C7 remove flags failed:',e.message);}
 }
