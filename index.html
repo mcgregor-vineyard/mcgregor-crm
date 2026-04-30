@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor <span>Connect</span><div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.121</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.123</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -2144,8 +2144,17 @@ async function saveAttempt(){
   const btn=document.getElementById('am-save-btn');btn.textContent='Saving...';btn.disabled=true;
   try{
     await sheetsAppend('Attempts!A:I',[[id,cid,attempt.method,attempt.date,attempt.outcome,attempt.notes,JSON.stringify(sales),S.cu,createdAt]]);
-    c.attempts.push(attempt);renderAll();closeModal('attempt-modal');showToast('Attempt logged');
-    if(document.getElementById('detail-panel').classList.contains('open'))showContactDetail(cid);
+    c.attempts.push(attempt);
+    renderAll();
+    closeModal('attempt-modal');
+    showToast('Attempt logged');
+    // Return to wherever we were
+    if(S.activeCamp){
+      sv('campaigns');
+      openCampDetail(S.activeCamp);
+    } else if(document.getElementById('detail-panel').classList.contains('open')){
+      showContactDetail(cid);
+    }
   }catch(e){showToast('Error: '+e.message,'err');}
   finally{btn.textContent='Save';btn.disabled=false;}
 }
