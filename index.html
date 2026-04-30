@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.143</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.146</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4347,7 +4347,7 @@ async function c7SyncCampaignArchived(campaign){
       const notes=(data&&(data.notes||data))||[];
       const existing=notes.find(n=>n.content&&n.content.startsWith(prefix));
       if(existing){
-        const resolvedContent='✅ [McGregor Connect] Completed campaign: '+campaign.name;
+        const resolvedContent='✅ [McGregor Connect] Completed campaign: '+campaign.name+'\nOriginal note: '+existing.content.replace(/^🚩 /,'');
         await c7Req('PUT','/note/'+existing.id,{content:resolvedContent,type:'Note',noteDate:new Date().toISOString()});
       }
     }catch(e){console.warn('C7 campaign archive note failed:',e.message);}
@@ -4379,7 +4379,7 @@ async function c7SyncTicketResolved(ticket){
     const existing=notes.find(n=>n.content&&n.content.startsWith(prefix));
     if(existing){
       // Update note content to show resolved
-      const resolvedContent='✅ [McGregor Connect] Resolved ticket: '+ticket.type+' — '+ticket.subject;
+      const resolvedContent='✅ [McGregor Connect] Resolved ticket: '+ticket.type+' — '+ticket.subject+'\nOriginal note: '+existing.content.replace(/^🚩 /,'');
       await c7Req('PUT','/note/'+existing.id,{content:resolvedContent,type:'Note',noteDate:new Date().toISOString()});
       console.log('C7 ticket note updated to resolved');
     }
@@ -4392,30 +4392,39 @@ async function c7SyncTicketMessage(ticket,msg){
   if(contact){c7Id=await resolveC7Id(contact)||c7Id;}
   if(!c7Id||c7Id.startsWith('x'))return;
   const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
-  let noteText='[McGregor Connect] Ticket "'+ticket.subject+'" — '+msg.createdAt;
+  let noteText='🚩 [McGregor Connect] Ticket Update:';
   if(msg.method)noteText+=' ('+msg.method+')';
-  noteText+=':\n'+msg.message+'\n— '+rep.name;
+  noteText+=' Active ticket: '+ticket.type+' — '+ticket.subject+' / '+msg.message+' — '+rep.name;
   try{await c7AddNote(c7Id,noteText);}
   catch(e){console.warn('C7 ticket note failed:',e.message);}
+}
+
+async function c7SyncAttemptLogged(contact,attempt){
+  const c7Id=contact.c7id||(await resolveC7Id(contact));
+  if(!c7Id)return;
+  const rep=TEAM[attempt.assignedBy]||TEAM[0];
+  let noteText='[McGregor Connect] Contact attempt: ('+attempt.method+') '+outcomeLabel(attempt.outcome);
+  if(attempt.notes)noteText+=' / '+attempt.notes;
+  noteText+=' — '+rep.name;
+  try{await c7AddNote(c7Id,noteText);}
+  catch(e){console.warn('C7 attempt note failed:',e.message);}
 }
 
 async function c7SyncOrderMessage(orderCustomer,msg){
   if(!orderCustomer.customerId)return;
   const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
-  let noteText='[McGregor Connect] Order followup — '+msg.createdAt;
+  let noteText='[McGregor Connect] Order followup:';
   if(msg.method)noteText+=' ('+msg.method+')';
-  noteText+=':\n'+msg.message;
-  noteText+='\n— '+rep.name;
+  noteText+=' '+msg.message+' — '+rep.name;
   await c7AddNote(orderCustomer.customerId,noteText);
 }
 
 async function c7SyncOutreachMessage(outreach,msg){
   if(!outreach.contactId)return;
   const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
-  let noteText='[McGregor Connect] Outreach "'+outreach.title+'" — '+msg.createdAt;
+  let noteText='[McGregor Connect] Outreach "'+outreach.title+'":';
   if(msg.method)noteText+=' ('+msg.method+')';
-  noteText+=':\n'+msg.message;
-  noteText+='\n— '+rep.name;
+  noteText+=' '+msg.message+' — '+rep.name;
   await c7AddNote(outreach.contactId,noteText);
 }
 
