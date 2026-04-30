@@ -121,8 +121,10 @@ select.fi{cursor:pointer;}
 .tab{padding:8px 14px;font-size:13px;cursor:pointer;color:var(--ink-m);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
 .tab:hover{color:var(--burg);}
 .tab.on{color:var(--burg);border-bottom-color:var(--burg);font-weight:500;}
-.detail-panel{width:300px;background:white;border-left:1px solid var(--bdr);display:none;flex-direction:column;flex-shrink:0;}
-.detail-panel.open{display:flex;}
+.detail-panel{position:fixed;top:0;right:-520px;width:500px;height:100vh;background:white;border-left:1px solid var(--bdr);display:flex;flex-direction:column;z-index:150;transition:right .25s ease;box-shadow:-4px 0 24px rgba(0,0,0,.12);}
+.detail-panel.open{right:0;display:flex;}
+.detail-panel-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.18);z-index:149;}
+.detail-panel-backdrop.open{display:block;}
 .camp-card{background:white;border:1px solid var(--bdr);border-radius:8px;padding:14px;margin-bottom:10px;transition:border-color .15s;}
 .camp-card:hover{border-color:var(--burg-l);}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:white;padding:10px 16px;border-radius:7px;font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;}
@@ -135,7 +137,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.126</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.127</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -473,12 +475,13 @@ select.fi{cursor:pointer;}
     </div>
   </div>
 
+  <div class="detail-panel-backdrop" id="detail-backdrop" onclick="closeDP()"></div>
   <div class="detail-panel" id="detail-panel">
-    <div style="padding:12px 14px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:500;" id="dp-title">Contact</div>
-      <button style="background:none;border:none;cursor:pointer;color:var(--ink-m);font-size:16px;" onclick="closeDP()">✕</button>
+    <div style="padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;background:var(--burg);color:white;flex-shrink:0;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;" id="dp-title">Contact</div>
+      <button style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:16px;border-radius:4px;padding:2px 8px;" onclick="closeDP()">✕</button>
     </div>
-    <div id="dp-body" style="padding:14px;overflow-y:auto;flex:1;"></div>
+    <div id="dp-body" style="padding:18px;overflow-y:auto;flex:1;"></div>
   </div>
 </div>
 
@@ -1550,25 +1553,29 @@ function renderCampaigns(){
     const pct=contacts.length?Math.round(sold/contacts.length*100):0;
     const div=document.createElement('div');div.className='camp-card';div.style.cursor='pointer';
     div.style.borderLeft='4px solid '+col.border;
-    div.onmouseenter=()=>div.style.borderColor=col.border;
-    div.onmouseleave=()=>div.style.borderColor=col.border;
+    div.style.background=col.bg;
+    div.onmouseenter=()=>div.style.opacity='.92';
+    div.onmouseleave=()=>div.style.opacity='1';
     div.onclick=(e)=>{if(!e.target.closest('button'))openCampDetail(c.id);};
     div.innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-        <div><div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;">${c.name}</div>
-        <div style="font-size:12px;color:var(--ink-m);">${c.start||''}${c.end?' → '+c.end:''}</div></div>
-        <div style="text-align:right;"><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;color:var(--burg);">${fmt$(rev)}</div><div style="font-size:11px;color:var(--ink-m);">revenue</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <div style="flex:1;">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:${col.text};line-height:1.1;">${c.name}</div>
+          <div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${c.start||''}${c.end?' → '+c.end:''}</div>
+          ${c.desc?`<div style="font-size:12px;color:var(--ink-m);margin-top:5px;line-height:1.5;">${c.desc}</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;"><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:${col.text};">${fmt$(rev)}</div><div style="font-size:11px;color:var(--ink-m);">revenue</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
-        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${contacts.length}</div><div style="font-size:11px;color:var(--ink-m);">contacts</div></div>
-        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${att}</div><div style="font-size:11px;color:var(--ink-m);">attempts</div></div>
-        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${sold}</div><div style="font-size:11px;color:var(--ink-m);">sold</div></div>
-        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:var(--burg);">${pct}%</div><div style="font-size:11px;color:var(--ink-m);">conv.</div></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;margin-top:10px;">
+        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:${col.text};">${contacts.length}</div><div style="font-size:11px;color:var(--ink-m);">contacts</div></div>
+        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:${col.text};">${att}</div><div style="font-size:11px;color:var(--ink-m);">attempts</div></div>
+        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:${col.text};">${sold}</div><div style="font-size:11px;color:var(--ink-m);">sold</div></div>
+        <div style="text-align:center;"><div style="font-size:28px;font-weight:500;font-family:'Cormorant Garamond',serif;color:${col.text};">${pct}%</div><div style="font-size:11px;color:var(--ink-m);">conv.</div></div>
       </div>
-      <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${col.border};"></div></div>
       <div style="margin-top:10px;display:flex;gap:8px;">
-        <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="openCampDetail('${c.id}')">View contacts</button>
-        <button class="btn btnp" style="font-size:11px;padding:3px 10px;" onclick="openImportForCamp('${c.id}')">+ Add contacts</button>
+        <button class="btn" style="font-size:11px;padding:3px 10px;border-color:${col.border};color:${col.text};" onclick="openCampDetail('${c.id}')">View contacts</button>
+        <button class="btn" style="font-size:11px;padding:3px 10px;background:${col.border};color:white;border-color:${col.border};" onclick="openImportForCamp('${c.id}')">+ Add contacts</button>
       </div>`;
     el.appendChild(div);
   });
@@ -1766,62 +1773,111 @@ function renderReports(){
 
 function showContactDetail(id){
   const c=S.contacts.find(x=>x.id===id);if(!c)return;
-  const camp=S.campaigns.find(x=>x.id===c.campId);const m=TEAM[c.assignee]||TEAM[0];const rev=getContactRevenue(c);
-  document.getElementById('dp-title').textContent=c.first+' '+c.last;
+  const camp=S.campaigns.find(x=>x.id===c.campId);
+  const col=getCampColor(c.campId);
+  const m=TEAM[c.assignee]||null;
+  const rev=getContactRevenue(c);
   const initials=((c.first||'')[0]||'')+((c.last||'')[0]||'');
+  document.getElementById('dp-title').textContent=c.first+' '+c.last;
   let html='';
-  html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">';
-  html+='<div class="av av-b" style="width:40px;height:40px;font-size:14px;">'+initials+'</div>';
-  html+='<div><div style="font-weight:500;font-size:15px;">'+c.first+' '+c.last+'</div><div style="font-size:12px;color:var(--ink-m);">'+(c.city||'')+'</div></div></div>';
-  html+='<div style="margin-bottom:12px;">';
-  if(c.phone)html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Phone </span>'+phoneLink(c.phone)+'</div>';
-  if(c.email)html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Email </span>'+emailLink(c.email)+'</div>';
-  html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Campaign </span>'+(camp?camp.name:'—')+'</div>';
-  html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Assigned </span>'+m.name+'</div>';
-  if(c.addReason||true){
-    const reasonVal=c.addReason||'';
-    html+='<div style="font-size:12px;margin-bottom:5px;display:flex;align-items:center;gap:6px;">'
-      +'<span style="color:var(--ink-m);">Add reason </span>'
-      +'<span id="dp-reason-display" style="flex:1;">'+( reasonVal||'<span style="color:var(--ink-f);font-style:italic;">Not set</span>')+'</span>'
-      +'<button onclick="editContactReason(\''+c.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);" title="Edit">✎</button>'
-      +'</div>';
-  }
-  if(rev>0)html+='<div style="font-size:12px;"><span style="color:var(--ink-m);">Revenue </span><span style="color:var(--burg);font-family:\'Cormorant Garamond\',serif;font-size:15px;">'+fmt$(rev)+'</span></div>';
-  if(c.c7id)html+='<div style="margin-top:8px;"><a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:12px;color:var(--burg);text-decoration:none;border:1px solid var(--bdr-s);border-radius:5px;padding:4px 10px;display:inline-block;">View in Commerce7 ↗</a></div>';
+
+  // Contact info card
+  html+='<div style="background:'+col.bg+';border:1px solid '+col.border+';border-radius:8px;padding:14px;margin-bottom:14px;">';
+  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">';
+  html+='<div class="av av-b" style="width:46px;height:46px;font-size:16px;flex-shrink:0;">'+initials+'</div>';
+  html+='<div><div style="font-weight:600;font-size:17px;color:'+col.text+';">'+c.first+' '+c.last+'</div>';
+  if(c.city)html+='<div style="font-size:12px;color:var(--ink-m);">'+c.city+'</div>';
+  html+='</div></div>';
+  html+='<div style="display:flex;flex-direction:column;gap:5px;font-size:13px;">';
+  if(c.phone)html+='<div>'+phoneLink(c.phone)+'</div>';
+  if(c.email)html+='<div>'+emailLink(c.email)+'</div>';
+  if(camp)html+='<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;background:'+col.border+';color:white;border-radius:4px;padding:1px 6px;">'+camp.name+'</span></div>';
+  if(m)html+='<div style="font-size:12px;color:var(--ink-m);">Assigned: '+m.name+'</div>';
+  if(c.addReason)html+='<div style="font-size:12px;color:var(--burg);">Added: '+c.addReason+' <button onclick="editContactReason(''+c.id+'')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">✎</button></div>';
+  else html+='<div style="font-size:12px;"><button onclick="editContactReason(''+c.id+'')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">✎ Add reason</button></div>';
+  if(rev>0)html+='<div style="font-size:14px;font-family:\'Cormorant Garamond\',serif;color:var(--burg);font-weight:600;">'+fmt$(rev)+' revenue</div>';
   html+='</div>';
-  html+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:8px;">History ('+(c.attempts||[]).length+')</div>';
-  if(!(c.attempts||[]).length){
-    html+='<div style="font-size:12px;color:var(--ink-m);margin-bottom:10px;">No attempts yet.</div>';
+  if(c.c7id)html+='<div style="margin-top:10px;"><a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:11px;color:'+col.text+';text-decoration:none;border:1px solid '+col.border+';border-radius:5px;padding:3px 8px;display:inline-block;">View in Commerce7 \u2197</a></div>';
+  html+='</div>';
+
+  // Action buttons
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:16px;">';
+  html+='<button class="btn btnp" onclick="openAttempt(''+c.id+'')">+ Log</button>';
+  html+='<button class="btn" onclick="openNewTicket(''+c.id+'',''+c.first+' '+c.last+'');closeDP();">+ Ticket</button>';
+  html+='<button class="btn" onclick="openNewReminder('contact',''+c.id+'',''+c.first+' '+c.last+'');">\uD83D\uDD14 Remind</button>';
+  html+='</div>';
+
+  // Unified timeline
+  const timeline=[];
+  (c.attempts||[]).forEach(a=>timeline.push({ts:a.createdAt||a.date||'',type:'attempt',data:a}));
+  const cTickets=S.tickets.filter(t=>t.customerId===c.c7id||t.customerId===c.id);
+  cTickets.forEach(t=>{
+    timeline.push({ts:t.createdAt||'',type:'ticket-open',data:t});
+    S.ticketMsgs.filter(tm=>tm.ticketId===t.id).forEach(msg=>timeline.push({ts:msg.createdAt||'',type:'ticket-msg',data:msg,ticket:t}));
+  });
+  S.reminders.filter(r=>r.refId===c.id).forEach(r=>timeline.push({ts:r.id||'',type:'reminder',data:r}));
+  timeline.sort((a,b)=>b.ts.localeCompare(a.ts));
+
+  html+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:10px;font-weight:600;">Communication history ('+timeline.length+')</div>';
+
+  if(!timeline.length){
+    html+='<div style="font-size:13px;color:var(--ink-m);padding:16px;text-align:center;background:var(--cream);border-radius:8px;">No history yet.</div>';
   } else {
-    (c.attempts||[]).slice().reverse().forEach(a=>{
-      html+='<div style="padding:8px;border:1px solid var(--bdr);border-radius:6px;margin-bottom:7px;">';
-      html+='<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;font-weight:500;">'+a.method+' · '+a.date+'</span><div style="display:flex;align-items:center;gap:6px;">'+outcomeBadge(a.outcome)+'<button onclick="openEditAttempt(\''+a.id+'\',\''+c.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);padding:0 2px;" title="Edit">✎</button></div></div>';
-      if(a.notes)html+='<div style="font-size:12px;color:var(--ink-m);">'+a.notes+'</div>';
-      if((a.sales||[]).length){
-        html+='<div style="font-size:11px;color:var(--burg);margin-top:4px;">';
-        if(a.sales[0]&&a.sales[0].orderNo)html+='<div style="font-weight:500;">Order #'+a.sales[0].orderNo+' — '+fmt$(a.sales[0].total)+'</div>';
-        html+=a.sales.map(s=>s.wine+' × '+s.qty).join(', ')+'</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:8px;">';
+    timeline.forEach(item=>{
+      if(item.type==='attempt'){
+        const a=item.data;
+        const rep=TEAM[a.assignedBy]||null;
+        html+='<div style="padding:10px 12px;background:var(--burg-f);border-radius:8px;border-left:3px solid var(--burg);">';
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+        html+='<span style="font-size:12px;font-weight:600;">'+a.method+'</span>';
+        html+='<div style="display:flex;align-items:center;gap:6px;">'+outcomeBadge(a.outcome)+'<span style="font-size:11px;color:var(--ink-f);">'+a.date+'</span><button onclick="openEditAttempt(''+a.id+'',''+c.id+'')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">\u270E</button></div>';
+        html+='</div>';
+        if(a.notes)html+='<div style="font-size:12px;color:var(--ink);">'+a.notes+'</div>';
+        if((a.sales||[]).length){
+          html+='<div style="font-size:11px;color:var(--burg);margin-top:4px;font-weight:500;">';
+          if(a.sales[0]&&a.sales[0].orderNo)html+='Order #'+a.sales[0].orderNo+' \u2014 '+fmt$(a.sales[0].total)+' ';
+          html+=a.sales.map(s=>s.wine+' \xd7 '+s.qty).join(', ')+'</div>';
+        }
+        if(rep)html+='<div style="font-size:11px;color:var(--ink-f);margin-top:3px;">by '+rep.name+'</div>';
+        html+='</div>';
+      } else if(item.type==='ticket-open'){
+        const t=item.data;
+        html+='<div style="padding:10px 12px;background:#FFF8E1;border-radius:8px;border-left:3px solid var(--w-tx);cursor:pointer;" onclick="openTicketThread(''+t.id+'')">';
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;">';
+        html+='<span style="font-size:12px;font-weight:600;">\uD83C\uDFAB '+t.subject+'</span>';
+        html+='<span class="bdg '+(TICKET_STATUS_COLORS[t.status]||'bdg-g')+'" style="font-size:10px;">'+t.status+'</span>';
+        html+='</div><div style="font-size:11px;color:var(--ink-m);margin-top:3px;">'+t.type+'</div></div>';
+      } else if(item.type==='ticket-msg'){
+        const msg=item.data;const t=item.ticket;
+        const auth=TEAM[msg.author]||{name:msg.authorName||'',init:'?',cls:'av-b'};
+        html+='<div style="padding:8px 12px;background:#FAFAFA;border-radius:8px;border-left:3px solid var(--bdr-s);cursor:pointer;" onclick="openTicketThread(''+t.id+'')">';
+        html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">';
+        html+='<div class="av '+auth.cls+'" style="width:16px;height:16px;font-size:7px;">'+auth.init+'</div>';
+        html+='<span style="font-size:11px;font-weight:500;">'+auth.name+'</span>';
+        html+='<span style="font-size:10px;color:var(--ink-f);">'+msg.createdAt+'</span>';
+        if(msg.method)html+='<span style="font-size:10px;background:white;color:var(--burg);border:1px solid var(--bdr-s);border-radius:3px;padding:0 4px;">'+msg.method+'</span>';
+        html+='</div><div style="font-size:12px;color:var(--ink-m);">'+msg.message.slice(0,80)+(msg.message.length>80?'\u2026':'')+'</div></div>';
+      } else if(item.type==='reminder'){
+        const r=item.data;
+        html+='<div style="padding:8px 12px;background:var(--s-bg);border-radius:8px;border-left:3px solid var(--s-tx);">';
+        html+='<div style="font-size:12px;font-weight:500;">\uD83D\uDD14 '+r.note+'</div>';
+        html+='<div style="font-size:11px;color:var(--ink-m);margin-top:2px;">Due: '+r.dueDate+(r.done?' \u2713':'')+'</div></div>';
       }
-      html+='</div>';
-    });
-  }
-  html+='<button class="btn btnp" style="width:100%;margin-top:4px;" onclick="openAttempt(\''+c.id+'\')">+ Log attempt</button>';
-  html+='<button class="btn" style="width:100%;margin-top:6px;" onclick="openNewTicket(\''+c.id+'\',\''+c.first+' '+c.last+'\');closeDP();">+ New ticket</button>';
-  html+='<button class="btn" style="width:100%;margin-top:6px;" onclick="openNewReminder(\'contact\',\''+c.id+'\',\''+c.first+' '+c.last+'\');">+ Set reminder</button>';
-  const cTickets=S.tickets.filter(t=>t.customerId===c.id);
-  if(cTickets.length){
-    html+='<div style="margin-top:12px;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:8px;">Tickets ('+cTickets.length+')</div>';
-    cTickets.forEach(t=>{
-      html+='<div style="padding:8px;border:1px solid var(--bdr);border-radius:6px;margin-bottom:6px;cursor:pointer;" onclick="openTicketThread(\''+t.id+'\')">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;font-weight:500;">'+t.subject+'</span><span class="bdg '+(TICKET_STATUS_COLORS[t.status]||'bdg-g')+'">'+t.status+'</span></div>';
-      html+='<div style="font-size:11px;color:var(--ink-m);margin-top:3px;">'+t.type+'</div></div>';
     });
     html+='</div>';
   }
   document.getElementById('dp-body').innerHTML=html;
-  document.getElementById('detail-panel').classList.add('open');
+  openDP();
 }
-function closeDP(){document.getElementById('detail-panel').classList.remove('open');}
+function closeDP(){
+  document.getElementById('detail-panel').classList.remove('open');
+  const bd=document.getElementById('detail-backdrop');if(bd)bd.classList.remove('open');
+}
+function openDP(){
+  document.getElementById('detail-panel').classList.add('open');
+  const bd=document.getElementById('detail-backdrop');if(bd)bd.classList.add('open');
+}
 
 // ---- Campaigns ----
 function openNewCamp(){
