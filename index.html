@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.137</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.138</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4274,11 +4274,12 @@ async function deleteAttempt(){
 }
 
 // ---- Commerce7 Flags & Notes ----
-async function c7Req(method,path,body){
+async function c7Req(method,path,body,v2){
   if(!CONFIG.C7_WORKER_URL)return null;
   const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
   const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-  const url=CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent('https://api.commerce7.com/v1'+path);
+  const base=v2?'https://api.commerce7.com/v2':'https://api.commerce7.com/v1';
+  const url=CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(base+(path.startsWith('/')?path:'/'+path));
   const opts={method,headers};
   if(body)opts.body=JSON.stringify(body);
   const res=await fetch(url,opts);
@@ -4291,56 +4292,37 @@ async function c7Req(method,path,body){
 async function c7AddFlag(customerId,content){
   if(!customerId)return null;
   try{
-    // First get current customer to read existing flags
-    const customer=await c7Req('GET','/customer/'+customerId,null);
-    const existing=(customer&&customer.flags)||[];
-    // Check not already flagged with same content
-    if(existing.some(f=>f.content===content))return existing.find(f=>f.content===content).id||'exists';
-    const newFlags=[...existing,{content}];
-    const updated=await c7Req('PUT','/customer/'+customerId,{flags:newFlags});
-    const added=updated&&updated.flags&&updated.flags.find(f=>f.content===content);
-    console.log('C7 flag added:',added);
-    return added?added.id:null;
+    const data=await c7Req('POST','/note',{customerId,content,type:'Flag',noteDate:new Date().toISOString()},true);
+    console.log('C7 flag added:',data&&data.id);
+    return data&&data.id?data.id:null;
   }catch(e){console.warn('C7 flag add failed:',e.message);return null;}
 }
 
-// Delete a specific flag from a C7 customer
+// Delete a flag by note ID
 async function c7DeleteFlag(customerId,flagId){
-  if(!customerId||!flagId)return;
-  try{
-    const customer=await c7Req('GET','/customer/'+customerId,null);
-    const remaining=((customer&&customer.flags)||[]).filter(f=>f.id!==flagId);
-    await c7Req('PUT','/customer/'+customerId,{flags:remaining});
-  }catch(e){console.warn('C7 flag delete failed:',e.message);}
+  if(!flagId)return;
+  try{await c7Req('DELETE','/note/'+flagId,null,true);}
+  catch(e){console.warn('C7 flag delete failed:',e.message);}
 }
 
-// Add a note to a C7 customer
+// Add a note to a C7 customer using v2 endpoint
 async function c7AddNote(customerId,content){
   if(!customerId)return null;
   try{
-    const data=await c7Req('POST','/customer/'+customerId+'/note',{content});
+    const data=await c7Req('POST','/note',{customerId,content,type:'Note',noteDate:new Date().toISOString()},true);
     return data&&data.id?data.id:null;
   }catch(e){console.warn('C7 note add failed:',e.message);return null;}
-}
-
-// Get customer flags and find one matching a prefix
-async function c7FindFlag(customerId,prefix){
-  if(!customerId)return null;
-  try{
-    const data=await c7Req('GET','/customer/'+customerId,null);
-    const flags=(data&&data.flags)||[];
-    const match=flags.find(f=>f.content&&f.content.startsWith(prefix));
-    return match||null;
-  }catch(e){console.warn('C7 flag lookup failed:',e.message);return null;}
 }
 
 // Remove all flags matching a prefix for a customer
 async function c7RemoveFlagsByPrefix(customerId,prefix){
   if(!customerId)return;
   try{
-    const customer=await c7Req('GET','/customer/'+customerId,null);
-    const remaining=((customer&&customer.flags)||[]).filter(f=>!(f.content&&f.content.startsWith(prefix)));
-    await c7Req('PUT','/customer/'+customerId,{flags:remaining});
+    const data=await c7Req('GET','/note?customerId='+customerId+'&type=Flag&limit=50',null,true);
+    const flags=(data&&(data.notes||data))||[];
+    for(const f of flags){
+      if(f.content&&f.content.startsWith(prefix))await c7DeleteFlag(customerId,f.id);
+    }
   }catch(e){console.warn('C7 remove flags failed:',e.message);}
 }
 
