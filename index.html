@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.124</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.125</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1442,21 +1442,21 @@ function updateCounts(){
   const all=activeContacts.length;
   const sold=activeContacts.filter(c=>c.attempts&&c.attempts.some(a=>a.outcome==='sold')).length;
   const rev=totalRevenue();const att=S.contacts.reduce((s,c)=>s+(c.attempts?c.attempts.length:0),0);
-  document.getElementById('fc-all').textContent=all;
-  document.getElementById('fc-pending').textContent=activeContacts.filter(c=>!c.attempts||!c.attempts.length).length;
-  document.getElementById('fc-reached').textContent=activeContacts.filter(c=>['reached','email-replied'].includes(getLastOutcome(c))).length;
-  document.getElementById('fc-vm').textContent=activeContacts.filter(c=>getLastOutcome(c)==='vm').length;
-  document.getElementById('fc-noanswer').textContent=activeContacts.filter(c=>getLastOutcome(c)==='noanswer').length;
-  document.getElementById('fc-sold').textContent=sold;
-  document.getElementById('fc-nosale').textContent=activeContacts.filter(c=>getLastOutcome(c)==='nosale').length;
-  document.getElementById('sb-camps').textContent=S.campaigns.filter(c=>!c.archived).length;
-  document.getElementById('sb-contacts').textContent=all;
-  document.getElementById('sb-rev').textContent=fmt$(rev);
-  document.getElementById('ds-camps').textContent=S.campaigns.filter(c=>!c.archived).length;
-  document.getElementById('ds-contacts').textContent=S.contacts.length;
-  document.getElementById('ds-attempts').textContent=att;
-  document.getElementById('ds-conv').textContent=(S.contacts.length?Math.round(sold/S.contacts.length*100):0)+'%';
-  document.getElementById('ds-rev').textContent=fmt$(rev);
+  (document.getElementById('fc-all')||{}).textContent=all;
+  (document.getElementById('fc-pending')||{}).textContent=activeContacts.filter(c=>!c.attempts||!c.attempts.length).length;
+  (document.getElementById('fc-reached')||{}).textContent=activeContacts.filter(c=>['reached','email-replied'].includes(getLastOutcome(c))).length;
+  (document.getElementById('fc-vm')||{}).textContent=activeContacts.filter(c=>getLastOutcome(c)==='vm').length;
+  (document.getElementById('fc-noanswer')||{}).textContent=activeContacts.filter(c=>getLastOutcome(c)==='noanswer').length;
+  (document.getElementById('fc-sold')||{}).textContent=sold;
+  (document.getElementById('fc-nosale')||{}).textContent=activeContacts.filter(c=>getLastOutcome(c)==='nosale').length;
+  (document.getElementById('sb-camps')||{}).textContent=S.campaigns.filter(c=>!c.archived).length;
+  (document.getElementById('sb-contacts')||{}).textContent=all;
+  (document.getElementById('sb-rev')||{}).textContent=fmt$(rev);
+  (document.getElementById('ds-camps')||{}).textContent=S.campaigns.filter(c=>!c.archived).length;
+  (document.getElementById('ds-contacts')||{}).textContent=S.contacts.length;
+  (document.getElementById('ds-attempts')||{}).textContent=att;
+  (document.getElementById('ds-conv')||{}).textContent=(S.contacts.length?Math.round(sold/S.contacts.length*100):0)+'%';
+  (document.getElementById('ds-rev')||{}).textContent=fmt$(rev);
 }
 
 function renderSidebar(){
@@ -2263,10 +2263,10 @@ function renderTickets(){
   document.getElementById('tk-inprog').textContent=inprog;
   document.getElementById('tk-resolved').textContent=resolved;
   document.getElementById('tk-total').textContent=S.tickets.length;
-  document.getElementById('tfc-all').textContent=S.tickets.length;
-  document.getElementById('tfc-open').textContent=open;
-  document.getElementById('tfc-inprog').textContent=inprog;
-  document.getElementById('tfc-resolved').textContent=resolved;
+  (document.getElementById('tfc-all')||{}).textContent=S.tickets.length;
+  (document.getElementById('tfc-open')||{}).textContent=open;
+  (document.getElementById('tfc-inprog')||{}).textContent=inprog;
+  const tfcResolved=document.getElementById('tfc-resolved');if(tfcResolved)tfcResolved.textContent=resolved;
 
   const typeFilter=(document.getElementById('ticket-type-filter')||{}).value||'';
   const q=(document.getElementById('srch').value||'').toLowerCase();
