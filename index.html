@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.131</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.132</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1154,7 +1154,7 @@ select.fi{cursor:pointer;}
         <div class="mtitle" id="thread-title">Ticket</div>
         <div style="font-size:12px;color:var(--ink-m);margin-top:2px;" id="thread-meta"></div>
         <div style="font-size:12px;color:var(--ink);margin-top:4px;padding:6px 8px;background:var(--burg-f);border-radius:5px;display:inline-block;" id="thread-customer-info"></div>
-        <a id="thread-c7link" href="#" target="_blank" style="display:none;font-size:11px;color:var(--burg);text-decoration:none;border:1px solid var(--bdr-s);border-radius:4px;padding:2px 8px;margin-top:5px;display:inline-block;">View in Commerce7 ↗</a>
+        <a id="thread-c7link" href="#" target="_blank" style="font-size:11px;color:var(--burg);text-decoration:none;border:1px solid var(--bdr-s);border-radius:4px;padding:2px 8px;margin-top:5px;display:none;">View in Commerce7 ↗</a>
       </div>
       <button class="mcls" onclick="closeModal('thread-modal')">✕</button>
     </div>
@@ -4357,46 +4357,57 @@ async function c7SyncCampaignArchived(campaign){
 // Called when a ticket is opened
 async function c7SyncTicketOpened(ticket){
   if(!ticket.customerId)return;
+  // Resolve actual C7 customer ID — ticket.customerId may be an internal contact ID
+  let c7Id=ticket.customerId;
+  // Check if this looks like an internal ID (not a UUID from C7) by checking contacts
+  const contact=S.contacts.find(c=>c.id===ticket.customerId);
+  if(contact&&contact.c7id)c7Id=contact.c7id;
+  if(!c7Id)return;
   const content='[McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
-  const flagId=await c7AddFlag(ticket.customerId,content);
-  if(flagId){
-    // Store flag id on ticket for later removal
-    ticket.c7FlagId=flagId;
-    // Save back to sheet
-    try{
-      const allRows=await sheetsGet('Tickets!A2:L');
-      const idx=allRows.findIndex(r=>r[0]===ticket.id);
-      // Store flagId in a note field or existing field — we'll use orderNo field as temporary storage
-      // Actually we'll just track it in the ticket note
-    }catch(e){}
-  }
+  try{
+    const data=await c7Req('POST','/customer/'+c7Id+'/flag',{content});
+    if(data&&data.id){
+      ticket.c7FlagId=data.id;
+      ticket.c7CustomerId=c7Id; // store resolved ID for removal later
+      console.log('C7 ticket flag added:',data.id,'for customer:',c7Id);
+    }
+  }catch(e){console.warn('C7 ticket flag failed:',e.message);}
 }
 
 // Called when a ticket is resolved — remove its C7 flag
 async function c7SyncTicketResolved(ticket){
-  if(!ticket.customerId)return;
+  // Use stored c7CustomerId if available, otherwise resolve
+  let c7Id=ticket.c7CustomerId||ticket.customerId;
+  const contact=S.contacts.find(c=>c.id===c7Id);
+  if(contact&&contact.c7id)c7Id=contact.c7id;
+  if(!c7Id)return;
   const prefix='[McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
-  await c7RemoveFlagsByPrefix(ticket.customerId,prefix);
+  await c7RemoveFlagsByPrefix(c7Id,prefix);
 }
 
 // ---- C7 sync on communication logged ----
 async function c7SyncAttemptLogged(contact,attempt){
-  if(!contact.c7id)return;
+  const c7Id=contact.c7id;
+  if(!c7Id)return;
   const rep=TEAM[attempt.assignedBy]||TEAM[0];
   let noteText='[McGregor Connect] '+attempt.date+' — '+attempt.method+' ('+outcomeLabel(attempt.outcome)+')';
   if(attempt.notes)noteText+=':\n'+attempt.notes;
   noteText+='\n— '+rep.name;
-  await c7AddNote(contact.c7id,noteText);
+  try{await c7Req('POST','/customer/'+c7Id+'/note',{content:noteText});}
+  catch(e){console.warn('C7 attempt note failed:',e.message);}
 }
 
 async function c7SyncTicketMessage(ticket,msg){
-  if(!ticket.customerId)return;
+  let c7Id=ticket.c7CustomerId||ticket.customerId;
+  const contact=S.contacts.find(c=>c.id===c7Id);
+  if(contact&&contact.c7id)c7Id=contact.c7id;
+  if(!c7Id)return;
   const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
   let noteText='[McGregor Connect] Ticket "'+ticket.subject+'" — '+msg.createdAt;
   if(msg.method)noteText+=' ('+msg.method+')';
-  noteText+=':\n'+msg.message;
-  noteText+='\n— '+rep.name;
-  await c7AddNote(ticket.customerId,noteText);
+  noteText+=':\n'+msg.message+'\n— '+rep.name;
+  try{await c7Req('POST','/customer/'+c7Id+'/note',{content:noteText});}
+  catch(e){console.warn('C7 ticket note failed:',e.message);}
 }
 
 async function c7SyncOrderMessage(orderCustomer,msg){
