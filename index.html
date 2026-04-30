@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.125</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.126</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -147,8 +147,8 @@ select.fi{cursor:pointer;}
     </div>
   </div>
   <div class="usr">
-    <div class="uav" id="cuav">DM</div>
-    <select id="cusel" style="background:rgba(255,255,255,.15);border:none;color:white;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;outline:none;" onchange="setCU(this.value)">
+    <div class="uav" id="cuav">DJ</div>
+    <select id="cusel" style="background:white;color:var(--burg);border:none;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;outline:none;border-radius:5px;padding:4px 8px;font-weight:500;" onchange="setCU(this.value)">
       <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option>
     </select>
     <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;" onclick="openMyTasks()">✓ My tasks</button>
@@ -583,6 +583,7 @@ select.fi{cursor:pointer;}
       </div>
       <div class="fr"><label class="fl">Assign to</label>
         <select class="fi" id="co-assign">
+          <option value="-1">Unassigned</option>
           <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option>
         </select>
       </div>
@@ -1777,6 +1778,14 @@ function showContactDetail(id){
   if(c.email)html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Email </span>'+emailLink(c.email)+'</div>';
   html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Campaign </span>'+(camp?camp.name:'—')+'</div>';
   html+='<div style="font-size:12px;margin-bottom:5px;"><span style="color:var(--ink-m);">Assigned </span>'+m.name+'</div>';
+  if(c.addReason||true){
+    const reasonVal=c.addReason||'';
+    html+='<div style="font-size:12px;margin-bottom:5px;display:flex;align-items:center;gap:6px;">'
+      +'<span style="color:var(--ink-m);">Add reason </span>'
+      +'<span id="dp-reason-display" style="flex:1;">'+( reasonVal||'<span style="color:var(--ink-f);font-style:italic;">Not set</span>')+'</span>'
+      +'<button onclick="editContactReason(\''+c.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);" title="Edit">✎</button>'
+      +'</div>';
+  }
   if(rev>0)html+='<div style="font-size:12px;"><span style="color:var(--ink-m);">Revenue </span><span style="color:var(--burg);font-family:\'Cormorant Garamond\',serif;font-size:15px;">'+fmt$(rev)+'</span></div>';
   if(c.c7id)html+='<div style="margin-top:8px;"><a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:12px;color:var(--burg);text-decoration:none;border:1px solid var(--bdr-s);border-radius:5px;padding:4px 10px;display:inline-block;">View in Commerce7 ↗</a></div>';
   html+='</div>';
@@ -1834,7 +1843,7 @@ async function saveCamp(){
 function populateCampSelects(){
   ['imp-camp','co-camp'].forEach(id=>{const sel=document.getElementById(id);if(!sel)return;sel.innerHTML=S.campaigns.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');});
 }
-function openAddContact(){populateCampSelects();['co-first','co-last','co-phone','co-email','co-city','co-reason'].forEach(id=>document.getElementById(id).value='');document.getElementById('co-assign').value=S.cu;openModal('contact-modal');}
+function openAddContact(){populateCampSelects();['co-first','co-last','co-phone','co-email','co-city','co-reason'].forEach(id=>document.getElementById(id).value='');document.getElementById('co-assign').value='-1';openModal('contact-modal');}
 
 async function saveContact(){
   const first=document.getElementById('co-first').value.trim(),last=document.getElementById('co-last').value.trim();if(!first||!last)return;
@@ -3433,6 +3442,21 @@ function openDeclineTicket(){
 // ---- Call Queue ----
 let CQ={queue:[],idx:0};
 
+function editContactReason(contactId){
+  const c=S.contacts.find(x=>x.id===contactId);if(!c)return;
+  const val=prompt('Add reason:',c.addReason||'');
+  if(val===null)return;
+  c.addReason=val.trim();
+  // Save to sheet
+  sheetsGet('Contacts!A2:K').then(rows=>{
+    const idx=rows.findIndex(r=>r[0]===contactId);
+    if(idx>=0)sheetsUpdate('Contacts!K'+(idx+2),[[c.addReason]]);
+  }).catch(()=>{});
+  // Refresh panel
+  showContactDetail(contactId);
+  showToast('Add reason updated');
+}
+
 function openCallQueue(){
   // Populate campaign filter
   const sel=document.getElementById('cq-camp-filter');
@@ -3506,9 +3530,11 @@ function showQueueCard(){
   const badge=document.getElementById('cq-campaign-badge');
   badge.textContent=camp?camp.name:'No campaign';
   badge.style.cssText='display:inline-block;margin-top:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;background:'+col.bg+';color:'+col.text+';border:1px solid '+col.border+';';
-  // Campaign description
+  // Campaign description and add reason
   const descEl=document.getElementById('cq-camp-desc');
-  descEl.textContent=camp&&camp.desc?camp.desc:'';
+  let descHtml=camp&&camp.desc?'<span>'+camp.desc+'</span>':'';
+  if(c.addReason)descHtml+=(descHtml?' &nbsp;·&nbsp; ':'')+'<span style="color:var(--burg);">Added: '+c.addReason+'</span>';
+  descEl.innerHTML=descHtml;
   // Clickable phone and email
   document.getElementById('cq-phone').innerHTML=c.phone?'<a href="tel:'+c.phone+'" style="color:var(--ink);text-decoration:none;font-size:16px;font-weight:500;">'+c.phone+'</a> <span title="Copy" onclick="copyToClipboard(\''+c.phone+'\')" style="cursor:pointer;opacity:.5;font-size:12px;">⧉</span>':'—';
   document.getElementById('cq-email').innerHTML=c.email?'<a href="mailto:'+c.email+'" style="color:var(--ink);text-decoration:none;">'+c.email+'</a> <span title="Copy" onclick="copyToClipboard(\''+c.email+'\')" style="cursor:pointer;opacity:.5;font-size:12px;">⧉</span>':'—';
