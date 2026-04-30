@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.141</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.142</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4294,7 +4294,7 @@ async function c7AddFlag(customerId,content){
   if(!customerId)return null;
   try{
     const noteContent='🚩 '+content;
-    const data=await c7Req('POST','/note',{customerId,content:noteContent});
+    const data=await c7Req('POST','/note',{customerId,content:noteContent,type:'Note',noteDate:new Date().toISOString()});
     console.log('C7 flag note added:',data&&data.id);
     return data&&data.id?data.id:null;
   }catch(e){console.warn('C7 flag add failed:',e.message);return null;}
@@ -4311,7 +4311,7 @@ async function c7DeleteFlag(customerId,flagId){
 async function c7AddNote(customerId,content){
   if(!customerId)return null;
   try{
-    const data=await c7Req('POST','/note',{customerId,content});
+    const data=await c7Req('POST','/note',{customerId,content,type:'Note',noteDate:new Date().toISOString()});
     return data&&data.id?data.id:null;
   }catch(e){console.warn('C7 note add failed:',e.message);return null;}
 }
