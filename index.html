@@ -137,7 +137,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.128</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.129</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1794,20 +1794,20 @@ function showContactDetail(id){
   html+='<div style="display:flex;flex-direction:column;gap:5px;font-size:13px;">';
   if(c.phone)html+='<div>'+phoneLink(c.phone)+'</div>';
   if(c.email)html+='<div>'+emailLink(c.email)+'</div>';
-  if(camp)html+='<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;background:'+col.border+';color:white;border-radius:4px;padding:1px 6px;">'+camp.name+'</span></div>';
+  if(camp)html+='<div><span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;background:'+col.border+';color:white;border-radius:4px;padding:1px 6px;">'+camp.name+'</span></div>';
   if(m)html+='<div style="font-size:12px;color:var(--ink-m);">Assigned: '+m.name+'</div>';
-  if(c.addReason)html+='<div style="font-size:12px;color:var(--burg);">Added: '+c.addReason+' <button onclick="editContactReason(''+c.id+'')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">✎</button></div>';
-  else html+='<div style="font-size:12px;"><button onclick="editContactReason(''+c.id+'')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">✎ Add reason</button></div>';
-  if(rev>0)html+='<div style="font-size:14px;font-family:\'Cormorant Garamond\',serif;color:var(--burg);font-weight:600;">'+fmt$(rev)+' revenue</div>';
+  if(c.addReason)html+='<div style="font-size:12px;color:var(--burg);">Added: '+c.addReason+' <button onclick="editContactReason(\''+c.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">&#9998;</button></div>';
+  else html+='<div style="font-size:12px;"><button onclick="editContactReason(\''+c.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">&#9998; Add reason</button></div>';
+  if(rev>0)html+='<div style="font-size:14px;font-family:serif;color:var(--burg);font-weight:600;">'+fmt$(rev)+' revenue</div>';
   html+='</div>';
-  if(c.c7id)html+='<div style="margin-top:10px;"><a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:11px;color:'+col.text+';text-decoration:none;border:1px solid '+col.border+';border-radius:5px;padding:3px 8px;display:inline-block;">View in Commerce7 \u2197</a></div>';
+  if(c.c7id)html+='<div style="margin-top:10px;"><a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:11px;color:'+col.text+';text-decoration:none;border:1px solid '+col.border+';border-radius:5px;padding:3px 8px;display:inline-block;">View in Commerce7</a></div>';
   html+='</div>';
 
   // Action buttons
   html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:16px;">';
-  html+='<button class="btn btnp" onclick="openAttempt(''+c.id+'')">+ Log</button>';
-  html+='<button class="btn" onclick="openNewTicket(''+c.id+'',''+c.first+' '+c.last+'');closeDP();">+ Ticket</button>';
-  html+='<button class="btn" onclick="openNewReminder('contact',''+c.id+'',''+c.first+' '+c.last+'');">\uD83D\uDD14 Remind</button>';
+  html+='<button class="btn btnp" onclick="openAttempt(\''+c.id+'\')">+ Log</button>';
+  html+='<button class="btn" onclick="openNewTicket(\''+c.id+'\',\''+c.first+' '+c.last+'\');closeDP();">+ Ticket</button>';
+  html+='<button class="btn" onclick="openNewReminder(\'contact\',\''+c.id+'\',\''+c.first+' '+c.last+'\');">&#128276; Remind</button>';
   html+='</div>';
 
   // Unified timeline
@@ -1827,45 +1827,45 @@ function showContactDetail(id){
     html+='<div style="font-size:13px;color:var(--ink-m);padding:16px;text-align:center;background:var(--cream);border-radius:8px;">No history yet.</div>';
   } else {
     html+='<div style="display:flex;flex-direction:column;gap:8px;">';
-    timeline.forEach(item=>{
+    timeline.forEach(function(item){
       if(item.type==='attempt'){
         const a=item.data;
         const rep=TEAM[a.assignedBy]||null;
         html+='<div style="padding:10px 12px;background:var(--burg-f);border-radius:8px;border-left:3px solid var(--burg);">';
         html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
         html+='<span style="font-size:12px;font-weight:600;">'+a.method+'</span>';
-        html+='<div style="display:flex;align-items:center;gap:6px;">'+outcomeBadge(a.outcome)+'<span style="font-size:11px;color:var(--ink-f);">'+a.date+'</span><button onclick="openEditAttempt(''+a.id+'',''+c.id+'')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">\u270E</button></div>';
+        html+='<div style="display:flex;align-items:center;gap:6px;">'+outcomeBadge(a.outcome)+'<span style="font-size:11px;color:var(--ink-f);">'+a.date+'</span><button onclick="openEditAttempt(\''+a.id+'\',\''+c.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);">&#9998;</button></div>';
         html+='</div>';
         if(a.notes)html+='<div style="font-size:12px;color:var(--ink);">'+a.notes+'</div>';
         if((a.sales||[]).length){
           html+='<div style="font-size:11px;color:var(--burg);margin-top:4px;font-weight:500;">';
-          if(a.sales[0]&&a.sales[0].orderNo)html+='Order #'+a.sales[0].orderNo+' \u2014 '+fmt$(a.sales[0].total)+' ';
-          html+=a.sales.map(s=>s.wine+' \xd7 '+s.qty).join(', ')+'</div>';
+          if(a.sales[0]&&a.sales[0].orderNo)html+='Order #'+a.sales[0].orderNo+' &mdash; '+fmt$(a.sales[0].total)+' ';
+          html+=a.sales.map(function(s){return s.wine+' x'+s.qty;}).join(', ')+'</div>';
         }
         if(rep)html+='<div style="font-size:11px;color:var(--ink-f);margin-top:3px;">by '+rep.name+'</div>';
         html+='</div>';
       } else if(item.type==='ticket-open'){
         const t=item.data;
-        html+='<div style="padding:10px 12px;background:#FFF8E1;border-radius:8px;border-left:3px solid var(--w-tx);cursor:pointer;" onclick="openTicketThread(''+t.id+'')">';
+        html+='<div style="padding:10px 12px;background:#FFF8E1;border-radius:8px;border-left:3px solid var(--w-tx);cursor:pointer;" onclick="openTicketThread(\''+t.id+'\')">';
         html+='<div style="display:flex;justify-content:space-between;align-items:center;">';
-        html+='<span style="font-size:12px;font-weight:600;">\uD83C\uDFAB '+t.subject+'</span>';
+        html+='<span style="font-size:12px;font-weight:600;">Ticket: '+t.subject+'</span>';
         html+='<span class="bdg '+(TICKET_STATUS_COLORS[t.status]||'bdg-g')+'" style="font-size:10px;">'+t.status+'</span>';
         html+='</div><div style="font-size:11px;color:var(--ink-m);margin-top:3px;">'+t.type+'</div></div>';
       } else if(item.type==='ticket-msg'){
         const msg=item.data;const t=item.ticket;
         const auth=TEAM[msg.author]||{name:msg.authorName||'',init:'?',cls:'av-b'};
-        html+='<div style="padding:8px 12px;background:#FAFAFA;border-radius:8px;border-left:3px solid var(--bdr-s);cursor:pointer;" onclick="openTicketThread(''+t.id+'')">';
+        html+='<div style="padding:8px 12px;background:#FAFAFA;border-radius:8px;border-left:3px solid var(--bdr-s);cursor:pointer;" onclick="openTicketThread(\''+t.id+'\')">';
         html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">';
         html+='<div class="av '+auth.cls+'" style="width:16px;height:16px;font-size:7px;">'+auth.init+'</div>';
         html+='<span style="font-size:11px;font-weight:500;">'+auth.name+'</span>';
         html+='<span style="font-size:10px;color:var(--ink-f);">'+msg.createdAt+'</span>';
         if(msg.method)html+='<span style="font-size:10px;background:white;color:var(--burg);border:1px solid var(--bdr-s);border-radius:3px;padding:0 4px;">'+msg.method+'</span>';
-        html+='</div><div style="font-size:12px;color:var(--ink-m);">'+msg.message.slice(0,80)+(msg.message.length>80?'\u2026':'')+'</div></div>';
+        html+='</div><div style="font-size:12px;color:var(--ink-m);">'+msg.message.slice(0,80)+(msg.message.length>80?'...':'')+'</div></div>';
       } else if(item.type==='reminder'){
         const r=item.data;
         html+='<div style="padding:8px 12px;background:var(--s-bg);border-radius:8px;border-left:3px solid var(--s-tx);">';
-        html+='<div style="font-size:12px;font-weight:500;">\uD83D\uDD14 '+r.note+'</div>';
-        html+='<div style="font-size:11px;color:var(--ink-m);margin-top:2px;">Due: '+r.dueDate+(r.done?' \u2713':'')+'</div></div>';
+        html+='<div style="font-size:12px;font-weight:500;">Reminder: '+r.note+'</div>';
+        html+='<div style="font-size:11px;color:var(--ink-m);margin-top:2px;">Due: '+r.dueDate+(r.done?' (done)':'')+'</div></div>';
       }
     });
     html+='</div>';
