@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.138</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.139</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4373,7 +4373,7 @@ async function c7SyncTicketMessage(ticket,msg){
   let noteText='[McGregor Connect] Ticket "'+ticket.subject+'" — '+msg.createdAt;
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=':\n'+msg.message+'\n— '+rep.name;
-  try{const _nd=await c7Req('POST','/customer/'+c7Id+'/note',{content:noteText,type:'Note'});console.log('C7 note added:',_nd&&_nd.id);}
+  try{await c7AddNote(c7Id,noteText);}
   catch(e){console.warn('C7 ticket note failed:',e.message);}
 }
 
