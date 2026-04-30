@@ -135,7 +135,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.123</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.124</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -151,6 +151,7 @@ select.fi{cursor:pointer;}
     <select id="cusel" style="background:rgba(255,255,255,.15);border:none;color:white;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;outline:none;" onchange="setCU(this.value)">
       <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option>
     </select>
+    <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;" onclick="openMyTasks()">✓ My tasks</button>
     <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;" onclick="openActivityLog()">📋 Activity</button>
     <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;" onclick="syncAll()" id="sync-btn">↻ Sync</button>
   </div>
@@ -186,7 +187,7 @@ select.fi{cursor:pointer;}
       <button class="fbtn on" id="tf-all" onclick="sv('tickets');setTF('all',this)">All tickets <span class="fc" id="tfc-all">0</span></button>
       <button class="fbtn" id="tf-open" onclick="sv('tickets');setTF('Open',this)">Open <span class="fc" id="tfc-open">0</span></button>
       <button class="fbtn" id="tf-inprog" onclick="sv('tickets');setTF('In Progress',this)">In progress <span class="fc" id="tfc-inprog">0</span></button>
-      <button class="fbtn" id="tf-resolved" onclick="sv('tickets');setTF('Resolved',this)">Resolved <span class="fc" id="tfc-resolved">0</span></button>
+      <button class="fbtn" id="tf-resolved" onclick="sv('tickets');setTF('Resolved',this)">Resolved</button>
     </div>
     <div>
       <div class="sl">Campaigns</div>
@@ -436,6 +437,9 @@ select.fi{cursor:pointer;}
               <option value="90">Last 90 days</option>
               <option value="365">Last 12 months</option>
             </select>
+            <select id="report-camp-filter" class="fi" style="width:auto;font-size:12px;padding:5px 9px;" onchange="renderReports()">
+              <option value="">All campaigns</option>
+            </select>
           </div>
           <button class="btn" onclick="exportCSV()">Export CSV</button>
         </div>
@@ -484,6 +488,7 @@ select.fi{cursor:pointer;}
     <div class="mhdr"><div class="mtitle">Add contacts to campaign</div><button class="mcls" onclick="closeModal('import-modal')">✕</button></div>
     <div class="mbdy">
       <div class="fr"><label class="fl">Campaign</label><select class="fi" id="imp-camp"></select></div>
+      <div class="fr"><label class="fl">Add reason <span style="color:var(--ink-f);font-weight:400;">(optional — applied to all contacts being added)</span></label><input type="text" class="fi" id="imp-reason" placeholder="e.g. Wine club member, Trade show, Referral" /></div>
       <div class="tab-row">
         <div class="tab on" onclick="switchImportTab('search',this)">Search Commerce7</div>
         <div class="tab" onclick="switchImportTab('upload',this)">Upload Excel / CSV</div>
@@ -581,6 +586,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option>
         </select>
       </div>
+      <div class="fr"><label class="fl">Add reason <span style="color:var(--ink-f);font-weight:400;">(optional)</span></label><input type="text" class="fi" id="co-reason" placeholder="e.g. Referred by John, Previous customer, Walk-in" /></div>
     </div>
     <div class="mftr"><button class="btn" onclick="closeModal('contact-modal')">Cancel</button><button class="btn btnp" onclick="saveContact()">Add</button></div>
   </div>
@@ -944,6 +950,7 @@ select.fi{cursor:pointer;}
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
         </select>
+        <button class="btn" style="font-size:12px;color:var(--s-tx);border-color:var(--s-tx);" onclick="resolveOutreach()">✓ Resolve</button>
         <div style="display:flex;align-items:center;gap:6px;flex:1;">
           <span style="font-size:12px;color:var(--ink-m);white-space:nowrap;">📅 Event:</span>
           <input type="date" class="fi" id="ort-event-date" style="flex:1;" onchange="updateOutreachEventDate()" />
@@ -999,6 +1006,53 @@ select.fi{cursor:pointer;}
     </div>
     <div class="mbdy" style="max-height:70vh;overflow-y:auto;padding:0;">
       <div id="activity-list" style="display:flex;flex-direction:column;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- My Tasks Modal -->
+<div id="mytasks-modal" class="modal-backdrop">
+  <div class="modal" style="width:620px;max-height:90vh;">
+    <div class="mhdr">
+      <div class="mtitle" id="mytasks-title">My Tasks</div>
+      <button class="mcls" onclick="closeModal('mytasks-modal')">✕</button>
+    </div>
+    <div class="mbdy" style="max-height:75vh;overflow-y:auto;padding:0;">
+      <div id="mytasks-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit attempt modal -->
+<div id="edit-attempt-modal" class="modal-backdrop">
+  <div class="modal" style="width:460px;">
+    <div class="mhdr"><div class="mtitle">Edit attempt</div><button class="mcls" onclick="closeModal('edit-attempt-modal')">✕</button></div>
+    <div class="mbdy">
+      <input type="hidden" id="ea-id" />
+      <input type="hidden" id="ea-cid" />
+      <div class="f2">
+        <div class="fr"><label class="fl">Method</label>
+          <select class="fi" id="ea-method">
+            <option>Phone call</option><option>Email</option><option>In person</option><option>Text</option><option>Other</option>
+          </select>
+        </div>
+        <div class="fr"><label class="fl">Date</label><input type="date" class="fi" id="ea-date" /></div>
+      </div>
+      <div class="fr"><label class="fl">Outcome</label>
+        <select class="fi" id="ea-outcome">
+          <option value="vm">Left voicemail</option>
+          <option value="noanswer">No answer</option>
+          <option value="reached">Reached</option>
+          <option value="email-sent">Email sent</option>
+          <option value="nosale">No sale</option>
+          <option value="sold">Sold</option>
+        </select>
+      </div>
+      <div class="fr"><label class="fl">Notes</label><textarea class="fi" id="ea-notes" rows="3"></textarea></div>
+    </div>
+    <div class="mftr" style="justify-content:space-between;">
+      <button class="btn" style="color:var(--d-tx);border-color:var(--d-tx);" onclick="deleteAttempt()">Delete</button>
+      <div style="display:flex;gap:8px;"><button class="btn" onclick="closeModal('edit-attempt-modal')">Cancel</button><button class="btn btnp" onclick="saveEditAttempt()">Save</button></div>
     </div>
   </div>
 </div>
@@ -1267,7 +1321,7 @@ async function ensureSheets(){
   });
   // Add headers
   if(needed.includes('Campaigns'))await sheetsUpdate('Campaigns!A1:G1',[['ID','Name','Start','End','Description','CreatedAt','Archived']]);
-  if(needed.includes('Contacts'))await sheetsUpdate('Contacts!A1:J1',[['ID','CampaignID','First','Last','Phone','Email','City','Assignee','CreatedAt','C7ID']]);
+  if(needed.includes('Contacts'))await sheetsUpdate('Contacts!A1:K1',[['ID','CampaignID','First','Last','Phone','Email','City','Assignee','CreatedAt','C7ID','AddReason']]);
   if(needed.includes('Attempts'))await sheetsUpdate('Attempts!A1:I1',[['ID','ContactID','Method','Date','Outcome','Notes','Sales','AssignedBy','CreatedAt']]);
   if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:L1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone']]);
   if(needed.includes('TicketMessages'))await sheetsUpdate('TicketMessages!A1:G1',[['ID','TicketID','Message','Author','AuthorName','CreatedAt','Method']]);
@@ -1283,13 +1337,13 @@ async function loadFromSheets(){
   try{
     await ensureSheets();
     const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows]=await Promise.all([
-      sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:J'),sheetsGet('Attempts!A2:I'),
+      sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:K'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:H'),
       sheetsGet('OrderCustomers!A2:M'),sheetsGet('OrderMessages!A2:G'),
       sheetsGet('Outreach!A2:L'),sheetsGet('OutreachMessages!A2:G')
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
-    S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',attempts:[]}));
+    S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
     const attempts=attemptRows.filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',method:r[2]||'',date:r[3]||'',outcome:r[4]||'',notes:r[5]||'',sales:safeJSON(r[6]),assignedBy:parseInt(r[7])||0,createdAt:r[8]||''}));
     S.contacts.forEach(c=>{c.attempts=attempts.filter(a=>a.contactId===c.id);});
     S.tickets=ticketRows.filter(r=>r[0]).map(r=>({id:r[0],subject:r[1]||'',type:r[2]||'',priority:r[3]||'Normal',status:r[4]||'Open',customerId:r[5]||'',customerName:r[6]||'',orderNo:r[7]||'',assignee:parseInt(r[8])||0,createdAt:r[9]||'',customerEmail:r[10]||'',customerPhone:r[11]||''}));
@@ -1381,23 +1435,27 @@ function closeModal(id){document.getElementById(id).classList.remove('op');}
 function renderAll(){renderSidebar();renderCampaigns();renderContacts();renderTickets();renderOrders();renderReminders();renderOutreach();renderReports();updateCounts();}
 
 function updateCounts(){
-  const all=S.contacts.length;
-  const sold=S.contacts.filter(c=>c.attempts&&c.attempts.some(a=>a.outcome==='sold')).length;
+  const activeContacts=S.contacts.filter(c=>{
+    const camp=S.campaigns.find(x=>x.id===c.campId);
+    return !camp||!camp.archived;
+  });
+  const all=activeContacts.length;
+  const sold=activeContacts.filter(c=>c.attempts&&c.attempts.some(a=>a.outcome==='sold')).length;
   const rev=totalRevenue();const att=S.contacts.reduce((s,c)=>s+(c.attempts?c.attempts.length:0),0);
   document.getElementById('fc-all').textContent=all;
-  document.getElementById('fc-pending').textContent=S.contacts.filter(c=>!c.attempts||!c.attempts.length).length;
-  document.getElementById('fc-reached').textContent=S.contacts.filter(c=>['reached','email-replied'].includes(getLastOutcome(c))).length;
-  document.getElementById('fc-vm').textContent=S.contacts.filter(c=>getLastOutcome(c)==='vm').length;
-  document.getElementById('fc-noanswer').textContent=S.contacts.filter(c=>getLastOutcome(c)==='noanswer').length;
+  document.getElementById('fc-pending').textContent=activeContacts.filter(c=>!c.attempts||!c.attempts.length).length;
+  document.getElementById('fc-reached').textContent=activeContacts.filter(c=>['reached','email-replied'].includes(getLastOutcome(c))).length;
+  document.getElementById('fc-vm').textContent=activeContacts.filter(c=>getLastOutcome(c)==='vm').length;
+  document.getElementById('fc-noanswer').textContent=activeContacts.filter(c=>getLastOutcome(c)==='noanswer').length;
   document.getElementById('fc-sold').textContent=sold;
-  document.getElementById('fc-nosale').textContent=S.contacts.filter(c=>getLastOutcome(c)==='nosale').length;
-  document.getElementById('sb-camps').textContent=S.campaigns.length;
+  document.getElementById('fc-nosale').textContent=activeContacts.filter(c=>getLastOutcome(c)==='nosale').length;
+  document.getElementById('sb-camps').textContent=S.campaigns.filter(c=>!c.archived).length;
   document.getElementById('sb-contacts').textContent=all;
   document.getElementById('sb-rev').textContent=fmt$(rev);
-  document.getElementById('ds-camps').textContent=S.campaigns.length;
-  document.getElementById('ds-contacts').textContent=all;
+  document.getElementById('ds-camps').textContent=S.campaigns.filter(c=>!c.archived).length;
+  document.getElementById('ds-contacts').textContent=S.contacts.length;
   document.getElementById('ds-attempts').textContent=att;
-  document.getElementById('ds-conv').textContent=(all?Math.round(sold/all*100):0)+'%';
+  document.getElementById('ds-conv').textContent=(S.contacts.length?Math.round(sold/S.contacts.length*100):0)+'%';
   document.getElementById('ds-rev').textContent=fmt$(rev);
 }
 
@@ -1634,15 +1692,25 @@ function renderReports(){
   const dateFilterEl=document.getElementById('report-date-filter');
   const days=dateFilterEl?parseInt(dateFilterEl.value)||0:0;
   const cutoff=days?new Date(Date.now()-days*86400000).toISOString().slice(0,10):'';
+  // Populate campaign filter dropdown
+  const campFilterEl=document.getElementById('report-camp-filter');
+  if(campFilterEl&&campFilterEl.options.length<=1){
+    S.campaigns.filter(c=>!c.archived).forEach(c=>{
+      const o=document.createElement('option');o.value=c.id;o.textContent=c.name;campFilterEl.appendChild(o);
+    });
+  }
+  const campFilter=campFilterEl?campFilterEl.value:'';
+  // Apply campaign filter to contacts
+  const baseContacts=campFilter?S.contacts.filter(c=>c.campId===campFilter):S.contacts;
   // Filter attempts by date
-  const filteredAttempts=S.contacts.flatMap(c=>(c.attempts||[]).filter(a=>!cutoff||a.date>=cutoff));
+  const filteredAttempts=baseContacts.flatMap(c=>(c.attempts||[]).filter(a=>!cutoff||a.date>=cutoff));
   const contactsWithSale=days
-    ?S.contacts.filter(c=>(c.attempts||[]).some(a=>a.outcome==='sold'&&(!cutoff||a.date>=cutoff)))
-    :S.contacts.filter(c=>c.attempts&&c.attempts.some(a=>a.outcome==='sold'));
+    ?baseContacts.filter(c=>(c.attempts||[]).some(a=>a.outcome==='sold'&&(!cutoff||a.date>=cutoff)))
+    :baseContacts.filter(c=>c.attempts&&c.attempts.some(a=>a.outcome==='sold'));
   const rev=days
     ?filteredAttempts.reduce((s,a)=>{if(a.outcome!=='sold')return s;const first=a.sales&&a.sales[0];if(first&&first.total!=null&&first.total!=='')return s+parseFloat(first.total);return s+(a.sales||[]).reduce((ss,item)=>ss+(parseFloat(item.qty||0)*parseFloat(item.price||0)),0);},0)
-    :totalRevenue();
-  const contactsTotal=days?S.contacts.filter(c=>(c.attempts||[]).some(a=>!cutoff||a.date>=cutoff)).length:S.contacts.length;
+    :baseContacts.reduce((s,c)=>s+getContactRevenue(c),0);
+  const contactsTotal=days?baseContacts.filter(c=>(c.attempts||[]).some(a=>!cutoff||a.date>=cutoff)).length:baseContacts.length;
   const conv=contactsTotal?Math.round(contactsWithSale.length/contactsTotal*100):0;
   const avg=contactsWithSale.length?Math.round(rev/contactsWithSale.length):0;
   document.getElementById('rp-rev').textContent=fmt$(rev);
@@ -1651,7 +1719,7 @@ function renderReports(){
   document.getElementById('rp-avg').textContent=fmt$(avg);
   const ldr=document.getElementById('leaderboard');ldr.innerHTML='';
   TEAM.map((t,i)=>{
-    const mine=S.contacts.filter(c=>c.assignee===i);
+    const mine=baseContacts.filter(c=>c.assignee===i);
     const myAtts=mine.flatMap(c=>(c.attempts||[]).filter(a=>!cutoff||a.date>=cutoff));
     const mySold=mine.filter(c=>(c.attempts||[]).some(a=>a.outcome==='sold'&&(!cutoff||a.date>=cutoff)));
     const myRev=days?myAtts.reduce((s,a)=>{if(a.outcome!=='sold')return s;const first=a.sales&&a.sales[0];if(first&&first.total!=null&&first.total!=='')return s+parseFloat(first.total);return s+(a.sales||[]).reduce((ss,item)=>ss+(parseFloat(item.qty||0)*parseFloat(item.price||0)),0);},0):mine.reduce((s,c)=>s+getContactRevenue(c),0);
@@ -1662,7 +1730,7 @@ function renderReports(){
     ldr.appendChild(div);
   });
   const outCounts={};
-  S.contacts.forEach(c=>{const lo=getLastOutcome(c);outCounts[lo]=(outCounts[lo]||0)+1;});
+  baseContacts.forEach(c=>{const lo=getLastOutcome(c);outCounts[lo]=(outCounts[lo]||0)+1;});
   const oKeys=Object.keys(outCounts),oVals=Object.values(outCounts),oColors=oKeys.map(k=>OUT_COLORS[k]||'#B4B2A9');
   if(S.outChart)S.outChart.destroy();
   const octx=document.getElementById('outcome-chart').getContext('2d');
@@ -1718,7 +1786,7 @@ function showContactDetail(id){
   } else {
     (c.attempts||[]).slice().reverse().forEach(a=>{
       html+='<div style="padding:8px;border:1px solid var(--bdr);border-radius:6px;margin-bottom:7px;">';
-      html+='<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;font-weight:500;">'+a.method+' · '+a.date+'</span>'+outcomeBadge(a.outcome)+'</div>';
+      html+='<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;font-weight:500;">'+a.method+' · '+a.date+'</span><div style="display:flex;align-items:center;gap:6px;">'+outcomeBadge(a.outcome)+'<button onclick="openEditAttempt(\''+a.id+'\',\''+c.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);padding:0 2px;" title="Edit">✎</button></div></div>';
       if(a.notes)html+='<div style="font-size:12px;color:var(--ink-m);">'+a.notes+'</div>';
       if((a.sales||[]).length){
         html+='<div style="font-size:11px;color:var(--burg);margin-top:4px;">';
@@ -1766,12 +1834,13 @@ async function saveCamp(){
 function populateCampSelects(){
   ['imp-camp','co-camp'].forEach(id=>{const sel=document.getElementById(id);if(!sel)return;sel.innerHTML=S.campaigns.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');});
 }
-function openAddContact(){populateCampSelects();['co-first','co-last','co-phone','co-email','co-city'].forEach(id=>document.getElementById(id).value='');document.getElementById('co-assign').value=S.cu;openModal('contact-modal');}
+function openAddContact(){populateCampSelects();['co-first','co-last','co-phone','co-email','co-city','co-reason'].forEach(id=>document.getElementById(id).value='');document.getElementById('co-assign').value=S.cu;openModal('contact-modal');}
 
 async function saveContact(){
   const first=document.getElementById('co-first').value.trim(),last=document.getElementById('co-last').value.trim();if(!first||!last)return;
   const id=uid();const createdAt=today();
-  const c={id,campId:document.getElementById('co-camp').value,first,last,phone:document.getElementById('co-phone').value,email:document.getElementById('co-email').value,city:document.getElementById('co-city').value,assignee:parseInt(document.getElementById('co-assign').value),createdAt,attempts:[]};
+  const addReason=document.getElementById('co-reason').value.trim();
+  const c={id,campId:document.getElementById('co-camp').value,first,last,phone:document.getElementById('co-phone').value,email:document.getElementById('co-email').value,city:document.getElementById('co-city').value,assignee:parseInt(document.getElementById('co-assign').value),createdAt,attempts:[],c7id:'',addReason};
   try{
     await sheetsAppend('Contacts!A:I',[[id,c.campId,c.first,c.last,c.phone,c.email,c.city,c.assignee,createdAt]]);
     S.contacts.push(c);renderAll();closeModal('contact-modal');showToast('Contact added');
@@ -1953,8 +2022,8 @@ async function confirmImport(){
   if(importMode==='search'){
     const toAdd=S.c7Selected.map(c=>({id:uid(),c7id:c.c7id||'',campId,first:c.firstName,last:c.lastName,phone:c.phone,email:c.email,city:c.city,assignee:S.cu,createdAt,attempts:[]}));
     try{
-      const rows=toAdd.map(c=>[c.id,c.campId,c.first,c.last,c.phone,c.email,c.city,c.assignee,c.createdAt,c.c7id||'']);
-      await sheetsAppend('Contacts!A:J',rows);
+      const rows=toAdd.map(c=>[c.id,c.campId,c.first,c.last,c.phone,c.email,c.city,c.assignee,c.createdAt,c.c7id||'',c.addReason||'']);
+      await sheetsAppend('Contacts!A:K',rows);
       S.contacts.push(...toAdd);renderAll();closeModal('import-modal');
       showToast(toAdd.length+' contact'+(toAdd.length>1?'s':'')+' added');
     }catch(e){showToast('Error: '+e.message,'err');}
@@ -1993,8 +2062,8 @@ async function confirmImport(){
   }
 
   try{
-    const rows=toAdd.map(c=>[c.id,c.campId,c.first,c.last,c.phone,c.email,c.city,c.assignee,c.createdAt,c.c7id||'']);
-    await sheetsAppend('Contacts!A:J',rows);
+    const rows=toAdd.map(c=>[c.id,c.campId,c.first,c.last,c.phone,c.email,c.city,c.assignee,c.createdAt,c.c7id||'',c.addReason||'']);
+    await sheetsAppend('Contacts!A:K',rows);
     S.contacts.push(...toAdd);renderAll();closeModal('import-modal');
     const matchMsg=withEmail.length?' ('+matched+' matched to Commerce7)':'';
     showToast(toAdd.length+' contact'+(toAdd.length>1?'s':'')+' added'+matchMsg);
@@ -2584,8 +2653,8 @@ function orderAgeDays(dateStr){
 }
 
 function buildOrderRow(o,showStatus){
-  const msgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id);
-  const humanMsgs=msgs.filter(m=>!(m.message&&m.message.match(/^\d+ unfulfilled order/)&&m.method===''));
+  const msgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id&&!(m.message&&m.message.match(/^\d+ unfulfilled order/)&&m.method===''));
+  const humanMsgs=msgs;
   const lastMsg=msgs.length?msgs[msgs.length-1]:null;
   const m=TEAM[o.assignee]||null;
   const assigneeHtml=m
@@ -3895,6 +3964,20 @@ async function addOutreachMessage(){
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
+async function resolveOutreach(){
+  const o=S.outreach.find(x=>x.id===S.activeOutreachId);if(!o)return;
+  o.status='Resolved';
+  document.getElementById('ort-status').value='Resolved';
+  await updateOutreachInSheet(o);
+  const msgId=uid();const createdAt=today();
+  const note='Marked as resolved.';
+  await sheetsAppend('OutreachMessages!A:G',[[msgId,o.id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'','',createdAt]]);
+  S.outreachMsgs.push({id:msgId,outreachId:o.id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'',method:'',createdAt});
+  renderOutreachMessages(o.id);
+  renderOutreach();
+  showToast('Outreach resolved');
+}
+
 async function updateOutreachStatus(){
   const o=S.outreach.find(x=>x.id===S.activeOutreachId);if(!o)return;
   o.status=document.getElementById('ort-status').value;
@@ -3931,6 +4014,144 @@ async function deleteOutreachPrompt(){
   S.outreachMsgs=S.outreachMsgs.filter(m=>m.outreachId!==id);
   closeModal('outreach-thread-modal');renderOutreach();
   showToast('Deleted — remove from Google Sheet manually');
+}
+
+// ---- My Tasks ----
+function openMyTasks(){
+  const m=TEAM[S.cu]||TEAM[0];
+  document.getElementById('mytasks-title').textContent=m.name+' — My Tasks';
+  renderMyTasks();
+  openModal('mytasks-modal');
+}
+
+function renderMyTasks(){
+  const el=document.getElementById('mytasks-content');
+  const t=today();
+  let html='';
+
+  // Reminders assigned to me
+  const myReminders=S.reminders.filter(r=>!r.done&&r.assignee===S.cu).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  if(myReminders.length){
+    html+='<div style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);background:var(--cream);border-bottom:1px solid var(--bdr);">🔔 Reminders ('+myReminders.length+')</div>';
+    myReminders.forEach(r=>{
+      const overdue=r.dueDate<t;const isToday=r.dueDate===t;
+      html+='<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;" onclick="closeModal(\'mytasks-modal\');sv(\'reminders\')">'
+        +'<div style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:'+(overdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--burg)')+'"></div>'
+        +'<div style="flex:1;"><div style="font-size:13px;font-weight:500;">'+r.note+'</div>'
+        +'<div style="font-size:11px;color:'+(overdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)')+';">'+r.dueDate+(overdue?' — Overdue':isToday?' — Due today':'')+(r.refName?' · '+r.refName:'')+'</div></div>'
+        +'</div>';
+    });
+  }
+
+  // Open tickets assigned to me
+  const myTickets=S.tickets.filter(t=>t.assignee===S.cu&&t.status!=='Resolved');
+  if(myTickets.length){
+    html+='<div style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);background:var(--cream);border-bottom:1px solid var(--bdr);">🎫 Open tickets ('+myTickets.length+')</div>';
+    myTickets.forEach(tk=>{
+      html+='<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);cursor:pointer;" onclick="closeModal(\'mytasks-modal\');sv(\'tickets\');openTicketThread(\''+tk.id+'\')">'
+        +'<div style="font-size:13px;font-weight:500;">'+tk.subject+'</div>'
+        +'<div style="font-size:11px;color:var(--ink-m);">'+tk.type+' · '+tk.status+(tk.customerName?' · '+tk.customerName:'')+'</div>'
+        +'</div>';
+    });
+  }
+
+  // Active orders assigned to me
+  const myOrders=S.orderCustomers.filter(o=>o.assignee===S.cu&&o.status!=='Resolved');
+  if(myOrders.length){
+    html+='<div style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);background:var(--cream);border-bottom:1px solid var(--bdr);">📦 Outstanding orders ('+myOrders.length+')</div>';
+    myOrders.forEach(o=>{
+      const pd=o.pickupDate;const overdue=pd&&pd<t;
+      html+='<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);cursor:pointer;" onclick="closeModal(\'mytasks-modal\');sv(\'orders\');openOrderThread(\''+o.id+'\')">'
+        +'<div style="font-size:13px;font-weight:500;">'+o.customerName+'</div>'
+        +'<div style="font-size:11px;color:'+(overdue?'var(--d-tx)':'var(--ink-m)')+';">'+(pd?'Pickup: '+pd+(overdue?' ⚠ Overdue':''):'No pickup date set')+'</div>'
+        +'</div>';
+    });
+  }
+
+  // Active outreach assigned to me
+  const myOutreach=S.outreach.filter(o=>o.assignee===S.cu&&o.status!=='Resolved');
+  if(myOutreach.length){
+    html+='<div style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);background:var(--cream);border-bottom:1px solid var(--bdr);">📬 Outreach ('+myOutreach.length+')</div>';
+    myOutreach.forEach(o=>{
+      const soon=o.eventDate&&o.eventDate<=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+      html+='<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);cursor:pointer;" onclick="closeModal(\'mytasks-modal\');sv(\'outreach\');openOutreachThread(\''+o.id+'\')">'
+        +'<div style="font-size:13px;font-weight:500;">'+o.title+'</div>'
+        +'<div style="font-size:11px;color:'+(soon?'var(--w-tx)':'var(--ink-m)')+';">'+o.type+(o.eventDate?' · 📅 '+o.eventDate:'')+(o.contactName?' · '+o.contactName:'')+'</div>'
+        +'</div>';
+    });
+  }
+
+  // Contacts in active campaigns assigned to me not yet contacted
+  const myCampaignContacts=S.contacts.filter(c=>{
+    const camp=S.campaigns.find(x=>x.id===c.campId);
+    return c.assignee===S.cu&&(!camp||!camp.archived)&&(!c.attempts||!c.attempts.length);
+  });
+  if(myCampaignContacts.length){
+    html+='<div style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);background:var(--cream);border-bottom:1px solid var(--bdr);">📞 Not yet contacted ('+myCampaignContacts.length+')</div>';
+    myCampaignContacts.slice(0,10).forEach(c=>{
+      const camp=S.campaigns.find(x=>x.id===c.campId);
+      html+='<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);cursor:pointer;" onclick="closeModal(\'mytasks-modal\');sv(\'contacts\');showContactDetail(\''+c.id+'\')">'
+        +'<div style="font-size:13px;font-weight:500;">'+c.first+' '+c.last+'</div>'
+        +'<div style="font-size:11px;color:var(--ink-m);">'+(camp?camp.name:'')+(c.phone?' · '+c.phone:'')+'</div>'
+        +'</div>';
+    });
+    if(myCampaignContacts.length>10)html+='<div style="padding:8px 16px;font-size:11px;color:var(--ink-f);">...and '+(myCampaignContacts.length-10)+' more</div>';
+  }
+
+  if(!html)html='<div style="padding:30px;text-align:center;color:var(--ink-m);font-size:14px;">🎉 No open tasks assigned to you!</div>';
+  el.innerHTML=html;
+}
+
+// ---- Edit/Delete Attempt ----
+function openEditAttempt(attemptId,contactId){
+  const c=S.contacts.find(x=>x.id===contactId);if(!c)return;
+  const a=c.attempts.find(x=>x.id===attemptId);if(!a)return;
+  document.getElementById('ea-id').value=attemptId;
+  document.getElementById('ea-cid').value=contactId;
+  document.getElementById('ea-method').value=a.method||'Phone call';
+  document.getElementById('ea-date').value=a.date||today();
+  document.getElementById('ea-outcome').value=a.outcome||'reached';
+  document.getElementById('ea-notes').value=a.notes||'';
+  openModal('edit-attempt-modal');
+}
+
+async function saveEditAttempt(){
+  const aid=document.getElementById('ea-id').value;
+  const cid=document.getElementById('ea-cid').value;
+  const c=S.contacts.find(x=>x.id===cid);if(!c)return;
+  const a=c.attempts.find(x=>x.id===aid);if(!a)return;
+  a.method=document.getElementById('ea-method').value;
+  a.date=document.getElementById('ea-date').value;
+  a.outcome=document.getElementById('ea-outcome').value;
+  a.notes=document.getElementById('ea-notes').value;
+  try{
+    const allRows=await sheetsGet('Attempts!A2:I');
+    const rowIdx=allRows.findIndex(r=>r[0]===aid);
+    if(rowIdx>=0)await sheetsUpdate('Attempts!A'+(rowIdx+2)+':I'+(rowIdx+2),[[a.id,cid,a.method,a.date,a.outcome,a.notes,JSON.stringify(a.sales||[]),a.assignedBy,a.createdAt]]);
+    closeModal('edit-attempt-modal');
+    renderAll();
+    if(S.activeCamp){sv('campaigns');openCampDetail(S.activeCamp);}
+    else if(document.getElementById('detail-panel').classList.contains('open'))showContactDetail(cid);
+    showToast('Attempt updated');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+async function deleteAttempt(){
+  if(!confirm('Delete this attempt? This cannot be undone.'))return;
+  const aid=document.getElementById('ea-id').value;
+  const cid=document.getElementById('ea-cid').value;
+  const c=S.contacts.find(x=>x.id===cid);if(!c)return;
+  c.attempts=c.attempts.filter(a=>a.id!==aid);
+  try{
+    const allRows=await sheetsGet('Attempts!A2:I');
+    const rowIdx=allRows.findIndex(r=>r[0]===aid);
+    if(rowIdx>=0)await sheetsUpdate('Attempts!A'+(rowIdx+2)+':I'+(rowIdx+2),[['','','','','','','','','']]);
+    closeModal('edit-attempt-modal');
+    renderAll();
+    if(S.activeCamp){sv('campaigns');openCampDetail(S.activeCamp);}
+    else if(document.getElementById('detail-panel').classList.contains('open'))showContactDetail(cid);
+    showToast('Attempt deleted');
+  }catch(e){showToast('Error: '+e.message,'err');}
 }
 
 // ---- Export ----
