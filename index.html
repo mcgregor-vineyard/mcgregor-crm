@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.146</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.147</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -2549,8 +2549,8 @@ async function saveTicket(){
       S.ticketMsgs.push(msg);
     }
     renderAll();closeModal('ticket-modal');showToast('Ticket created');
-    // Add C7 flag and note in background
-    c7SyncTicketOpened(ticket).catch(()=>{});
+    // Add C7 flag and note in background, passing initial note if present
+    c7SyncTicketOpened(ticket,note).catch(()=>{});
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -4357,10 +4357,11 @@ async function c7SyncCampaignArchived(campaign){
 
 // ---- C7 sync on ticket actions ----
 // Called when a ticket is opened
-async function c7SyncTicketOpened(ticket){
+async function c7SyncTicketOpened(ticket,initialNote){
   const c7Id=ticket.customerId;
   if(!c7Id||c7Id.startsWith('x')){console.warn('C7 ticket sync — no C7 ID, skipping');return;}
-  const content='[McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
+  let content='[McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
+  if(initialNote)content+=' / '+initialNote;
   const flagId=await c7AddFlag(c7Id,content);
   if(flagId){ticket.c7FlagId=flagId;ticket.c7CustomerId=c7Id;console.log('C7 ticket flag added:',flagId);}
 }
