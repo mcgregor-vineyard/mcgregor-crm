@@ -138,7 +138,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.148</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.150</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -2099,7 +2099,7 @@ async function confirmImport(){
   const createdAt=today();
 
   if(importMode==='search'){
-    const toAdd=S.c7Selected.map(c=>({id:uid(),c7id:c.c7id||'',campId,first:c.firstName,last:c.lastName,phone:c.phone,email:c.email,city:c.city,assignee:S.cu,createdAt,attempts:[]}));
+    const toAdd=S.c7Selected.map(c=>({id:uid(),c7id:c.c7id||'',campId,first:c.firstName,last:c.lastName,phone:c.phone,email:c.email,city:c.city,assignee:-1,createdAt,attempts:[]}));
     try{
       const rows=toAdd.map(c=>[c.id,c.campId,c.first,c.last,c.phone,c.email,c.city,c.assignee,c.createdAt,c.c7id||'',c.addReason||'']);
       await sheetsAppend('Contacts!A:K',rows);
@@ -2114,7 +2114,7 @@ async function confirmImport(){
   }
 
   // Excel upload — match emails to Commerce7
-  const toAdd=S.pendingUpload.map(r=>({id:uid(),c7id:'',campId,...r,assignee:S.cu,createdAt,attempts:[]}));
+  const toAdd=S.pendingUpload.map(r=>({id:uid(),c7id:'',campId,...r,assignee:-1,createdAt,attempts:[]}));
   const withEmail=toAdd.filter(c=>c.email);
   let matched=0;
 
@@ -4403,7 +4403,9 @@ async function c7SyncAttemptLogged(contact,attempt){
   const c7Id=contact.c7id||(await resolveC7Id(contact));
   if(!c7Id)return;
   const rep=TEAM[attempt.assignedBy]||TEAM[0];
+  const camp=S.campaigns.find(c=>c.id===contact.campId);
   let noteText='[McGregor Connect] Contact attempt: ('+attempt.method+') '+outcomeLabel(attempt.outcome);
+  if(camp)noteText+=' | Campaign: '+camp.name;
   if(attempt.notes)noteText+=' / '+attempt.notes;
   noteText+=' — '+rep.name;
   try{await c7AddNote(c7Id,noteText);}
@@ -4413,7 +4415,7 @@ async function c7SyncAttemptLogged(contact,attempt){
 async function c7SyncOrderMessage(orderCustomer,msg){
   if(!orderCustomer.customerId)return;
   const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
-  let noteText='[McGregor Connect] Order followup:';
+  let noteText='[McGregor Connect] Outstanding Order Followup:';
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=' '+msg.message+' — '+rep.name;
   await c7AddNote(orderCustomer.customerId,noteText);
