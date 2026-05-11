@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.152</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.153</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -870,7 +870,7 @@ select.fi{cursor:pointer;}
 
 <!-- New outreach modal -->
 <div id="outreach-modal" class="modal-backdrop">
-  <div class="modal" style="width:540px;">
+  <div class="modal" style="width:540px;" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle" id="orm-title">New outreach</div><button class="mcls" onclick="closeModal('outreach-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="orm-id" />
@@ -929,7 +929,7 @@ select.fi{cursor:pointer;}
       </div>
       <div class="f2">
         <div class="fr"><label class="fl">Guest count</label><input type="number" class="fi" id="orm-guest-count" placeholder="e.g. 25" min="1" /></div>
-        <div class="fr"></div>
+        <div class="fr"><label class="fl">Website</label><input type="text" class="fi" id="orm-website" placeholder="https://..." /></div>
       </div>
       <div class="fr"><label class="fl">Details / notes</label><textarea class="fi" id="orm-notes" rows="3" placeholder="Describe the inquiry or vendor relationship..."></textarea></div>
     </div>
@@ -1346,7 +1346,7 @@ async function ensureSheets(){
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
   if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:M1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate','UnfulfilledCount','ResolvedAt']]);
   if(needed.includes('OrderMessages'))await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
-  if(needed.includes('Outreach'))await sheetsUpdate('Outreach!A1:L1',[['ID','Title','Type','Status','EventDate','ContactID','ContactName','ContactEmail','ContactPhone','Assignee','CreatedAt','GuestCount']]);
+  if(needed.includes('Outreach'))await sheetsUpdate('Outreach!A1:L1',[['ID','Title','Type','Status','EventDate','ContactID','ContactName','ContactEmail','ContactPhone','Assignee','CreatedAt','GuestCount','Website']]);
   if(needed.includes('OutreachMessages'))await sheetsUpdate('OutreachMessages!A1:G1',[['ID','OutreachID','Message','Author','AuthorName','Method','CreatedAt']]);
 }
 
@@ -1358,7 +1358,7 @@ async function loadFromSheets(){
       sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:K'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:H'),
       sheetsGet('OrderCustomers!A2:M'),sheetsGet('OrderMessages!A2:G'),
-      sheetsGet('Outreach!A2:L'),sheetsGet('OutreachMessages!A2:G')
+      sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G')
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
@@ -1369,7 +1369,7 @@ async function loadFromSheets(){
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     S.orderMsgs=orderMsgRows.filter(r=>r[0]).map(r=>({id:r[0],orderCustomerId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
-    S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||''}));
+    S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||'',website:r[12]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
     try{renderAll();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
@@ -3904,6 +3904,7 @@ function renderOutreach(){
   if(!list.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--ink-m);">No outreach records found.</td></tr>';return;}
   list.forEach(o=>{
     const msgs=S.outreachMsgs.filter(m=>m.outreachId===o.id);
+    const realMsgs=msgs.filter(m=>m.method&&m.method.trim()!=='');
     const lastMsg=msgs.length?msgs[msgs.length-1]:null;
     const m=TEAM[o.assignee]||null;
     const assigneeHtml=m?'<div class="av '+m.cls+'" style="width:18px;height:18px;font-size:7px;">'+m.init+'</div>':'—';
@@ -3918,7 +3919,7 @@ function renderOutreach(){
       <td style="font-size:12px;color:var(--ink-m);">${o.guestCount?'👥 '+o.guestCount:'—'}</td>
       <td><span class="bdg ${TICKET_STATUS_COLORS[o.status]||'bdg-g'}">${o.status}</span></td>
       <td style="font-size:12px;color:var(--ink-m);">${lastMsg?lastMsg.createdAt:o.createdAt}</td>
-      <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${msgs.length}</span></td>
+      <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${realMsgs.length}</span></td>
       <td>${assigneeHtml}</td>`;
     tbody.appendChild(tr);
   });
@@ -3939,6 +3940,7 @@ function openNewOutreach(){
   document.getElementById('orm-assignee').value='-1';
   document.getElementById('orm-guest-count').value='';
   document.getElementById('orm-notes').value='';
+  document.getElementById('orm-website').value='';
   document.getElementById('orm-customer-info').style.display='none';
   document.getElementById('orm-dropdown').style.display='none';
   openModal('outreach-modal');
@@ -4009,10 +4011,10 @@ async function saveOutreach(){
   const title=document.getElementById('orm-title-input').value.trim();
   if(!title){showToast('Please enter a title','err');return;}
   const id=uid();const createdAt=today();
-  const o={id,title,type:document.getElementById('orm-type').value,status:document.getElementById('orm-status').value,eventDate:document.getElementById('orm-event-date').value,contactId:document.getElementById('orm-customer-id').value,contactName:document.getElementById('orm-contact-name').value,contactEmail:document.getElementById('orm-contact-email').value,contactPhone:document.getElementById('orm-contact-phone').value,assignee:parseInt(document.getElementById('orm-assignee').value),createdAt,guestCount:document.getElementById('orm-guest-count').value||''};
+  const o={id,title,type:document.getElementById('orm-type').value,status:document.getElementById('orm-status').value,eventDate:document.getElementById('orm-event-date').value,contactId:document.getElementById('orm-customer-id').value,contactName:document.getElementById('orm-contact-name').value,contactEmail:document.getElementById('orm-contact-email').value,contactPhone:document.getElementById('orm-contact-phone').value,assignee:parseInt(document.getElementById('orm-assignee').value),createdAt,guestCount:document.getElementById('orm-guest-count').value||'',website:document.getElementById('orm-website').value.trim()||''};
   const notes=document.getElementById('orm-notes').value.trim();
   try{
-    await sheetsAppend('Outreach!A:L',[[o.id,o.title,o.type,o.status,o.eventDate,o.contactId,o.contactName,o.contactEmail,o.contactPhone,o.assignee,o.createdAt,o.guestCount]]);
+    await sheetsAppend('Outreach!A:M',[[o.id,o.title,o.type,o.status,o.eventDate,o.contactId,o.contactName,o.contactEmail,o.contactPhone,o.assignee,o.createdAt,o.guestCount,o.website||'']]);
     S.outreach.push(o);
     if(notes){
       const msgId=uid();
@@ -4043,6 +4045,7 @@ function openOutreachThread(id){
   if(o.contactName)custHtml+='<span style="font-weight:500;font-size:13px;">'+o.contactName+'</span>';
   if(o.contactEmail)custHtml+=' &nbsp;·&nbsp; <a href="mailto:'+o.contactEmail+'" style="color:var(--ink);">'+o.contactEmail+'</a> <span onclick="copyToClipboard(\''+o.contactEmail+'\')" style="cursor:pointer;opacity:.5;font-size:11px;">⧉</span>';
   if(o.contactPhone)custHtml+=' &nbsp;·&nbsp; <a href="tel:'+o.contactPhone+'" style="color:var(--ink);">'+o.contactPhone+'</a> <span onclick="copyToClipboard(\''+o.contactPhone+'\')" style="cursor:pointer;opacity:.5;font-size:11px;">⧉</span>';
+  if(o.website)custHtml+=' &nbsp;·&nbsp; <a href="'+(o.website.startsWith('http')?o.website:'https://'+o.website)+'" target="_blank" style="color:var(--burg);">🌐 Website ↗</a>';
   document.getElementById('ort-contact-info').innerHTML=custHtml||'<span style="color:var(--ink-f);">No contact info</span>';
   const c7link=document.getElementById('ort-c7link');
   if(o.contactId){c7link.href='https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+o.contactId;c7link.style.display='inline';}
@@ -4130,7 +4133,7 @@ async function updateOutreachEventDate(){
 
 async function updateOutreachInSheet(o){
   try{
-    const allRows=await sheetsGet('Outreach!A2:L');
+    const allRows=await sheetsGet('Outreach!A2:M');
     const rowIdx=allRows.findIndex(r=>r[0]===o.id);
     if(rowIdx>=0)await sheetsUpdate('Outreach!A'+(rowIdx+2)+':L'+(rowIdx+2),[[o.id,o.title,o.type,o.status,o.eventDate,o.contactId,o.contactName,o.contactEmail,o.contactPhone,o.assignee,o.createdAt,o.guestCount||'']]);
   }catch(e){showToast('Error saving: '+e.message,'err');}
@@ -4376,24 +4379,16 @@ async function c7SyncTicketOpened(ticket,initialNote){
   if(flagId){ticket.c7FlagId=flagId;ticket.c7CustomerId=c7Id;console.log('C7 ticket flag added:',flagId);}
 }
 
-// Called when a ticket is resolved — remove its C7 flag
+// Called when a ticket is resolved — leave opening note intact, add a new resolved note
 async function c7SyncTicketResolved(ticket){
   let c7Id=ticket.c7Id||ticket.customerId;
   const contact=S.contacts.find(c=>c.id===c7Id||c.c7id===c7Id);
   if(contact){c7Id=await resolveC7Id(contact)||c7Id;}
   if(!c7Id||c7Id.startsWith('x'))return;
-  const prefix='🚩 [McGregor Connect] Active ticket: '+ticket.type+' — '+ticket.subject;
-  // Find the existing flag note and update it rather than delete
-  try{
-    const data=await c7Req('GET','/note?customerId='+c7Id+'&limit=50',null);
-    const notes=(data&&(data.notes||data))||[];
-    const existing=notes.find(n=>n.content&&n.content.startsWith(prefix));
-    if(existing){
-      const resolvedContent='✅ [McGregor Connect] Resolved ticket: '+ticket.type+' — '+ticket.subject+'\nOriginal note: '+existing.content.replace(/^🚩 /,'');
-      await c7Req('PUT','/note/'+existing.id,{customerId:c7Id,content:resolvedContent,type:'Note',noteDate:existing.noteDate||new Date().toISOString()});
-      console.log('C7 ticket note updated to resolved');
-    }
-  }catch(e){console.warn('C7 ticket resolve note failed:',e.message);}
+  // Add a new resolved note — leave the opening 🚩 note untouched
+  const resolvedContent='✅ [McGregor Connect] Resolved ticket: '+ticket.type+' — '+ticket.subject;
+  try{await c7AddNote(c7Id,resolvedContent);}
+  catch(e){console.warn('C7 ticket resolve note failed:',e.message);}
 }
 
 async function c7SyncTicketMessage(ticket,msg){
@@ -4402,7 +4397,7 @@ async function c7SyncTicketMessage(ticket,msg){
   if(contact){c7Id=await resolveC7Id(contact)||c7Id;}
   if(!c7Id||c7Id.startsWith('x'))return;
   const rep=TEAM[msg.author]||{name:msg.authorName||'Team'};
-  let noteText='🚩 [McGregor Connect] Ticket Update:';
+  let noteText='🔔 [McGregor Connect] Ticket Update:';
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=' Active ticket: '+ticket.type+' — '+ticket.subject+' / '+msg.message+' — '+rep.name;
   try{await c7AddNote(c7Id,noteText);return true;}
