@@ -129,6 +129,8 @@ select.fi{cursor:pointer;}
 .camp-card{background:white;border:1px solid var(--bdr);border-radius:8px;padding:14px;margin-bottom:10px;transition:border-color .15s;}
 .camp-card:hover{border-color:var(--burg-l);}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:white;padding:10px 16px;border-radius:7px;font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;}
+.c7toast{position:fixed;bottom:68px;right:24px;padding:6px 12px;border-radius:6px;font-size:11px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;}
+.c7toast.show{opacity:1;}.c7toast.ok{background:#e6f4ea;color:#1a7f37;border:1px solid #b7e0c0;}.c7toast.err{background:#fdecea;color:#c0392b;border:1px solid #f5c6c3;}
 .toast.show{opacity:1;}
 .toast.ok{background:#3B6D11;}
 .toast.err{background:#A32D2D;}
@@ -138,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.150</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.152</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -364,7 +366,7 @@ select.fi{cursor:pointer;}
         <div id="orders-resolved-section" style="display:none;">
           <div class="tbl-wrap">
             <table class="tbl" style="table-layout:auto;">
-              <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Status</th><th>Last followup</th><th>Messages</th><th></th></tr></thead>
+              <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Status</th><th>Resolved</th><th>Last followup</th><th>Messages</th><th></th></tr></thead>
               <tbody id="orders-resolved-tbody"></tbody>
             </table>
           </div>
@@ -619,6 +621,7 @@ select.fi{cursor:pointer;}
         </select>
       </div>
       <div class="fr"><label class="fl">Notes</label><textarea class="fi" id="am-notes" rows="2" placeholder="What did they say?"></textarea></div>
+      <div class="fr"><label class="fl">Logged by</label><select class="fi" id="am-rep"><option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option></select></div>
       <div id="sale-fields" style="display:none;">
         <div id="recent-orders-wrap" style="margin-bottom:10px;display:none;">
           <div style="font-size:11px;color:var(--ink-m);margin-bottom:6px;">Recent orders — click to select</div>
@@ -1069,6 +1072,7 @@ select.fi{cursor:pointer;}
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="c7toast" id="c7toast"></div>
 
 <!-- New ticket modal -->
 <div id="ticket-modal" class="modal-backdrop">
@@ -1267,6 +1271,7 @@ function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function today(){return new Date().toISOString().slice(0,10);}
 function fmt$(n){return '$'+(Math.round(n)||0).toLocaleString();}
 function showToast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(type==='ok'?'ok':'err');setTimeout(()=>t.className='toast',2500);}
+function showC7Toast(ok){const t=document.getElementById('c7toast');t.textContent=ok?'✓ Synced to Commerce7':'⚠ Commerce7 sync failed';t.className='c7toast show '+(ok?'ok':'err');setTimeout(()=>t.className='c7toast',3000);}
 
 // ---- Google Sheets JWT Auth ----
 async function getAccessToken(){
@@ -1339,7 +1344,7 @@ async function ensureSheets(){
   if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:L1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone']]);
   if(needed.includes('TicketMessages'))await sheetsUpdate('TicketMessages!A1:G1',[['ID','TicketID','Message','Author','AuthorName','CreatedAt','Method']]);
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
-  if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:M1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate','UnfulfilledCount']]);
+  if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:M1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate','UnfulfilledCount','ResolvedAt']]);
   if(needed.includes('OrderMessages'))await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
   if(needed.includes('Outreach'))await sheetsUpdate('Outreach!A1:L1',[['ID','Title','Type','Status','EventDate','ContactID','ContactName','ContactEmail','ContactPhone','Assignee','CreatedAt','GuestCount']]);
   if(needed.includes('OutreachMessages'))await sheetsUpdate('OutreachMessages!A1:G1',[['ID','OutreachID','Message','Author','AuthorName','Method','CreatedAt']]);
@@ -1362,7 +1367,7 @@ async function loadFromSheets(){
     S.tickets=ticketRows.filter(r=>r[0]).map(r=>({id:r[0],subject:r[1]||'',type:r[2]||'',priority:r[3]||'Normal',status:r[4]||'Open',customerId:r[5]||'',customerName:r[6]||'',orderNo:r[7]||'',assignee:parseInt(r[8])||0,createdAt:r[9]||'',customerEmail:r[10]||'',customerPhone:r[11]||''}));
     S.ticketMsgs=ticketMsgRows.filter(r=>r[0]).map(r=>({id:r[0],ticketId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||'',method:r[6]||''}));
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
-    S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1}));
+    S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     S.orderMsgs=orderMsgRows.filter(r=>r[0]).map(r=>({id:r[0],orderCustomerId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
@@ -2161,7 +2166,7 @@ function openAttempt(cid){
   const c=S.contacts.find(x=>x.id===cid);if(!c)return;
   document.getElementById('am-cid').value=cid;
   document.getElementById('am-title').textContent='Log attempt — '+c.first+' '+c.last;
-  document.getElementById('am-method').value='Phone';document.getElementById('am-date').value=today();
+  document.getElementById('am-method').value='Phone';document.getElementById('am-date').value=today();document.getElementById('am-rep').value=S.cu;
   document.getElementById('am-outcome').value='reached';document.getElementById('am-notes').value='';
   document.getElementById('am-order-num').value='';
   document.getElementById('order-result').style.display='none';
@@ -2294,7 +2299,7 @@ async function saveAttempt(){
     console.log('Saving sales:',JSON.stringify(sales));
   }
   const id=uid();const createdAt=today();
-  const attempt={id,contactId:cid,method:document.getElementById('am-method').value,date:document.getElementById('am-date').value,outcome,notes:document.getElementById('am-notes').value,sales,assignedBy:S.cu,createdAt};
+  const attempt={id,contactId:cid,method:document.getElementById('am-method').value,date:document.getElementById('am-date').value,outcome,notes:document.getElementById('am-notes').value,sales,assignedBy:parseInt(document.getElementById('am-rep').value),createdAt};
   const btn=document.getElementById('am-save-btn');btn.textContent='Saving...';btn.disabled=true;
   try{
     await sheetsAppend('Attempts!A:I',[[id,cid,attempt.method,attempt.date,attempt.outcome,attempt.notes,JSON.stringify(sales),S.cu,createdAt]]);
@@ -2303,7 +2308,7 @@ async function saveAttempt(){
     closeModal('attempt-modal');
     showToast('Attempt logged');
     // Sync to C7 in background
-    c7SyncAttemptLogged(c,attempt).catch(()=>{});
+    c7SyncAttemptLogged(c,attempt).then(ok=>showC7Toast(ok)).catch(()=>showC7Toast(false));
     // Return to wherever we were
     if(S.activeCamp){
       sv('campaigns');
@@ -2626,7 +2631,7 @@ async function addThreadMessage(){
     renderTickets();
     showToast('Message added');
     // Sync note to C7 in background
-    if(t)c7SyncTicketMessage(t,newMsg).catch(()=>{});
+    if(t)c7SyncTicketMessage(t,newMsg).then(ok=>showC7Toast(ok)).catch(()=>showC7Toast(false));
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -2738,6 +2743,7 @@ function renderOrders(){
   const rtbody=document.getElementById('orders-resolved-tbody');
   if(rtbody){
     rtbody.innerHTML='';
+    resolvedList.sort((a,b)=>(b.resolvedAt||b.createdAt||'').localeCompare(a.resolvedAt||a.createdAt||''));
     resolvedList.forEach(o=>rtbody.appendChild(buildOrderRow(o,false)));
     if(!resolvedList.length)rtbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--ink-m);">No resolved followups.</td></tr>';
   }
@@ -2789,6 +2795,7 @@ function buildOrderRow(o,showStatus){
       <td style="font-size:12px;" onclick="event.stopPropagation();">${emailLink(o.customerEmail)}</td>
       <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(o.customerPhone)}</td>
       <td><span class="bdg bdg-s">Resolved</span></td>
+      <td style="font-size:12px;color:var(--ink-m);">${o.resolvedAt||'—'}</td>
       <td style="font-size:12px;color:var(--ink-m);">${lastMsg?lastMsg.createdAt:o.createdAt}</td>
       <td><span class="bdg" style="background:var(--burg-f);color:var(--burg);font-size:11px;">${humanMsgs.length}</span></td>
       <td>${assigneeHtml}</td>`;
@@ -3155,13 +3162,15 @@ async function addOrderMessage(){
     if(o&&o.status==='Open'){o.status='In Progress';document.getElementById('ot-status').value='In Progress';await updateOrderInSheet(o);}
     document.getElementById('ot-new-msg').value='';document.getElementById('ot-method').value='';
     renderOrderMessages(S.activeOrderId);renderOrders();showToast('Note added');
-    if(o)c7SyncOrderMessage(o,newMsg).catch(()=>{});
+    if(o)c7SyncOrderMessage(o,newMsg).then(ok=>showC7Toast(ok)).catch(()=>showC7Toast(false));
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
 async function updateOrderStatus(){
   const o=S.orderCustomers.find(x=>x.id===S.activeOrderId);if(!o)return;
   o.status=document.getElementById('ot-status').value;
+  if(o.status==='Resolved'&&!o.resolvedAt)o.resolvedAt=today();
+  else if(o.status!=='Resolved')o.resolvedAt='';
   await updateOrderInSheet(o);renderOrders();
 }
 
@@ -3203,9 +3212,9 @@ async function createPickupReminder(o,pickupDate){
 
 async function updateOrderInSheet(o){
   try{
-    const allRows=await sheetsGet('OrderCustomers!A2:K');
+    const allRows=await sheetsGet('OrderCustomers!A2:N');
     const rowIdx=allRows.findIndex(r=>r[0]===o.id);
-    if(rowIdx>=0)await sheetsUpdate('OrderCustomers!A'+(rowIdx+2)+':M'+(rowIdx+2),[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate||'',o.oldestOrderDate||'',o.unfulfilledCount!==undefined?o.unfulfilledCount:'']]);
+    if(rowIdx>=0)await sheetsUpdate('OrderCustomers!A'+(rowIdx+2)+':N'+(rowIdx+2),[[o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate||'',o.oldestOrderDate||'',o.unfulfilledCount!==undefined?o.unfulfilledCount:'',o.resolvedAt||'']]);
   }catch(e){showToast('Error saving: '+e.message,'err');}
 }
 
@@ -3323,7 +3332,8 @@ async function syncOutstandingOrders(){
         return d.slice(0,10);
       }).filter(Boolean).sort();
       const oldestDate=dates[0]||'';
-      const exists=S.orderCustomers.some(o=>o.customerId===cid&&o.status!=='Resolved');
+      // Use customerId+oldestOrderDate as unique key — allows re-entry if new orders appear after resolution
+      const exists=S.orderCustomers.some(o=>o.customerId===cid&&o.oldestOrderDate===oldestDate&&o.status!=='Resolved');
       if(exists){skippedDupe++;continue;}
       const id=uid();const createdAt=today();
       const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:'',pickupDate:'',oldestOrderDate:oldestDate};
@@ -3346,7 +3356,7 @@ async function syncOutstandingOrders(){
 
 async function autoResolveOrderCustomer(){
   const o=S.orderCustomers.find(x=>x.id===S.activeOrderId);if(!o)return;
-  o.status='Resolved';
+  o.status='Resolved';o.resolvedAt=today();
   document.getElementById('ot-status').value='Resolved';
   await updateOrderInSheet(o);
   // Add auto note
@@ -3385,7 +3395,7 @@ async function checkOrdersResolved(){
         });
         if(unfulfilled.length===0){
           // All fulfilled — auto-resolve
-          o.status='Resolved';
+          o.status='Resolved';o.resolvedAt=today();
           await updateOrderInSheet(o);
           const msgId=uid();const createdAt=today();
           const note='Auto-resolved: all orders fulfilled in Commerce7.';
@@ -4079,7 +4089,7 @@ async function addOutreachMessage(){
     if(o&&o.status==='Open'){o.status='In Progress';document.getElementById('ort-status').value='In Progress';await updateOutreachInSheet(o);}
     document.getElementById('ort-new-msg').value='';document.getElementById('ort-method').value='';
     renderOutreachMessages(S.activeOutreachId);renderOutreach();showToast('Message added');
-    if(o)c7SyncOutreachMessage(o,newMsg).catch(()=>{});
+    if(o)c7SyncOutreachMessage(o,newMsg).then(ok=>showC7Toast(ok)).catch(()=>showC7Toast(false));
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -4395,8 +4405,8 @@ async function c7SyncTicketMessage(ticket,msg){
   let noteText='🚩 [McGregor Connect] Ticket Update:';
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=' Active ticket: '+ticket.type+' — '+ticket.subject+' / '+msg.message+' — '+rep.name;
-  try{await c7AddNote(c7Id,noteText);}
-  catch(e){console.warn('C7 ticket note failed:',e.message);}
+  try{await c7AddNote(c7Id,noteText);return true;}
+  catch(e){console.warn('C7 ticket note failed:',e.message);return false;}
 }
 
 async function c7SyncAttemptLogged(contact,attempt){
@@ -4408,8 +4418,8 @@ async function c7SyncAttemptLogged(contact,attempt){
   if(camp)noteText+=' | Campaign: '+camp.name;
   if(attempt.notes)noteText+=' / '+attempt.notes;
   noteText+=' — '+rep.name;
-  try{await c7AddNote(c7Id,noteText);}
-  catch(e){console.warn('C7 attempt note failed:',e.message);}
+  try{await c7AddNote(c7Id,noteText);return true;}
+  catch(e){console.warn('C7 attempt note failed:',e.message);return false;}
 }
 
 async function c7SyncOrderMessage(orderCustomer,msg){
@@ -4418,7 +4428,7 @@ async function c7SyncOrderMessage(orderCustomer,msg){
   let noteText='[McGregor Connect] Outstanding Order Followup:';
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=' '+msg.message+' — '+rep.name;
-  await c7AddNote(orderCustomer.customerId,noteText);
+  return await c7AddNote(orderCustomer.customerId,noteText).then(()=>true).catch(()=>false);
 }
 
 async function c7SyncOutreachMessage(outreach,msg){
@@ -4427,7 +4437,7 @@ async function c7SyncOutreachMessage(outreach,msg){
   let noteText='[McGregor Connect] Outreach "'+outreach.title+'":';
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=' '+msg.message+' — '+rep.name;
-  await c7AddNote(outreach.contactId,noteText);
+  return await c7AddNote(outreach.contactId,noteText).then(()=>true).catch(()=>false);
 }
 
 // ---- Export ----
