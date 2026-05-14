@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.153</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.155</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1213,7 +1213,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
+  C7_WORKER_URL: 'mcgregor-connect-gate.dan-f74.workers.dev',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -1368,6 +1368,17 @@ async function loadFromSheets(){
     S.ticketMsgs=ticketMsgRows.filter(r=>r[0]).map(r=>({id:r[0],ticketId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||'',method:r[6]||''}));
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
+    // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
+    const seen={};
+    S.orderCustomers=S.orderCustomers.filter(o=>{
+      if(o.status==='Resolved')return true;
+      if(!seen[o.customerId]){seen[o.customerId]=o;return true;}
+      // Keep whichever has the older order date
+      if((o.oldestOrderDate||'9999')<(seen[o.customerId].oldestOrderDate||'9999')){
+        seen[o.customerId]=o;return true;
+      }
+      return false;
+    });
     S.orderMsgs=orderMsgRows.filter(r=>r[0]).map(r=>({id:r[0],orderCustomerId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||'',website:r[12]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
@@ -3332,9 +3343,19 @@ async function syncOutstandingOrders(){
         return d.slice(0,10);
       }).filter(Boolean).sort();
       const oldestDate=dates[0]||'';
-      // Use customerId+oldestOrderDate as unique key — allows re-entry if new orders appear after resolution
-      const exists=S.orderCustomers.some(o=>o.customerId===cid&&o.oldestOrderDate===oldestDate&&o.status!=='Resolved');
-      if(exists){skippedDupe++;continue;}
+      // If customer already has an active entry, update it rather than create a duplicate
+      const existingActive=S.orderCustomers.find(o=>o.customerId===cid&&o.status!=='Resolved');
+      if(existingActive){
+        // Update oldestOrderDate if it has changed
+        if(existingActive.oldestOrderDate!==oldestDate){
+          existingActive.oldestOrderDate=oldestDate;
+          await updateOrderInSheet(existingActive);
+        }
+        skippedDupe++;continue;
+      }
+      // Also skip if a resolved entry exists with the same oldestOrderDate (same batch of orders)
+      const resolvedDupe=S.orderCustomers.find(o=>o.customerId===cid&&o.status==='Resolved'&&o.oldestOrderDate===oldestDate);
+      if(resolvedDupe){skippedDupe++;continue;}
       const id=uid();const createdAt=today();
       const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:'',pickupDate:'',oldestOrderDate:oldestDate};
       const msgId=uid();const note=cust.orders.length+' unfulfilled order'+(cust.orders.length!==1?'s':'')+' found in Commerce7 (oldest: '+oldestDate+').';
@@ -4452,6 +4473,17 @@ function exportCSV(){
 document.querySelectorAll('.modal-backdrop').forEach(bd=>{
   bd.addEventListener('click',e=>{if(e.target===bd)bd.classList.remove('op');});
 });
+
+// ---- Gate token check ----
+// Blocks direct GitHub Pages access — token is injected by the Cloudflare gate Worker
+(function(){
+  const meta = document.querySelector('meta[name="mcg-gate"]');
+  if(!meta || meta.getAttribute('content') !== 'authorized'){
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    window.location.replace('about:blank');
+  }
+})();
 
 // ---- Boot ----
 loadFromSheets();
