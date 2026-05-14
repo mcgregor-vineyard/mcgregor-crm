@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.155</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.157</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -381,7 +381,7 @@ select.fi{cursor:pointer;}
               <option value="upcoming">Upcoming</option>
               <option value="today">Due today</option>
               <option value="overdue">Overdue</option>
-              <option value="all">All</option>
+              <option value="all" selected>All</option>
               <option value="done">Completed</option>
             </select>
           </div>
@@ -785,6 +785,31 @@ select.fi{cursor:pointer;}
       <input type="hidden" id="rm-ref-id" />
     </div>
     <div class="mftr"><button class="btn" onclick="closeModal('reminder-modal')">Cancel</button><button class="btn btnp" onclick="saveReminder()">Save</button></div>
+  </div>
+</div>
+
+<!-- Reminder detail modal -->
+<div id="reminder-detail-modal" class="modal-backdrop">
+  <div class="modal" style="width:500px;max-height:80vh;display:flex;flex-direction:column;" onclick="event.stopPropagation();">
+    <div class="mhdr">
+      <div>
+        <div class="mtitle" id="rdt-title"></div>
+        <div id="rdt-meta" style="font-size:12px;color:var(--ink-m);margin-top:2px;"></div>
+      </div>
+      <button class="mcls" onclick="closeModal('reminder-detail-modal')">✕</button>
+    </div>
+    <div class="mbdy" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+      <div id="rdt-messages" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div style="border-top:1px solid var(--bdr);padding-top:12px;">
+        <textarea class="fi" id="rdt-new-note" rows="2" placeholder="Add a note..."></textarea>
+      </div>
+    </div>
+    <div class="mftr" style="display:flex;gap:8px;">
+      <button class="btn" onclick="closeModal('reminder-detail-modal')">Close</button>
+      <button class="btn" onclick="saveReminderNote()" id="rdt-save-btn">Add note</button>
+      <div style="flex:1;"></div>
+      <button class="btn btnp" id="rdt-resolve-btn" onclick="resolveReminderFromDetail()">✓ Mark done</button>
+    </div>
   </div>
 </div>
 
@@ -1213,7 +1238,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'mcgregor-connect-gate.dan-f74.workers.dev',
+  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -1263,9 +1288,9 @@ function getCampColor(campId){
   return idx>=0?CAMP_COLORS[idx%CAMP_COLORS.length]:{bg:'var(--cream)',border:'var(--bdr)',text:'var(--ink-m)'};
 }
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
-const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages'};
+const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages'};
 
-let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],activeOutreachId:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
+let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],activeOutreachId:null,activeReminderId:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
 
 function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function today(){return new Date().toISOString().slice(0,10);}
@@ -1344,6 +1369,7 @@ async function ensureSheets(){
   if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:L1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone']]);
   if(needed.includes('TicketMessages'))await sheetsUpdate('TicketMessages!A1:G1',[['ID','TicketID','Message','Author','AuthorName','CreatedAt','Method']]);
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
+  if(needed.includes('ReminderNotes'))await sheetsUpdate('ReminderNotes!A1:F1',[['ID','ReminderID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:M1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate','UnfulfilledCount','ResolvedAt']]);
   if(needed.includes('OrderMessages'))await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
   if(needed.includes('Outreach'))await sheetsUpdate('Outreach!A1:L1',[['ID','Title','Type','Status','EventDate','ContactID','ContactName','ContactEmail','ContactPhone','Assignee','CreatedAt','GuestCount','Website']]);
@@ -1354,11 +1380,12 @@ async function loadFromSheets(){
   setSyncBar('loading','Loading from Google Sheets...');
   try{
     await ensureSheets();
-    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows]=await Promise.all([
+    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows]=await Promise.all([
       sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:K'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:H'),
       sheetsGet('OrderCustomers!A2:M'),sheetsGet('OrderMessages!A2:G'),
-      sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G')
+      sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
+      sheetsGet('ReminderNotes!A2:F')
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
@@ -1367,6 +1394,7 @@ async function loadFromSheets(){
     S.tickets=ticketRows.filter(r=>r[0]).map(r=>({id:r[0],subject:r[1]||'',type:r[2]||'',priority:r[3]||'Normal',status:r[4]||'Open',customerId:r[5]||'',customerName:r[6]||'',orderNo:r[7]||'',assignee:parseInt(r[8])||0,createdAt:r[9]||'',customerEmail:r[10]||'',customerPhone:r[11]||''}));
     S.ticketMsgs=ticketMsgRows.filter(r=>r[0]).map(r=>({id:r[0],ticketId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||'',method:r[6]||''}));
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
+    S.reminderNotes=(reminderNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],reminderId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
     const seen={};
@@ -3183,6 +3211,7 @@ async function updateOrderStatus(){
   if(o.status==='Resolved'&&!o.resolvedAt)o.resolvedAt=today();
   else if(o.status!=='Resolved')o.resolvedAt='';
   await updateOrderInSheet(o);renderOrders();
+  if(o.status==='Resolved')resolveOrderReminders(o.id).catch(()=>{});
 }
 
 async function updateOrderAssignee(){
@@ -3387,6 +3416,7 @@ async function autoResolveOrderCustomer(){
   S.orderMsgs.push({id:msgId,orderCustomerId:o.id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',method:'',createdAt});
   renderOrderMessages(o.id);
   renderOrders();
+  resolveOrderReminders(o.id).catch(()=>{});
   showToast(o.customerName+' marked as resolved');
 }
 
@@ -3422,6 +3452,7 @@ async function checkOrdersResolved(){
           const note='Auto-resolved: all orders fulfilled in Commerce7.';
           await sheetsAppend('OrderMessages!A:G',[[msgId,o.id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System','',createdAt]]);
           S.orderMsgs.push({id:msgId,orderCustomerId:o.id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',method:'',createdAt});
+          resolveOrderReminders(o.id).catch(()=>{});
           resolved++;
         } else {
           // Update oldest order date if changed
@@ -3441,14 +3472,18 @@ async function checkOrdersResolved(){
 
 // ---- Reminders ----
 function renderReminders(){
-  const f=document.getElementById('reminder-filter')?document.getElementById('reminder-filter').value:'upcoming';
+  const f=document.getElementById('reminder-filter')?document.getElementById('reminder-filter').value:'all';
   const t=today();
   let rs=[...S.reminders];
   if(f==='today')rs=rs.filter(r=>!r.done&&r.dueDate===t);
   else if(f==='overdue')rs=rs.filter(r=>!r.done&&r.dueDate<t);
   else if(f==='upcoming')rs=rs.filter(r=>!r.done&&r.dueDate>=t);
   else if(f==='done')rs=rs.filter(r=>r.done);
-  rs.sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  // All active (non-done) first, then done — each group sorted oldest to newest
+  rs.sort((a,b)=>{
+    if(a.done!==b.done)return a.done?1:-1;
+    return a.dueDate.localeCompare(b.dueDate);
+  });
   const overdue=S.reminders.filter(r=>!r.done&&r.dueDate<t).length;
   const dueToday=S.reminders.filter(r=>!r.done&&r.dueDate===t).length;
   const upcoming=S.reminders.filter(r=>!r.done&&r.dueDate>t).length;
@@ -3463,17 +3498,20 @@ function renderReminders(){
     const m=TEAM[r.assignee]||TEAM[0];
     const isOverdue=!r.done&&r.dueDate<t;
     const isToday=!r.done&&r.dueDate===t;
+    const noteCount=(S.reminderNotes||[]).filter(n=>n.reminderId===r.id).length;
     const div=document.createElement('div');
-    div.style.cssText='background:white;border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;'+(r.done?'opacity:.55;':'');
-    div.innerHTML='<div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:'+(r.done?'var(--burg)':'white')+';color:white;font-size:10px;" onclick="toggleReminder(\''+r.id+'\')">'+(r.done?'✓':'')+'</div>'
+    div.style.cssText='background:white;border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;'+(r.done?'opacity:.55;':'');
+    div.onclick=()=>openReminderDetail(r.id);
+    div.innerHTML='<div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:'+(r.done?'var(--burg)':'white')+';color:white;font-size:10px;" onclick="event.stopPropagation();toggleReminder(\''+r.id+'\')">'+(r.done?'✓':'')+'</div>'
       +'<div style="flex:1;">'
       +'<div style="font-weight:500;font-size:14px;'+(r.done?'text-decoration:line-through;':'')+'">'+r.note+'</div>'
       +'<div style="display:flex;gap:10px;margin-top:4px;font-size:12px;color:var(--ink-m);">'
       +'<span style="color:'+(isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)')+';">'+r.dueDate+'</span>'
       +(r.refName?'<span>↳ '+r.refName+'</span>':'')
+      +(noteCount?'<span>🗒 '+noteCount+'</span>':'')
       +'<div style="display:flex;align-items:center;gap:4px;"><div class="av '+m.cls+'" style="width:16px;height:16px;font-size:7px;">'+m.init+'</div>'+m.name+'</div>'
       +'</div></div>'
-      +'<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="openEditReminder(\''+r.id+'\')">Edit</button>';
+      +'<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="event.stopPropagation();openEditReminder(\''+r.id+'\')">Edit</button>';
     el.appendChild(div);
   });
 }
@@ -3524,6 +3562,21 @@ async function saveReminder(){
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
+// Resolve all open reminders linked to an order customer record
+async function resolveOrderReminders(orderId){
+  const open=S.reminders.filter(r=>r.refType==='order'&&r.refId===orderId&&!r.done);
+  if(!open.length)return;
+  try{
+    const allRows=await sheetsGet('Reminders!A2:H');
+    for(const r of open){
+      r.done=true;
+      const rowIdx=allRows.findIndex(row=>row[0]===r.id);
+      if(rowIdx>=0)await sheetsUpdate('Reminders!H'+(rowIdx+2),[['true']]);
+    }
+    renderReminders();
+  }catch(e){console.warn('Could not resolve order reminders:',e.message);}
+}
+
 async function toggleReminder(id){
   const r=S.reminders.find(x=>x.id===id);if(!r)return;
   r.done=!r.done;
@@ -3532,6 +3585,79 @@ async function toggleReminder(id){
     const rowIdx=allRows.findIndex(row=>row[0]===id);
     if(rowIdx>=0)await sheetsUpdate('Reminders!H'+(rowIdx+2),[[r.done.toString()]]);
     renderReminders();
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+// ---- Reminder Detail Modal ----
+function openReminderDetail(id){
+  const r=S.reminders.find(x=>x.id===id);if(!r)return;
+  S.activeReminderId=id;
+  const t=today();
+  const isOverdue=!r.done&&r.dueDate<t;
+  const isToday=!r.done&&r.dueDate===t;
+  const m=TEAM[r.assignee]||TEAM[0];
+  document.getElementById('rdt-title').textContent=r.note;
+  let meta=r.dueDate;
+  if(isOverdue)meta+=' · Overdue';
+  else if(isToday)meta+=' · Due today';
+  if(r.refName)meta+=' · ↳ '+r.refName;
+  meta+=' · '+m.name;
+  document.getElementById('rdt-meta').textContent=meta;
+  document.getElementById('rdt-meta').style.color=isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)';
+  const btn=document.getElementById('rdt-resolve-btn');
+  if(r.done){btn.textContent='↩ Mark undone';btn.style.background='var(--ink-m)';}
+  else{btn.textContent='✓ Mark done';btn.style.background='';}
+  document.getElementById('rdt-new-note').value='';
+  renderReminderNotes(id);
+  openModal('reminder-detail-modal');
+}
+
+function renderReminderNotes(reminderId){
+  const notes=(S.reminderNotes||[]).filter(n=>n.reminderId===reminderId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  const el=document.getElementById('rdt-messages');el.innerHTML='';
+  if(!notes.length){el.innerHTML='<div style="color:var(--ink-m);font-size:13px;">No notes yet.</div>';return;}
+  notes.forEach(n=>{
+    const rep=TEAM[n.author]||{name:n.authorName||'Team',cls:'av-b',init:'?'};
+    const div=document.createElement('div');
+    div.style.cssText='background:var(--cream);border-radius:7px;padding:10px 12px;font-size:13px;';
+    div.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+      +'<div style="display:flex;align-items:center;gap:6px;"><div class="av '+rep.cls+'" style="width:18px;height:18px;font-size:7px;">'+rep.init+'</div><span style="font-weight:500;">'+rep.name+'</span></div>'
+      +'<span style="font-size:11px;color:var(--ink-m);">'+n.createdAt+'</span></div>'
+      +'<div>'+n.message+'</div>';
+    el.appendChild(div);
+  });
+}
+
+async function saveReminderNote(){
+  const remId=S.activeReminderId;if(!remId)return;
+  const msg=document.getElementById('rdt-new-note').value.trim();if(!msg)return;
+  const btn=document.getElementById('rdt-save-btn');btn.disabled=true;btn.textContent='Saving...';
+  const id=uid();const createdAt=today();
+  const rep=TEAM[S.cu]||TEAM[0];
+  try{
+    await sheetsAppend('ReminderNotes!A:F',[[id,remId,msg,S.cu,rep.name,createdAt]]);
+    const n={id,reminderId:remId,message:msg,author:S.cu,authorName:rep.name,createdAt};
+    S.reminderNotes.push(n);
+    document.getElementById('rdt-new-note').value='';
+    renderReminderNotes(remId);
+    renderReminders();
+    showToast('Note added');
+  }catch(e){showToast('Error: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Add note';}
+}
+
+async function resolveReminderFromDetail(){
+  const r=S.reminders.find(x=>x.id===S.activeReminderId);if(!r)return;
+  r.done=!r.done;
+  try{
+    const allRows=await sheetsGet('Reminders!A2:H');
+    const rowIdx=allRows.findIndex(row=>row[0]===r.id);
+    if(rowIdx>=0)await sheetsUpdate('Reminders!H'+(rowIdx+2),[[r.done.toString()]]);
+    const btn=document.getElementById('rdt-resolve-btn');
+    if(r.done){btn.textContent='↩ Mark undone';btn.style.background='var(--ink-m)';}
+    else{btn.textContent='✓ Mark done';btn.style.background='';}
+    renderReminders();
+    showToast(r.done?'Reminder marked done':'Reminder reopened');
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
