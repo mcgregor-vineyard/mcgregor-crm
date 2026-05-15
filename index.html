@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.157</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.158</div></div>
     <div class="nav">
       <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -3310,10 +3310,18 @@ async function syncOutstandingOrders(){
   try{
     // Always reload from sheet first to get true current state
     const [custRows,msgRows]=await Promise.all([
-      sheetsGet('OrderCustomers!A2:M'),
+      sheetsGet('OrderCustomers!A2:N'),
       sheetsGet('OrderMessages!A2:G')
     ]);
-    S.orderCustomers=custRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||''}));
+    S.orderCustomers=custRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
+    // Apply same dedup as initial load
+    const seenSync={};
+    S.orderCustomers=S.orderCustomers.filter(o=>{
+      if(o.status==='Resolved')return true;
+      if(!seenSync[o.customerId]){seenSync[o.customerId]=o;return true;}
+      if((o.oldestOrderDate||'9999')<(seenSync[o.customerId].oldestOrderDate||'9999')){seenSync[o.customerId]=o;return true;}
+      return false;
+    });
     S.orderMsgs=msgRows.filter(r=>r[0]).map(r=>({id:r[0],orderCustomerId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     statusEl.textContent='Fetching unfulfilled orders from Commerce7...';
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
@@ -3388,14 +3396,14 @@ async function syncOutstandingOrders(){
       const id=uid();const createdAt=today();
       const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:'',pickupDate:'',oldestOrderDate:oldestDate};
       const msgId=uid();const note=cust.orders.length+' unfulfilled order'+(cust.orders.length!==1?'s':'')+' found in Commerce7 (oldest: '+oldestDate+').';
-      newCustRows.push([o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate,o.oldestOrderDate]);
+      newCustRows.push([o.id,o.customerId,o.customerName,o.customerEmail,o.customerPhone,o.status,o.assignee,o.createdAt,o.syncedAt,o.notes,o.pickupDate,o.oldestOrderDate,'','']);
       newMsgRows.push([msgId,id,note,S.cu,TEAM[S.cu]?TEAM[S.cu].name:'System','',createdAt]);
       S.orderCustomers.push(o);
       S.orderMsgs.push({id:msgId,orderCustomerId:id,message:note,author:S.cu,authorName:TEAM[S.cu]?TEAM[S.cu].name:'System',method:'',createdAt});
       created++;
     }
     // Write all rows in two batch calls
-    if(newCustRows.length)await sheetsAppend('OrderCustomers!A:L',newCustRows);
+    if(newCustRows.length)await sheetsAppend('OrderCustomers!A:N',newCustRows);
     if(newMsgRows.length)await sheetsAppend('OrderMessages!A:G',newMsgRows);
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
     statusEl.textContent='Done — '+created+' new customer'+(created!==1?'s':'')+' added'+(skippedDupe?' · '+skippedDupe+' already tracked':'')+'.';
