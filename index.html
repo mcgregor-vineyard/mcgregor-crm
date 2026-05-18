@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.167</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.168</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -457,6 +457,7 @@ select.fi{cursor:pointer;}
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                 <div style="font-weight:600;font-size:14px;">Project Items</div>
                 <div style="display:flex;gap:6px;">
+                  <button class="btn" style="font-size:12px;" onclick="enrichProjectContactsFromC7(S.activeProject,true)" title="Re-fetch order data from Commerce7">↻ Refresh C7</button>
                   <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openProjectImport()">+ Add / Import</button>
                 </div>
               </div>
@@ -1395,7 +1396,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
+  C7_WORKER_URL: '',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -5153,12 +5154,12 @@ async function confirmProjectImport(){
   finally{btn.disabled=false;btn.textContent='Add to project';}
 }
 
-async function enrichProjectContactsFromC7(projectId){
-  const contacts=S.projectContacts.filter(c=>c.projectId===projectId&&(!c.c7CustomerId)&&(c.email||c.orderNo));
-  if(!contacts.length)return;
+async function enrichProjectContactsFromC7(projectId,forceAll){
+  const contacts=S.projectContacts.filter(c=>c.projectId===projectId&&(forceAll||!c.c7CustomerId)&&(c.email||c.orderNo));
+  if(!contacts.length){if(forceAll)showToast('No items to refresh');return;}
+  showToast('Refreshing C7 data...');
   for(const c of contacts){
     try{
-      // Look up by order number first if available
       if(c.orderNo){
         const orderData=await c7Req('GET','/order?orderNumber='+encodeURIComponent(c.orderNo),null);
         const orders=(orderData&&orderData.orders)||[];
@@ -5168,7 +5169,6 @@ async function enrichProjectContactsFromC7(projectId){
           c.c7OrderData=JSON.stringify({status:ord.fulfillmentStatus||'',total:ord.total||0,orderDate:(ord.orderPaidDate||ord.createdAt||'').slice(0,10),orderId:ord.id||''});
         }
       }
-      // Fall back to email lookup
       if(!c.c7CustomerId&&c.email){
         const custData=await c7Req('GET','/customer?q='+encodeURIComponent(c.email)+'&limit=5',null);
         const custs=(custData&&custData.customers)||[];
@@ -5184,7 +5184,7 @@ async function enrichProjectContactsFromC7(projectId){
     await new Promise(r=>setTimeout(r,400));
   }
   renderProjectContacts(projectId);
-  showToast('Commerce7 data loaded');
+  showToast('Commerce7 data refreshed');
 }
 
 async function toggleProjectContact(contactId){
