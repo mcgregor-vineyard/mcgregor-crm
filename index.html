@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.165</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.167</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4865,9 +4865,15 @@ function renderProjectContacts(projectId){
     if(c.c7OrderData){try{const d=JSON.parse(c.c7OrderData);c7Info=d.status||'';}catch(e){}}
     const displayName=(c.first+' '+c.last).trim()||'—';
     const updateCount=(S.projectItemNotes||[]).filter(n=>n.contactId===c.id).length;
-    const orderLink=c.orderNo&&CONFIG.C7_TENANT
-      ?`<a href="https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/orders?orderNumber=${encodeURIComponent(c.orderNo)}" target="_blank" style="color:var(--burg);text-decoration:none;">${c.orderNo} ↗</a>`
-      :(c.orderNo||'—');
+    let orderLink=c.orderNo||'—';
+    if(c.orderNo&&CONFIG.C7_TENANT){
+      let c7OrderId='';
+      if(c.c7OrderData){try{const d=JSON.parse(c.c7OrderData);c7OrderId=d.orderId||'';}catch(e){}}
+      const orderUrl=c7OrderId
+        ?`https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/store/order/${c7OrderId}/summary`
+        :`https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/store/order`;
+      orderLink=`<a href="${orderUrl}" target="_blank" style="color:var(--burg);text-decoration:none;">${c.orderNo} ↗</a>`;
+    }
     const tr=document.createElement('tr');
     tr.style.cssText='cursor:pointer;';
     tr.onclick=(e)=>{if(e.target.tagName!=='BUTTON'&&e.target.tagName!=='A')openPjItemPanel(c.id);};
@@ -5159,7 +5165,7 @@ async function enrichProjectContactsFromC7(projectId){
         if(orders.length){
           const ord=orders[0];
           c.c7CustomerId=ord.customerId||'';
-          c.c7OrderData=JSON.stringify({status:ord.fulfillmentStatus||'',total:ord.total||0,orderDate:(ord.orderPaidDate||ord.createdAt||'').slice(0,10)});
+          c.c7OrderData=JSON.stringify({status:ord.fulfillmentStatus||'',total:ord.total||0,orderDate:(ord.orderPaidDate||ord.createdAt||'').slice(0,10),orderId:ord.id||''});
         }
       }
       // Fall back to email lookup
@@ -5217,8 +5223,12 @@ function openPjItemPanel(contactId){
   if(c.email)info+=`<div style="margin-bottom:4px;"><a href="mailto:${c.email}" style="color:var(--burg);">${c.email}</a></div>`;
   if(c.phone)info+=`<div style="margin-bottom:4px;">${c.phone}</div>`;
   if(c.orderNo){
-    const orderUrl=CONFIG.C7_TENANT?`https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/orders?orderNumber=${encodeURIComponent(c.orderNo)}`:'#';
-    info+=`<div style="margin-bottom:4px;">Order: <a href="${orderUrl}" target="_blank" style="color:var(--burg);">${c.orderNo} ↗</a></div>`;
+    let ordUrl='#';
+    if(CONFIG.C7_TENANT){
+      let c7oid='';if(c.c7OrderData){try{const _d=JSON.parse(c.c7OrderData);c7oid=_d.orderId||'';}catch(e){}}
+      ordUrl=c7oid?`https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/store/order/${c7oid}/summary`:`https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/store/order`;
+    }
+    info+=`<div style="margin-bottom:4px;">Order: <a href="${ordUrl}" target="_blank" style="color:var(--burg);">${c.orderNo} ↗</a></div>`;
   }
   if(c.c7OrderData){try{const d=JSON.parse(c.c7OrderData);if(d.status)info+=`<div style="margin-bottom:4px;color:var(--ink-m);">C7 status: ${d.status}</div>`;}catch(e){}}
   if(c.completedBy)info+=`<div style="margin-top:6px;color:var(--s-tx);font-size:12px;">✓ Completed by ${c.completedBy}${c.completedAt?' · '+c.completedAt:''}</div>`;
