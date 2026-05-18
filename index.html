@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.161</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.162</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -457,7 +457,7 @@ select.fi{cursor:pointer;}
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                 <div style="font-weight:600;font-size:14px;">Contacts</div>
                 <div style="display:flex;gap:6px;">
-                  <button class="btn" style="font-size:12px;" onclick="openProjectImport()">Import</button>
+                  <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openProjectImport()">+ Add / Import</button>
                 </div>
               </div>
               <div id="pj-contacts-list"></div>
@@ -876,6 +876,7 @@ select.fi{cursor:pointer;}
       <div class="tab-row" style="margin-bottom:14px;">
         <button class="tab on" id="pj-tab-search" onclick="switchPjImportTab('search',this)">Search Commerce7</button>
         <button class="tab" id="pj-tab-upload" onclick="switchPjImportTab('upload',this)">Upload file</button>
+        <button class="tab" id="pj-tab-manual" onclick="switchPjImportTab('manual',this)">Manual entry</button>
       </div>
       <!-- C7 Search tab -->
       <div id="pj-import-search">
@@ -894,6 +895,23 @@ select.fi{cursor:pointer;}
           <div style="font-size:13px;color:var(--ink-m);margin-bottom:8px;" id="pj-import-count"></div>
           <div id="pj-import-table-wrap" style="max-height:260px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;"></div>
         </div>
+      </div>
+      <!-- Manual entry tab -->
+      <div id="pj-import-manual" style="display:none;">
+        <div class="f2">
+          <div class="fr"><label class="fl">Name / Item *</label><input type="text" class="fi" id="pj-manual-name" placeholder="Person name or item description" /></div>
+          <div class="fr"><label class="fl">Last name</label><input type="text" class="fi" id="pj-manual-last" placeholder="Optional" /></div>
+        </div>
+        <div class="f2">
+          <div class="fr"><label class="fl">Email</label><input type="email" class="fi" id="pj-manual-email" placeholder="Optional" /></div>
+          <div class="fr"><label class="fl">Phone</label><input type="tel" class="fi" id="pj-manual-phone" placeholder="Optional" /></div>
+        </div>
+        <div class="fr"><label class="fl">Order #</label><input type="text" class="fi" id="pj-manual-order" placeholder="Optional" /></div>
+        <div id="pj-manual-queue" style="margin-top:12px;display:none;">
+          <div style="font-size:12px;font-weight:600;color:var(--ink-f);margin-bottom:6px;">Queued to add:</div>
+          <div id="pj-manual-queue-list" style="max-height:160px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;"></div>
+        </div>
+        <button class="btn" style="margin-top:10px;width:100%;" onclick="addToManualQueue()">+ Add another</button>
       </div>
     </div>
     <div class="mftr">
@@ -4931,12 +4949,19 @@ let pjPendingUpload=[];
 let pjC7Selected=[];
 
 function openProjectImport(){
-  pjPendingUpload=[];pjC7Selected=[];
+  pjPendingUpload=[];pjC7Selected=[];pjManualQueue=[];
   document.getElementById('pj-file-input').value='';
   document.getElementById('pj-import-preview').style.display='none';
   document.getElementById('pj-c7-results').innerHTML='<div style="padding:14px;color:var(--ink-m);font-size:13px;text-align:center;">Search to find Commerce7 customers</div>';
   document.getElementById('pj-c7-search-input').value='';
   document.getElementById('pj-c7-selected-summary').textContent='';
+  document.getElementById('pj-manual-name').value='';
+  document.getElementById('pj-manual-last').value='';
+  document.getElementById('pj-manual-email').value='';
+  document.getElementById('pj-manual-phone').value='';
+  document.getElementById('pj-manual-order').value='';
+  document.getElementById('pj-manual-queue').style.display='none';
+  document.getElementById('pj-manual-queue-list').innerHTML='';
   switchPjImportTab('search',document.getElementById('pj-tab-search'));
   openModal('project-import-modal');
 }
@@ -4946,6 +4971,38 @@ function switchPjImportTab(tab,btn){
   btn.classList.add('on');
   document.getElementById('pj-import-search').style.display=tab==='search'?'':'none';
   document.getElementById('pj-import-upload').style.display=tab==='upload'?'':'none';
+  document.getElementById('pj-import-manual').style.display=tab==='manual'?'':'none';
+}
+
+let pjManualQueue=[];
+
+function addToManualQueue(){
+  const name=document.getElementById('pj-manual-name').value.trim();
+  if(!name){showToast('Name or item is required','err');return;}
+  const last=document.getElementById('pj-manual-last').value.trim();
+  const email=document.getElementById('pj-manual-email').value.trim();
+  const phone=document.getElementById('pj-manual-phone').value.trim();
+  const orderNo=document.getElementById('pj-manual-order').value.trim();
+  pjManualQueue.push({first:name,last,email,phone,orderNo});
+  // Clear fields for next entry
+  ['pj-manual-name','pj-manual-last','pj-manual-email','pj-manual-phone','pj-manual-order'].forEach(id=>document.getElementById(id).value='');
+  renderManualQueue();
+  document.getElementById('pj-manual-name').focus();
+}
+
+function renderManualQueue(){
+  const el=document.getElementById('pj-manual-queue-list');
+  const wrap=document.getElementById('pj-manual-queue');
+  if(!pjManualQueue.length){wrap.style.display='none';return;}
+  wrap.style.display='';
+  el.innerHTML='';
+  pjManualQueue.forEach((item,i)=>{
+    const div=document.createElement('div');
+    div.style.cssText='padding:8px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;font-size:13px;';
+    div.innerHTML='<span><strong>'+(item.first+' '+item.last).trim()+'</strong>'+(item.email?' · '+item.email:'')+(item.orderNo?' · #'+item.orderNo:'')+'</span>'
+      +'<button onclick="pjManualQueue.splice('+i+',1);renderManualQueue();" style="background:none;border:none;cursor:pointer;color:var(--d-tx);font-size:14px;padding:0 4px;">✕</button>';
+    el.appendChild(div);
+  });
 }
 
 async function searchPjC7(){
@@ -5022,7 +5079,10 @@ function handleProjectFileUpload(input){
 
 async function confirmProjectImport(){
   const projectId=S.activeProject;if(!projectId)return;
-  const toAdd=[...pjC7Selected,...pjPendingUpload];
+  // Also include any single-entry manual fields that haven't been queued yet
+  const manualName=document.getElementById('pj-manual-name').value.trim();
+  if(manualName)pjManualQueue.push({first:manualName,last:document.getElementById('pj-manual-last').value.trim(),email:document.getElementById('pj-manual-email').value.trim(),phone:document.getElementById('pj-manual-phone').value.trim(),orderNo:document.getElementById('pj-manual-order').value.trim()});
+  const toAdd=[...pjC7Selected,...pjPendingUpload,...pjManualQueue];
   if(!toAdd.length){showToast('No contacts selected','err');return;}
   const btn=document.getElementById('pj-import-btn');btn.disabled=true;btn.textContent='Adding...';
   try{
@@ -5033,7 +5093,7 @@ async function confirmProjectImport(){
     closeModal('project-import-modal');
     renderProjectContacts(projectId);
     showToast(toAdd.length+' contact'+(toAdd.length>1?'s':'')+' added');
-    pjPendingUpload=[];pjC7Selected=[];
+    pjPendingUpload=[];pjC7Selected=[];pjManualQueue=[];
     // Enrich from C7 in background
     enrichProjectContactsFromC7(projectId);
   }catch(e){showToast('Error: '+e.message,'err');}
