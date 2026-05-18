@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.169</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.170</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -5166,6 +5166,7 @@ async function enrichProjectContactsFromC7(projectId,forceAll){
         console.log('C7 order search for',c.orderNo,':',orders.length,'results',orderData);
         if(orders.length){
           const ord=orders[0];
+          console.log('  → order id:',ord.id,'fulfillment:',ord.fulfillmentStatus);
           c.c7CustomerId=ord.customerId||'';
           c.c7OrderData=JSON.stringify({status:ord.fulfillmentStatus||'',total:ord.total||0,orderDate:(ord.orderPaidDate||ord.createdAt||'').slice(0,10),orderId:ord.id||''});
         }
