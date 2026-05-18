@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.162</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.163</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1503,7 +1503,7 @@ async function ensureSheets(){
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
   if(needed.includes('ReminderNotes'))await sheetsUpdate('ReminderNotes!A1:F1',[['ID','ReminderID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('Projects'))await sheetsUpdate('Projects!A1:H1',[['ID','Name','Description','StartDate','EndDate','Assignee','Status','CreatedAt']]);
-  if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:L1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes']]);
+  if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:M1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes','Done']]);
   if(needed.includes('ProjectNotes'))await sheetsUpdate('ProjectNotes!A1:F1',[['ID','ProjectID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:M1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate','UnfulfilledCount','ResolvedAt']]);
   if(needed.includes('OrderMessages'))await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
@@ -1521,7 +1521,7 @@ async function loadFromSheets(){
       sheetsGet('OrderCustomers!A2:N'),sheetsGet('OrderMessages!A2:G'),
       sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
       sheetsGet('ReminderNotes!A2:F'),
-      sheetsGet('Projects!A2:H'),sheetsGet('ProjectContacts!A2:L'),sheetsGet('ProjectNotes!A2:F')
+      sheetsGet('Projects!A2:H'),sheetsGet('ProjectContacts!A2:M'),sheetsGet('ProjectNotes!A2:F')
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
@@ -1532,7 +1532,7 @@ async function loadFromSheets(){
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
     S.reminderNotes=(reminderNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],reminderId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.projects=(projectRows||[]).filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',desc:r[2]||'',startDate:r[3]||'',endDate:r[4]||'',assignee:parseInt(r[5])||0,status:r[6]||'Active',createdAt:r[7]||''}));
-    S.projectContacts=(projectContactRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',first:r[2]||'',last:r[3]||'',email:r[4]||'',phone:r[5]||'',orderNo:r[6]||'',c7CustomerId:r[7]||'',c7OrderData:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',notes:r[11]||''}));
+    S.projectContacts=(projectContactRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',first:r[2]||'',last:r[3]||'',email:r[4]||'',phone:r[5]||'',orderNo:r[6]||'',c7CustomerId:r[7]||'',c7OrderData:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',notes:r[11]||'',done:r[12]==='true'}));
     S.projectNotes=(projectNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
@@ -4820,17 +4820,31 @@ function closeProjectDetail(){
 function renderProjectContacts(projectId){
   const contacts=S.projectContacts.filter(c=>c.projectId===projectId);
   const el=document.getElementById('pj-contacts-list');if(!el)return;
-  if(!contacts.length){el.innerHTML='<div class="empty">No contacts yet. Use Import to add contacts.</div>';return;}
+  if(!contacts.length){el.innerHTML='<div class="empty">No contacts yet. Use + Add / Import to add contacts.</div>';return;}
   el.innerHTML='';
+  const done=contacts.filter(c=>c.done).length;
+  if(done>0){
+    const bar=document.createElement('div');
+    bar.style.cssText='margin-bottom:10px;font-size:12px;color:var(--ink-m);display:flex;align-items:center;gap:8px;';
+    const pct=Math.round(done/contacts.length*100);
+    bar.innerHTML=`<div style="flex:1;background:var(--bdr);border-radius:4px;height:6px;overflow:hidden;"><div style="width:${pct}%;background:var(--s-tx);height:100%;border-radius:4px;transition:width .3s;"></div></div><span>${done}/${contacts.length} completed</span>`;
+    el.appendChild(bar);
+  }
   const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
-  tbl.innerHTML='<thead><tr><th>Name / Item</th><th>Email</th><th>Phone</th><th>Order #</th><th>C7 Status</th><th>Notes</th><th></th></tr></thead>';
+  tbl.innerHTML='<thead><tr><th style="width:28px;"></th><th>Name / Item</th><th>Email</th><th>Phone</th><th>Order #</th><th>C7 Status</th><th>Notes</th><th></th></tr></thead>';
   const tbody=document.createElement('tbody');
   contacts.forEach(c=>{
     let c7Info='';
     if(c.c7OrderData){try{const d=JSON.parse(c.c7OrderData);c7Info=d.status||'';}catch(e){}}
     const displayName=(c.first+' '+c.last).trim()||'—';
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td style="font-weight:500;">${displayName}</td>
+    tr.style.opacity=c.done?'0.5':'1';
+    tr.innerHTML=`<td>
+        <div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;background:${c.done?'var(--s-tx)':'white'};color:white;font-size:10px;flex-shrink:0;" onclick="toggleProjectContact('${c.id}')">
+          ${c.done?'✓':''}
+        </div>
+      </td>
+      <td style="font-weight:500;${c.done?'text-decoration:line-through;color:var(--ink-m);':''}">${displayName}</td>
       <td style="font-size:12px;">${c.email?'<a href="mailto:'+c.email+'" style="color:var(--burg);">'+c.email+'</a>':''}</td>
       <td style="font-size:12px;">${c.phone||''}</td>
       <td style="font-size:12px;">${c.orderNo||'—'}</td>
@@ -5087,9 +5101,9 @@ async function confirmProjectImport(){
   const btn=document.getElementById('pj-import-btn');btn.disabled=true;btn.textContent='Adding...';
   try{
     const createdAt=today();
-    const rows=toAdd.map(c=>[uid(),projectId,c.first,c.last,c.email||'',c.phone||'',c.orderNo||'',c.c7id||'','',S.cu,createdAt,'']);
-    await sheetsAppend('ProjectContacts!A:L',rows);
-    rows.forEach(r=>S.projectContacts.push({id:r[0],projectId:r[1],first:r[2],last:r[3],email:r[4],phone:r[5],orderNo:r[6],c7CustomerId:r[7],c7OrderData:'',assignee:r[9],createdAt:r[10],notes:''}));
+    const rows=toAdd.map(c=>[uid(),projectId,c.first,c.last,c.email||'',c.phone||'',c.orderNo||'',c.c7id||'','',S.cu,createdAt,'','false']);
+    await sheetsAppend('ProjectContacts!A:M',rows);
+    rows.forEach(r=>S.projectContacts.push({id:r[0],projectId:r[1],first:r[2],last:r[3],email:r[4],phone:r[5],orderNo:r[6],c7CustomerId:r[7],c7OrderData:'',assignee:r[9],createdAt:r[10],notes:'',done:false}));
     closeModal('project-import-modal');
     renderProjectContacts(projectId);
     showToast(toAdd.length+' contact'+(toAdd.length>1?'s':'')+' added');
@@ -5123,7 +5137,7 @@ async function enrichProjectContactsFromC7(projectId){
         if(match)c.c7CustomerId=match.id;
       }
       if(c.c7CustomerId||c.c7OrderData){
-        const allRows=await sheetsGet('ProjectContacts!A2:L');
+        const allRows=await sheetsGet('ProjectContacts!A2:M');
         const rowIdx=allRows.findIndex(r=>r[0]===c.id);
         if(rowIdx>=0)await sheetsUpdate('ProjectContacts!H'+(rowIdx+2)+':I'+(rowIdx+2),[[c.c7CustomerId,c.c7OrderData]]);
       }
@@ -5134,12 +5148,23 @@ async function enrichProjectContactsFromC7(projectId){
   showToast('Commerce7 data loaded');
 }
 
+async function toggleProjectContact(contactId){
+  const c=S.projectContacts.find(x=>x.id===contactId);if(!c)return;
+  c.done=!c.done;
+  try{
+    const allRows=await sheetsGet('ProjectContacts!A2:M');
+    const rowIdx=allRows.findIndex(r=>r[0]===contactId);
+    if(rowIdx>=0)await sheetsUpdate('ProjectContacts!M'+(rowIdx+2),[[c.done.toString()]]);
+    renderProjectContacts(c.projectId);
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
 async function removeProjectContact(contactId){
   if(!confirm('Remove this contact from the project?'))return;
   try{
-    const allRows=await sheetsGet('ProjectContacts!A2:L');
+    const allRows=await sheetsGet('ProjectContacts!A2:M');
     const rowIdx=allRows.findIndex(r=>r[0]===contactId);
-    if(rowIdx>=0)await sheetsUpdate('ProjectContacts!A'+(rowIdx+2)+':L'+(rowIdx+2),[['','','','','','','','','','','','']]);
+    if(rowIdx>=0)await sheetsUpdate('ProjectContacts!A'+(rowIdx+2)+':M'+(rowIdx+2),[['','','','','','','','','','','','','']]);
     S.projectContacts=S.projectContacts.filter(c=>c.id!==contactId);
     renderProjectContacts(S.activeProject);
     showToast('Contact removed');
