@@ -140,14 +140,15 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.158</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.159</div></div>
     <div class="nav">
-      <button class="ntab on" onclick="sv('campaigns')">Campaigns</button>
+      <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
       <button class="ntab" onclick="sv('tickets')">Tickets</button>
       <button class="ntab" onclick="sv('orders')">Orders</button>
       <button class="ntab" onclick="sv('reminders')">Reminders</button>
       <button class="ntab" onclick="sv('outreach')">Outreach</button>
+      <button class="ntab" onclick="sv('projects')">Projects</button>
       <button class="ntab" onclick="sv('reports')">Reports</button>
     </div>
   </div>
@@ -427,6 +428,48 @@ select.fi{cursor:pointer;}
             <thead><tr><th>Title</th><th>Type</th><th>Contact</th><th>Event date</th><th>Guests</th><th>Status</th><th>Last update</th><th>Msgs</th><th></th></tr></thead>
             <tbody id="outreach-tbody"></tbody>
           </table>
+        </div>
+      </div>
+
+      <div id="view-projects" class="view">
+        <div class="vhdr">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="vtitle">Projects</div>
+          </div>
+          <button class="btn btnp" onclick="openNewProject()">+ New project</button>
+        </div>
+        <!-- Project list (shown when no project is open) -->
+        <div id="project-list-view">
+          <div id="projects-list"></div>
+        </div>
+        <!-- Project detail (shown when a project is open) -->
+        <div id="project-detail-view" style="display:none;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <button class="btn" onclick="closeProjectDetail()" style="font-size:12px;">← All projects</button>
+            <div id="pj-detail-title" style="font-size:20px;font-weight:600;font-family:'Cormorant Garamond',serif;flex:1;"></div>
+            <button class="btn" onclick="openEditProject(S.activeProject)" style="font-size:12px;">Edit</button>
+            <button class="btn" style="font-size:12px;color:var(--d-tx);border-color:var(--d-tx);" onclick="archiveProject(S.activeProject,true)">Archive</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
+            <!-- Left: description + contacts -->
+            <div>
+              <div id="pj-detail-desc" style="background:white;border:1px solid var(--bdr);border-radius:8px;padding:16px;margin-bottom:16px;font-size:14px;line-height:1.6;white-space:pre-wrap;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="font-weight:600;font-size:14px;">Contacts</div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn" style="font-size:12px;" onclick="openProjectImport()">Import</button>
+                </div>
+              </div>
+              <div id="pj-contacts-list"></div>
+            </div>
+            <!-- Right: notes thread -->
+            <div>
+              <div style="font-weight:600;font-size:14px;margin-bottom:10px;">Notes</div>
+              <div id="pj-notes-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+              <textarea class="fi" id="pj-new-note" rows="3" placeholder="Add a note..."></textarea>
+              <button class="btn btnp" style="width:100%;margin-top:8px;" onclick="saveProjectNote()">Add note</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -789,6 +832,62 @@ select.fi{cursor:pointer;}
 </div>
 
 <!-- Reminder detail modal -->
+<!-- Project modal -->
+<div id="project-modal" class="modal-backdrop">
+  <div class="modal" style="width:600px;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle" id="pm-title">New project</div><button class="mcls" onclick="closeModal('project-modal')">✕</button></div>
+    <div class="mbdy">
+      <input type="hidden" id="pm-id" />
+      <div class="fr"><label class="fl">Project name *</label><input type="text" class="fi" id="pm-name" placeholder="e.g. 2025 Club Outreach" /></div>
+      <div class="f2">
+        <div class="fr"><label class="fl">Start date</label><input type="date" class="fi" id="pm-start" /></div>
+        <div class="fr"><label class="fl">End date</label><input type="date" class="fi" id="pm-end" /></div>
+      </div>
+      <div class="fr"><label class="fl">Description</label><textarea class="fi" id="pm-desc" rows="6" placeholder="Describe the project goals, background, and any relevant details..."></textarea></div>
+      <div class="f2">
+        <div class="fr"><label class="fl">Assigned to</label>
+          <select class="fi" id="pm-assignee">
+            <option value="-1">Unassigned</option>
+            <option value="0">Dan Jimerson</option>
+            <option value="1">Mike DeGaetano</option>
+            <option value="2">Ellen Quibell</option>
+            <option value="3">John McGregor</option>
+          </select>
+        </div>
+        <div class="fr"><label class="fl">Status</label>
+          <select class="fi" id="pm-status">
+            <option value="Active">Active</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="mftr"><button class="btn" onclick="closeModal('project-modal')">Cancel</button><button class="btn btnp" onclick="saveProject()">Save project</button></div>
+  </div>
+</div>
+
+<!-- Project contact import modal -->
+<div id="project-import-modal" class="modal-backdrop">
+  <div class="modal" style="width:580px;max-height:80vh;display:flex;flex-direction:column;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle">Add contacts to project</div><button class="mcls" onclick="closeModal('project-import-modal')">✕</button></div>
+    <div class="mbdy" style="flex:1;overflow-y:auto;">
+      <div style="margin-bottom:12px;">
+        <label class="fl" style="margin-bottom:6px;display:block;">Upload CSV/Excel (columns: First, Last, Email, Phone, Order#)</label>
+        <input type="file" id="pj-file-input" accept=".csv,.xlsx,.xls" class="fi" onchange="handleProjectFileUpload(this)" />
+      </div>
+      <div id="pj-import-preview" style="display:none;">
+        <div style="font-size:13px;color:var(--ink-m);margin-bottom:8px;" id="pj-import-count"></div>
+        <div id="pj-import-table-wrap" style="max-height:280px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;"></div>
+      </div>
+    </div>
+    <div class="mftr">
+      <button class="btn" onclick="closeModal('project-import-modal')">Cancel</button>
+      <button class="btn btnp" id="pj-import-btn" onclick="confirmProjectImport()" style="display:none;">Add to project</button>
+    </div>
+  </div>
+</div>
+
 <div id="reminder-detail-modal" class="modal-backdrop">
   <div class="modal" style="width:500px;max-height:80vh;display:flex;flex-direction:column;" onclick="event.stopPropagation();">
     <div class="mhdr">
@@ -1288,9 +1387,9 @@ function getCampColor(campId){
   return idx>=0?CAMP_COLORS[idx%CAMP_COLORS.length]:{bg:'var(--cream)',border:'var(--bdr)',text:'var(--ink-m)'};
 }
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
-const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages'};
+const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages',projects:'Projects',projectContacts:'ProjectContacts',projectNotes:'ProjectNotes'};
 
-let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],activeOutreachId:null,activeReminderId:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
+let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
 
 function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function today(){return new Date().toISOString().slice(0,10);}
@@ -1370,6 +1469,9 @@ async function ensureSheets(){
   if(needed.includes('TicketMessages'))await sheetsUpdate('TicketMessages!A1:G1',[['ID','TicketID','Message','Author','AuthorName','CreatedAt','Method']]);
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
   if(needed.includes('ReminderNotes'))await sheetsUpdate('ReminderNotes!A1:F1',[['ID','ReminderID','Message','Author','AuthorName','CreatedAt']]);
+  if(needed.includes('Projects'))await sheetsUpdate('Projects!A1:H1',[['ID','Name','Description','StartDate','EndDate','Assignee','Status','CreatedAt']]);
+  if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:L1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes']]);
+  if(needed.includes('ProjectNotes'))await sheetsUpdate('ProjectNotes!A1:F1',[['ID','ProjectID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:M1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate','UnfulfilledCount','ResolvedAt']]);
   if(needed.includes('OrderMessages'))await sheetsUpdate('OrderMessages!A1:G1',[['ID','OrderCustomerID','Message','Author','AuthorName','Method','CreatedAt']]);
   if(needed.includes('Outreach'))await sheetsUpdate('Outreach!A1:L1',[['ID','Title','Type','Status','EventDate','ContactID','ContactName','ContactEmail','ContactPhone','Assignee','CreatedAt','GuestCount','Website']]);
@@ -1380,12 +1482,13 @@ async function loadFromSheets(){
   setSyncBar('loading','Loading from Google Sheets...');
   try{
     await ensureSheets();
-    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows]=await Promise.all([
+    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows,projectRows,projectContactRows,projectNoteRows]=await Promise.all([
       sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:K'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:H'),
-      sheetsGet('OrderCustomers!A2:M'),sheetsGet('OrderMessages!A2:G'),
+      sheetsGet('OrderCustomers!A2:N'),sheetsGet('OrderMessages!A2:G'),
       sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
-      sheetsGet('ReminderNotes!A2:F')
+      sheetsGet('ReminderNotes!A2:F'),
+      sheetsGet('Projects!A2:H'),sheetsGet('ProjectContacts!A2:L'),sheetsGet('ProjectNotes!A2:F')
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
@@ -1395,6 +1498,9 @@ async function loadFromSheets(){
     S.ticketMsgs=ticketMsgRows.filter(r=>r[0]).map(r=>({id:r[0],ticketId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||'',method:r[6]||''}));
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
     S.reminderNotes=(reminderNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],reminderId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
+    S.projects=(projectRows||[]).filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',desc:r[2]||'',startDate:r[3]||'',endDate:r[4]||'',assignee:parseInt(r[5])||0,status:r[6]||'Active',createdAt:r[7]||''}));
+    S.projectContacts=(projectContactRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',first:r[2]||'',last:r[3]||'',email:r[4]||'',phone:r[5]||'',orderNo:r[6]||'',c7CustomerId:r[7]||'',c7OrderData:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',notes:r[11]||''}));
+    S.projectNotes=(projectNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
     const seen={};
@@ -1482,7 +1588,7 @@ function sv(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   document.getElementById('view-'+view).classList.add('on');
-  ['campaigns','contacts','tickets','orders','reminders','outreach','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
+  ['campaigns','contacts','tickets','orders','reminders','outreach','projects','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
   closeDP();renderAll();
 }
 function setCU(i){S.cu=parseInt(i);document.getElementById('cuav').textContent=TEAM[S.cu].init;}
@@ -1490,7 +1596,7 @@ function setF(f,el){S.filter=f;document.querySelectorAll('.fbtn').forEach(b=>b.c
 function openModal(id){document.getElementById(id).classList.add('op');}
 function closeModal(id){document.getElementById(id).classList.remove('op');}
 
-function renderAll(){renderSidebar();renderCampaigns();renderContacts();renderTickets();renderOrders();renderReminders();renderOutreach();renderReports();updateCounts();}
+function renderAll(){renderSidebar();renderCampaigns();renderContacts();renderTickets();renderOrders();renderReminders();renderOutreach();renderProjects();renderReports();updateCounts();}
 
 function updateCounts(){
   const activeContacts=S.contacts.filter(c=>{
@@ -1863,6 +1969,7 @@ function showContactDetail(id){
   html+='<button class="btn btnp" onclick="openAttempt(\''+c.id+'\')">+ Log</button>';
   html+='<button class="btn" onclick="openNewTicket(\''+( c.c7id||c.id)+'\',\''+c.first+' '+c.last+'\');closeDP();">+ Ticket</button>';
   html+='<button class="btn" onclick="openNewReminder(\'contact\',\''+c.id+'\',\''+c.first+' '+c.last+'\');">&#128276; Remind</button>';
+  html+='<button class="btn" style="grid-column:1/-1;color:var(--d-tx);border-color:var(--d-tx);" onclick="removeContactFromCampaign(\''+c.id+'\')">Remove from campaign</button>';
   html+='</div>';
 
   // Unified timeline
@@ -3596,6 +3703,32 @@ async function toggleReminder(id){
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
+async function removeContactFromCampaign(contactId){
+  const c=S.contacts.find(x=>x.id===contactId);if(!c)return;
+  const camp=S.campaigns.find(x=>x.id===c.campId);
+  const name=c.first+' '+c.last;
+  if(!confirm('Remove '+name+' from '+(camp?camp.name:'this campaign')+'? Their attempt history will also be deleted.'))return;
+  try{
+    // Remove from sheet
+    const allRows=await sheetsGet('Contacts!A2:K');
+    const rowIdx=allRows.findIndex(r=>r[0]===contactId);
+    if(rowIdx>=0){
+      // Clear the row by overwriting with blanks
+      await sheetsUpdate('Contacts!A'+(rowIdx+2)+':K'+(rowIdx+2),[['','','','','','','','','','','']]);
+    }
+    // Also remove attempt rows
+    const attemptRows=await sheetsGet('Attempts!A2:I');
+    for(let i=0;i<attemptRows.length;i++){
+      if(attemptRows[i][1]===contactId)await sheetsUpdate('Attempts!A'+(i+2)+':I'+(i+2),[['','','','','','','','','']]);
+    }
+    // Remove from state
+    S.contacts=S.contacts.filter(x=>x.id!==contactId);
+    closeDP();
+    renderAll();
+    showToast(name+' removed from campaign');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
 // ---- Reminder Detail Modal ----
 function openReminderDetail(id){
   const r=S.reminders.find(x=>x.id===id);if(!r)return;
@@ -4316,28 +4449,28 @@ function renderMyTasks(){
   const t=today();
   let html='';
 
-  // Reminders assigned to me
-  const myReminders=S.reminders.filter(r=>!r.done&&r.assignee===S.cu).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  if(myReminders.length){
-    html+='<div style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);background:var(--cream);border-bottom:1px solid var(--bdr);">🔔 Reminders ('+myReminders.length+')</div>';
-    myReminders.forEach(r=>{
-      const overdue=r.dueDate<t;const isToday=r.dueDate===t;
-      html+='<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;" onclick="closeModal(\'mytasks-modal\');sv(\'reminders\')">'
-        +'<div style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:'+(overdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--burg)')+'"></div>'
-        +'<div style="flex:1;"><div style="font-size:13px;font-weight:500;">'+r.note+'</div>'
-        +'<div style="font-size:11px;color:'+(overdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)')+';">'+r.dueDate+(overdue?' — Overdue':isToday?' — Due today':'')+(r.refName?' · '+r.refName:'')+'</div></div>'
-        +'</div>';
-    });
-  }
-
-  // Open tickets assigned to me
-  const myTickets=S.tickets.filter(t=>t.assignee===S.cu&&t.status!=='Resolved');
+  // Open tickets assigned to me — FIRST
+  const myTickets=S.tickets.filter(tk=>tk.assignee===S.cu&&tk.status!=='Resolved');
   if(myTickets.length){
     html+='<div style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);background:var(--cream);border-bottom:1px solid var(--bdr);">🎫 Open tickets ('+myTickets.length+')</div>';
     myTickets.forEach(tk=>{
       html+='<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);cursor:pointer;" onclick="closeModal(\'mytasks-modal\');sv(\'tickets\');openTicketThread(\''+tk.id+'\')">'
         +'<div style="font-size:13px;font-weight:500;">'+tk.subject+'</div>'
         +'<div style="font-size:11px;color:var(--ink-m);">'+tk.type+' · '+tk.status+(tk.customerName?' · '+tk.customerName:'')+'</div>'
+        +'</div>';
+    });
+  }
+
+  // Reminders assigned to me — today and overdue only
+  const myReminders=S.reminders.filter(r=>!r.done&&r.assignee===S.cu&&r.dueDate<=t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  if(myReminders.length){
+    html+='<div style="padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);background:var(--cream);border-bottom:1px solid var(--bdr);">🔔 Reminders ('+myReminders.length+')</div>';
+    myReminders.forEach(r=>{
+      const overdue=r.dueDate<t;const isToday=r.dueDate===t;
+      html+='<div style="padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="closeModal(\'mytasks-modal\');sv(\'reminders\');setTimeout(()=>openReminderDetail(\''+r.id+'\'),200)">'
+        +'<div style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:'+(overdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--burg)')+'"></div>'
+        +'<div style="flex:1;"><div style="font-size:13px;font-weight:500;">'+r.note+'</div>'
+        +'<div style="font-size:11px;color:'+(overdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)')+';">'+r.dueDate+(overdue?' — Overdue':isToday?' — Due today':'')+(r.refName?' · '+r.refName:'')+'</div></div>'
         +'</div>';
     });
   }
@@ -4588,6 +4721,300 @@ async function c7SyncOutreachMessage(outreach,msg){
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=' '+msg.message+' — '+rep.name;
   return await c7AddNote(outreach.contactId,noteText).then(()=>true).catch(()=>false);
+}
+
+// ---- Projects ----
+function renderProjects(){
+  const el=document.getElementById('projects-list');if(!el)return;
+  const active=S.projects.filter(p=>p.status!=='Archived');
+  const archived=S.projects.filter(p=>p.status==='Archived');
+  el.innerHTML='';
+  if(!active.length&&!archived.length){el.innerHTML='<div class="empty">No projects yet. Click + New project to get started.</div>';return;}
+  active.forEach(p=>el.appendChild(buildProjectCard(p)));
+  if(archived.length){
+    const archDiv=document.createElement('div');
+    archDiv.style.cssText='margin-top:20px;';
+    archDiv.innerHTML='<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-f);margin-bottom:10px;">Archived ('+archived.length+')</div>';
+    archived.forEach(p=>{const c=buildProjectCard(p);c.style.opacity='.55';archDiv.appendChild(c);});
+    el.appendChild(archDiv);
+  }
+}
+
+function buildProjectCard(p){
+  const contacts=S.projectContacts.filter(c=>c.projectId===p.id);
+  const notes=S.projectNotes.filter(n=>n.projectId===p.id);
+  const m=TEAM[p.assignee]||(p.assignee===-1?null:TEAM[0]);
+  const div=document.createElement('div');
+  div.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;padding:18px 20px;margin-bottom:12px;cursor:pointer;transition:box-shadow .15s;';
+  div.onmouseover=()=>div.style.boxShadow='0 2px 12px rgba(0,0,0,.08)';
+  div.onmouseout=()=>div.style.boxShadow='';
+  div.onclick=()=>openProjectDetail(p.id);
+  const statusColor=p.status==='Active'?'var(--s-tx)':p.status==='On Hold'?'var(--w-tx)':'var(--ink-m)';
+  const statusBg=p.status==='Active'?'var(--s-bg)':p.status==='On Hold'?'var(--w-bg)':'var(--cream)';
+  div.innerHTML=`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+    <div style="flex:1;">
+      <div style="font-size:18px;font-weight:600;font-family:'Cormorant Garamond',serif;color:var(--burg);margin-bottom:6px;">${p.name}</div>
+      ${p.desc?'<div style="font-size:13px;color:var(--ink-m);line-height:1.5;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">'+p.desc+'</div>':''}
+      <div style="display:flex;gap:12px;font-size:12px;color:var(--ink-m);">
+        <span><strong style="color:var(--ink);">${contacts.length}</strong> contacts</span>
+        <span><strong style="color:var(--ink);">${notes.length}</strong> notes</span>
+        ${p.startDate?'<span>📅 '+p.startDate+(p.endDate?' – '+p.endDate:'')+'</span>':''}
+        ${m?'<span><div class="av '+m.cls+'" style="width:14px;height:14px;font-size:6px;display:inline-flex;vertical-align:middle;">'+m.init+'</div> '+m.name+'</span>':''}
+      </div>
+    </div>
+    <span style="background:${statusBg};color:${statusColor};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;">${p.status}</span>
+  </div>`;
+  return div;
+}
+
+function openProjectDetail(id){
+  const p=S.projects.find(x=>x.id===id);if(!p)return;
+  S.activeProject=id;
+  document.getElementById('pj-detail-title').textContent=p.name;
+  document.getElementById('pj-detail-desc').textContent=p.desc||'No description.';
+  document.getElementById('project-list-view').style.display='none';
+  document.getElementById('project-detail-view').style.display='';
+  renderProjectContacts(id);
+  renderProjectNotes(id);
+}
+
+function closeProjectDetail(){
+  S.activeProject=null;
+  document.getElementById('project-list-view').style.display='';
+  document.getElementById('project-detail-view').style.display='none';
+}
+
+function renderProjectContacts(projectId){
+  const contacts=S.projectContacts.filter(c=>c.projectId===projectId);
+  const el=document.getElementById('pj-contacts-list');if(!el)return;
+  if(!contacts.length){el.innerHTML='<div class="empty">No contacts yet. Use Import to add contacts.</div>';return;}
+  el.innerHTML='';
+  const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
+  tbl.innerHTML='<thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Order #</th><th>C7 Status</th><th>Notes</th><th></th></tr></thead>';
+  const tbody=document.createElement('tbody');
+  contacts.forEach(c=>{
+    let c7Info='';
+    if(c.c7OrderData){try{const d=JSON.parse(c.c7OrderData);c7Info=d.status||'';}catch(e){}}
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="font-weight:500;">${c.first} ${c.last}</td>
+      <td style="font-size:12px;">${c.email?'<a href="mailto:'+c.email+'" style="color:var(--burg);">'+c.email+'</a>':''}</td>
+      <td style="font-size:12px;">${c.phone||''}</td>
+      <td style="font-size:12px;">${c.orderNo||'—'}</td>
+      <td style="font-size:12px;color:var(--ink-m);">${c7Info||'—'}</td>
+      <td style="font-size:12px;color:var(--ink-m);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.notes||''}</td>
+      <td><button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="removeProjectContact('${c.id}')">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+  el.appendChild(tbl);
+}
+
+function renderProjectNotes(projectId){
+  const notes=S.projectNotes.filter(n=>n.projectId===projectId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  const el=document.getElementById('pj-notes-list');if(!el)return;
+  el.innerHTML='';
+  if(!notes.length){el.innerHTML='<div style="color:var(--ink-m);font-size:13px;">No notes yet.</div>';return;}
+  notes.forEach(n=>{
+    const rep=TEAM[n.author]||{name:n.authorName||'Team',cls:'av-b',init:'?'};
+    const div=document.createElement('div');
+    div.style.cssText='background:var(--cream);border-radius:7px;padding:10px 12px;font-size:13px;';
+    div.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+      +'<div style="display:flex;align-items:center;gap:6px;"><div class="av '+rep.cls+'" style="width:18px;height:18px;font-size:7px;">'+rep.init+'</div><span style="font-weight:500;">'+rep.name+'</span></div>'
+      +'<span style="font-size:11px;color:var(--ink-m);">'+n.createdAt+'</span></div>'
+      +'<div>'+n.message+'</div>';
+    el.appendChild(div);
+  });
+}
+
+async function saveProjectNote(){
+  const projectId=S.activeProject;if(!projectId)return;
+  const msg=document.getElementById('pj-new-note').value.trim();if(!msg)return;
+  const id=uid();const createdAt=today();const rep=TEAM[S.cu]||TEAM[0];
+  try{
+    await sheetsAppend('ProjectNotes!A:F',[[id,projectId,msg,S.cu,rep.name,createdAt]]);
+    S.projectNotes.push({id,projectId,message:msg,author:S.cu,authorName:rep.name,createdAt});
+    document.getElementById('pj-new-note').value='';
+    renderProjectNotes(projectId);
+    showToast('Note added');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+function openNewProject(){
+  document.getElementById('pm-id').value='';
+  document.getElementById('pm-title').textContent='New project';
+  document.getElementById('pm-name').value='';
+  document.getElementById('pm-desc').value='';
+  document.getElementById('pm-start').value='';
+  document.getElementById('pm-end').value='';
+  document.getElementById('pm-assignee').value=S.cu;
+  document.getElementById('pm-status').value='Active';
+  openModal('project-modal');
+}
+
+function openEditProject(id){
+  const p=S.projects.find(x=>x.id===id);if(!p)return;
+  document.getElementById('pm-id').value=p.id;
+  document.getElementById('pm-title').textContent='Edit project';
+  document.getElementById('pm-name').value=p.name;
+  document.getElementById('pm-desc').value=p.desc||'';
+  document.getElementById('pm-start').value=p.startDate||'';
+  document.getElementById('pm-end').value=p.endDate||'';
+  document.getElementById('pm-assignee').value=p.assignee;
+  document.getElementById('pm-status').value=p.status||'Active';
+  openModal('project-modal');
+}
+
+async function saveProject(){
+  const name=document.getElementById('pm-name').value.trim();
+  if(!name){showToast('Project name required','err');return;}
+  const editId=document.getElementById('pm-id').value;
+  const desc=document.getElementById('pm-desc').value.trim();
+  const startDate=document.getElementById('pm-start').value;
+  const endDate=document.getElementById('pm-end').value;
+  const assignee=parseInt(document.getElementById('pm-assignee').value);
+  const status=document.getElementById('pm-status').value;
+  try{
+    if(editId){
+      const p=S.projects.find(x=>x.id===editId);if(!p)return;
+      p.name=name;p.desc=desc;p.startDate=startDate;p.endDate=endDate;p.assignee=assignee;p.status=status;
+      const allRows=await sheetsGet('Projects!A2:H');
+      const rowIdx=allRows.findIndex(r=>r[0]===editId);
+      if(rowIdx>=0)await sheetsUpdate('Projects!A'+(rowIdx+2)+':H'+(rowIdx+2),[[p.id,p.name,p.desc,p.startDate,p.endDate,p.assignee,p.status,p.createdAt]]);
+      if(S.activeProject===editId){
+        document.getElementById('pj-detail-title').textContent=name;
+        document.getElementById('pj-detail-desc').textContent=desc||'No description.';
+      }
+    } else {
+      const id=uid();const createdAt=today();
+      const p={id,name,desc,startDate,endDate,assignee,status,createdAt};
+      await sheetsAppend('Projects!A:H',[[id,name,desc,startDate,endDate,assignee,status,createdAt]]);
+      S.projects.push(p);
+    }
+    closeModal('project-modal');
+    renderProjects();
+    showToast(editId?'Project updated':'Project created');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+async function archiveProject(id,archive){
+  const p=S.projects.find(x=>x.id===id);if(!p)return;
+  if(archive&&!confirm('Archive "'+p.name+'"?'))return;
+  p.status=archive?'Archived':p.status==='Archived'?'Active':p.status;
+  try{
+    const allRows=await sheetsGet('Projects!A2:H');
+    const rowIdx=allRows.findIndex(r=>r[0]===id);
+    if(rowIdx>=0)await sheetsUpdate('Projects!G'+(rowIdx+2),[[p.status]]);
+    if(archive)closeProjectDetail();
+    renderProjects();
+    showToast(archive?p.name+' archived':'Project restored');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+// ---- Project import ----
+let pjPendingUpload=[];
+
+function openProjectImport(){
+  pjPendingUpload=[];
+  document.getElementById('pj-file-input').value='';
+  document.getElementById('pj-import-preview').style.display='none';
+  document.getElementById('pj-import-btn').style.display='none';
+  openModal('project-import-modal');
+}
+
+function handleProjectFileUpload(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const data=new Uint8Array(e.target.result);
+    const wb=XLSX.read(data,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(rows.length<2){showToast('No data found in file','err');return;}
+    // Auto-detect columns: First, Last, Email, Phone, Order#
+    const header=rows[0].map(h=>(h||'').toString().toLowerCase());
+    const col=n=>header.findIndex(h=>h.includes(n));
+    const iFirst=col('first'),iLast=col('last'),iEmail=col('email'),iPhone=col('phone'),iOrder=col('order');
+    pjPendingUpload=rows.slice(1).filter(r=>r.some(c=>c!=='')).map(r=>({
+      first:(iFirst>=0?r[iFirst]:'').toString().trim(),
+      last:(iLast>=0?r[iLast]:'').toString().trim(),
+      email:(iEmail>=0?r[iEmail]:'').toString().trim(),
+      phone:(iPhone>=0?r[iPhone]:'').toString().trim(),
+      orderNo:(iOrder>=0?r[iOrder]:'').toString().trim(),
+    })).filter(r=>r.first||r.last||r.email);
+    const wrap=document.getElementById('pj-import-table-wrap');
+    wrap.innerHTML='<table class="tbl"><thead><tr><th>First</th><th>Last</th><th>Email</th><th>Phone</th><th>Order #</th></tr></thead><tbody>'
+      +pjPendingUpload.slice(0,20).map(r=>`<tr><td>${r.first}</td><td>${r.last}</td><td>${r.email}</td><td>${r.phone}</td><td>${r.orderNo}</td></tr>`).join('')
+      +(pjPendingUpload.length>20?'<tr><td colspan="5" style="text-align:center;color:var(--ink-m);">...and '+(pjPendingUpload.length-20)+' more</td></tr>':'')
+      +'</tbody></table>';
+    document.getElementById('pj-import-count').textContent=pjPendingUpload.length+' contacts ready to import';
+    document.getElementById('pj-import-preview').style.display='';
+    document.getElementById('pj-import-btn').style.display='';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function confirmProjectImport(){
+  const projectId=S.activeProject;if(!projectId||!pjPendingUpload.length)return;
+  const btn=document.getElementById('pj-import-btn');btn.disabled=true;btn.textContent='Adding...';
+  try{
+    const createdAt=today();
+    const rows=pjPendingUpload.map(c=>[uid(),projectId,c.first,c.last,c.email,c.phone,c.orderNo,'','',S.cu,createdAt,'']);
+    await sheetsAppend('ProjectContacts!A:L',rows);
+    rows.forEach(r=>S.projectContacts.push({id:r[0],projectId:r[1],first:r[2],last:r[3],email:r[4],phone:r[5],orderNo:r[6],c7CustomerId:'',c7OrderData:'',assignee:r[9],createdAt:r[10],notes:''}));
+    closeModal('project-import-modal');
+    renderProjectContacts(projectId);
+    showToast(pjPendingUpload.length+' contacts added');
+    pjPendingUpload=[];
+    // Enrich from C7 in background
+    enrichProjectContactsFromC7(projectId);
+  }catch(e){showToast('Error: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Add to project';}
+}
+
+async function enrichProjectContactsFromC7(projectId){
+  const contacts=S.projectContacts.filter(c=>c.projectId===projectId&&(!c.c7CustomerId)&&(c.email||c.orderNo));
+  if(!contacts.length)return;
+  for(const c of contacts){
+    try{
+      // Look up by order number first if available
+      if(c.orderNo){
+        const orderData=await c7Req('GET','/order?orderNumber='+encodeURIComponent(c.orderNo),null);
+        const orders=(orderData&&orderData.orders)||[];
+        if(orders.length){
+          const ord=orders[0];
+          c.c7CustomerId=ord.customerId||'';
+          c.c7OrderData=JSON.stringify({status:ord.fulfillmentStatus||'',total:ord.total||0,orderDate:(ord.orderPaidDate||ord.createdAt||'').slice(0,10)});
+        }
+      }
+      // Fall back to email lookup
+      if(!c.c7CustomerId&&c.email){
+        const custData=await c7Req('GET','/customer?q='+encodeURIComponent(c.email)+'&limit=5',null);
+        const custs=(custData&&custData.customers)||[];
+        const match=custs.find(cu=>(cu.emails||[]).some(e=>e.email.toLowerCase()===c.email.toLowerCase()));
+        if(match)c.c7CustomerId=match.id;
+      }
+      if(c.c7CustomerId||c.c7OrderData){
+        const allRows=await sheetsGet('ProjectContacts!A2:L');
+        const rowIdx=allRows.findIndex(r=>r[0]===c.id);
+        if(rowIdx>=0)await sheetsUpdate('ProjectContacts!H'+(rowIdx+2)+':I'+(rowIdx+2),[[c.c7CustomerId,c.c7OrderData]]);
+      }
+    }catch(e){console.warn('C7 enrich failed for',c.first,c.last,e.message);}
+    await new Promise(r=>setTimeout(r,400));
+  }
+  renderProjectContacts(projectId);
+  showToast('Commerce7 data loaded');
+}
+
+async function removeProjectContact(contactId){
+  if(!confirm('Remove this contact from the project?'))return;
+  try{
+    const allRows=await sheetsGet('ProjectContacts!A2:L');
+    const rowIdx=allRows.findIndex(r=>r[0]===contactId);
+    if(rowIdx>=0)await sheetsUpdate('ProjectContacts!A'+(rowIdx+2)+':L'+(rowIdx+2),[['','','','','','','','','','','','']]);
+    S.projectContacts=S.projectContacts.filter(c=>c.id!==contactId);
+    renderProjectContacts(S.activeProject);
+    showToast('Contact removed');
+  }catch(e){showToast('Error: '+e.message,'err');}
 }
 
 // ---- Export ----
