@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.159</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.160</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -869,21 +869,36 @@ select.fi{cursor:pointer;}
 
 <!-- Project contact import modal -->
 <div id="project-import-modal" class="modal-backdrop">
-  <div class="modal" style="width:580px;max-height:80vh;display:flex;flex-direction:column;" onclick="event.stopPropagation();">
+  <div class="modal" style="width:600px;max-height:85vh;display:flex;flex-direction:column;" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle">Add contacts to project</div><button class="mcls" onclick="closeModal('project-import-modal')">✕</button></div>
     <div class="mbdy" style="flex:1;overflow-y:auto;">
-      <div style="margin-bottom:12px;">
+      <!-- Tab switcher -->
+      <div class="tab-row" style="margin-bottom:14px;">
+        <button class="tab on" id="pj-tab-search" onclick="switchPjImportTab('search',this)">Search Commerce7</button>
+        <button class="tab" id="pj-tab-upload" onclick="switchPjImportTab('upload',this)">Upload file</button>
+      </div>
+      <!-- C7 Search tab -->
+      <div id="pj-import-search">
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input type="text" class="fi" id="pj-c7-search-input" placeholder="Search by name, email, or phone..." onkeydown="if(event.key==='Enter')searchPjC7()" style="flex:1;" />
+          <button class="btn btnp" onclick="searchPjC7()">Search</button>
+        </div>
+        <div id="pj-c7-results" style="max-height:260px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;"></div>
+        <div id="pj-c7-selected-summary" style="margin-top:8px;font-size:13px;color:var(--burg);font-weight:500;"></div>
+      </div>
+      <!-- Upload tab -->
+      <div id="pj-import-upload" style="display:none;">
         <label class="fl" style="margin-bottom:6px;display:block;">Upload CSV/Excel (columns: First, Last, Email, Phone, Order#)</label>
         <input type="file" id="pj-file-input" accept=".csv,.xlsx,.xls" class="fi" onchange="handleProjectFileUpload(this)" />
-      </div>
-      <div id="pj-import-preview" style="display:none;">
-        <div style="font-size:13px;color:var(--ink-m);margin-bottom:8px;" id="pj-import-count"></div>
-        <div id="pj-import-table-wrap" style="max-height:280px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;"></div>
+        <div id="pj-import-preview" style="display:none;margin-top:12px;">
+          <div style="font-size:13px;color:var(--ink-m);margin-bottom:8px;" id="pj-import-count"></div>
+          <div id="pj-import-table-wrap" style="max-height:260px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;"></div>
+        </div>
       </div>
     </div>
     <div class="mftr">
       <button class="btn" onclick="closeModal('project-import-modal')">Cancel</button>
-      <button class="btn btnp" id="pj-import-btn" onclick="confirmProjectImport()" style="display:none;">Add to project</button>
+      <button class="btn btnp" id="pj-import-btn" onclick="confirmProjectImport()">Add to project</button>
     </div>
   </div>
 </div>
@@ -4912,13 +4927,64 @@ async function archiveProject(id,archive){
 
 // ---- Project import ----
 let pjPendingUpload=[];
+let pjC7Selected=[];
 
 function openProjectImport(){
-  pjPendingUpload=[];
+  pjPendingUpload=[];pjC7Selected=[];
   document.getElementById('pj-file-input').value='';
   document.getElementById('pj-import-preview').style.display='none';
-  document.getElementById('pj-import-btn').style.display='none';
+  document.getElementById('pj-c7-results').innerHTML='<div style="padding:14px;color:var(--ink-m);font-size:13px;text-align:center;">Search to find Commerce7 customers</div>';
+  document.getElementById('pj-c7-search-input').value='';
+  document.getElementById('pj-c7-selected-summary').textContent='';
+  switchPjImportTab('search',document.getElementById('pj-tab-search'));
   openModal('project-import-modal');
+}
+
+function switchPjImportTab(tab,btn){
+  document.querySelectorAll('#project-import-modal .tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('pj-import-search').style.display=tab==='search'?'':'none';
+  document.getElementById('pj-import-upload').style.display=tab==='upload'?'':'none';
+}
+
+async function searchPjC7(){
+  const q=document.getElementById('pj-c7-search-input').value.trim();if(!q)return;
+  const el=document.getElementById('pj-c7-results');
+  el.innerHTML='<div style="padding:14px;text-align:center;color:var(--ink-m);">Searching...</div>';
+  try{
+    const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
+    const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
+    const url='https://api.commerce7.com/v1/customer?q='+encodeURIComponent(q)+'&limit=20';
+    const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
+    const data=await res.json();
+    const custs=(data.customers||[]);
+    if(!custs.length){el.innerHTML='<div style="padding:14px;text-align:center;color:var(--ink-m);">No results found.</div>';return;}
+    el.innerHTML='';
+    custs.forEach(cu=>{
+      const name=((cu.firstName||'')+' '+(cu.lastName||'')).trim()||'Unknown';
+      const email=(cu.emails&&cu.emails[0])?cu.emails[0].email:'';
+      const phone=(cu.phones&&cu.phones[0])?cu.phones[0].phone:'';
+      const alreadyAdded=pjC7Selected.some(x=>x.c7id===cu.id)||S.projectContacts.some(x=>x.projectId===S.activeProject&&x.c7CustomerId===cu.id);
+      const div=document.createElement('div');
+      div.style.cssText='padding:10px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;cursor:pointer;'+(alreadyAdded?'opacity:.5;':'');
+      div.onclick=()=>{if(!alreadyAdded)togglePjC7Select(cu,name,email,phone);};
+      const isSelected=pjC7Selected.some(x=>x.c7id===cu.id);
+      div.innerHTML='<div style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--bdr-s);background:'+(isSelected?'var(--burg)':'white')+';display:flex;align-items:center;justify-content:center;font-size:10px;color:white;flex-shrink:0;">'+(isSelected?'✓':'')+'</div>'
+        +'<div><div style="font-weight:500;font-size:13px;">'+name+'</div><div style="font-size:11px;color:var(--ink-m);">'+(email||phone||cu.id)+'</div></div>';
+      el.appendChild(div);
+    });
+  }catch(e){el.innerHTML='<div style="padding:14px;color:var(--d-tx);">Error: '+e.message+'</div>';}
+}
+
+function togglePjC7Select(cu,name,email,phone){
+  const idx=pjC7Selected.findIndex(x=>x.c7id===cu.id);
+  if(idx>=0)pjC7Selected.splice(idx,1);
+  else{
+    const parts=name.split(' ');
+    pjC7Selected.push({c7id:cu.id,first:parts[0]||'',last:parts.slice(1).join(' ')||'',email,phone,orderNo:''});
+  }
+  document.getElementById('pj-c7-selected-summary').textContent=pjC7Selected.length?pjC7Selected.length+' customer'+(pjC7Selected.length>1?'s':'')+' selected':'';
+  searchPjC7();
 }
 
 function handleProjectFileUpload(input){
@@ -4954,17 +5020,19 @@ function handleProjectFileUpload(input){
 }
 
 async function confirmProjectImport(){
-  const projectId=S.activeProject;if(!projectId||!pjPendingUpload.length)return;
+  const projectId=S.activeProject;if(!projectId)return;
+  const toAdd=[...pjC7Selected,...pjPendingUpload];
+  if(!toAdd.length){showToast('No contacts selected','err');return;}
   const btn=document.getElementById('pj-import-btn');btn.disabled=true;btn.textContent='Adding...';
   try{
     const createdAt=today();
-    const rows=pjPendingUpload.map(c=>[uid(),projectId,c.first,c.last,c.email,c.phone,c.orderNo,'','',S.cu,createdAt,'']);
+    const rows=toAdd.map(c=>[uid(),projectId,c.first,c.last,c.email||'',c.phone||'',c.orderNo||'',c.c7id||'','',S.cu,createdAt,'']);
     await sheetsAppend('ProjectContacts!A:L',rows);
-    rows.forEach(r=>S.projectContacts.push({id:r[0],projectId:r[1],first:r[2],last:r[3],email:r[4],phone:r[5],orderNo:r[6],c7CustomerId:'',c7OrderData:'',assignee:r[9],createdAt:r[10],notes:''}));
+    rows.forEach(r=>S.projectContacts.push({id:r[0],projectId:r[1],first:r[2],last:r[3],email:r[4],phone:r[5],orderNo:r[6],c7CustomerId:r[7],c7OrderData:'',assignee:r[9],createdAt:r[10],notes:''}));
     closeModal('project-import-modal');
     renderProjectContacts(projectId);
-    showToast(pjPendingUpload.length+' contacts added');
-    pjPendingUpload=[];
+    showToast(toAdd.length+' contact'+(toAdd.length>1?'s':'')+' added');
+    pjPendingUpload=[];pjC7Selected=[];
     // Enrich from C7 in background
     enrichProjectContactsFromC7(projectId);
   }catch(e){showToast('Error: '+e.message,'err');}
