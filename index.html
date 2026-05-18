@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.160</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.161</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -888,7 +888,7 @@ select.fi{cursor:pointer;}
       </div>
       <!-- Upload tab -->
       <div id="pj-import-upload" style="display:none;">
-        <label class="fl" style="margin-bottom:6px;display:block;">Upload CSV/Excel (columns: First, Last, Email, Phone, Order#)</label>
+        <label class="fl" style="margin-bottom:6px;display:block;">Upload CSV/Excel — columns: Name/Item (or First + Last), Email, Phone, Order#</label>
         <input type="file" id="pj-file-input" accept=".csv,.xlsx,.xls" class="fi" onchange="handleProjectFileUpload(this)" />
         <div id="pj-import-preview" style="display:none;margin-top:12px;">
           <div style="font-size:13px;color:var(--ink-m);margin-bottom:8px;" id="pj-import-count"></div>
@@ -4805,13 +4805,14 @@ function renderProjectContacts(projectId){
   if(!contacts.length){el.innerHTML='<div class="empty">No contacts yet. Use Import to add contacts.</div>';return;}
   el.innerHTML='';
   const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
-  tbl.innerHTML='<thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Order #</th><th>C7 Status</th><th>Notes</th><th></th></tr></thead>';
+  tbl.innerHTML='<thead><tr><th>Name / Item</th><th>Email</th><th>Phone</th><th>Order #</th><th>C7 Status</th><th>Notes</th><th></th></tr></thead>';
   const tbody=document.createElement('tbody');
   contacts.forEach(c=>{
     let c7Info='';
     if(c.c7OrderData){try{const d=JSON.parse(c.c7OrderData);c7Info=d.status||'';}catch(e){}}
+    const displayName=(c.first+' '+c.last).trim()||'—';
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td style="font-weight:500;">${c.first} ${c.last}</td>
+    tr.innerHTML=`<td style="font-weight:500;">${displayName}</td>
       <td style="font-size:12px;">${c.email?'<a href="mailto:'+c.email+'" style="color:var(--burg);">'+c.email+'</a>':''}</td>
       <td style="font-size:12px;">${c.phone||''}</td>
       <td style="font-size:12px;">${c.orderNo||'—'}</td>
@@ -4996,23 +4997,23 @@ function handleProjectFileUpload(input){
     const ws=wb.Sheets[wb.SheetNames[0]];
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
     if(rows.length<2){showToast('No data found in file','err');return;}
-    // Auto-detect columns: First, Last, Email, Phone, Order#
+    // Auto-detect columns: Name/Item (or First+Last), Email, Phone, Order#
     const header=rows[0].map(h=>(h||'').toString().toLowerCase());
     const col=n=>header.findIndex(h=>h.includes(n));
     const iFirst=col('first'),iLast=col('last'),iEmail=col('email'),iPhone=col('phone'),iOrder=col('order');
-    pjPendingUpload=rows.slice(1).filter(r=>r.some(c=>c!=='')).map(r=>({
-      first:(iFirst>=0?r[iFirst]:'').toString().trim(),
-      last:(iLast>=0?r[iLast]:'').toString().trim(),
-      email:(iEmail>=0?r[iEmail]:'').toString().trim(),
-      phone:(iPhone>=0?r[iPhone]:'').toString().trim(),
-      orderNo:(iOrder>=0?r[iOrder]:'').toString().trim(),
-    })).filter(r=>r.first||r.last||r.email);
+    const iName=(iFirst<0&&iLast<0)?header.findIndex(h=>h.includes('name')||h.includes('item')):-1;
+    pjPendingUpload=rows.slice(1).filter(r=>r.some(c=>c!=='')).map(r=>{
+      let first='',last='';
+      if(iFirst>=0||iLast>=0){first=(iFirst>=0?r[iFirst]:'').toString().trim();last=(iLast>=0?r[iLast]:'').toString().trim();}
+      else if(iName>=0){first=r[iName].toString().trim();}
+      return {first,last,email:(iEmail>=0?r[iEmail]:'').toString().trim(),phone:(iPhone>=0?r[iPhone]:'').toString().trim(),orderNo:(iOrder>=0?r[iOrder]:'').toString().trim()};
+    }).filter(r=>r.first||r.last||r.email);
     const wrap=document.getElementById('pj-import-table-wrap');
-    wrap.innerHTML='<table class="tbl"><thead><tr><th>First</th><th>Last</th><th>Email</th><th>Phone</th><th>Order #</th></tr></thead><tbody>'
-      +pjPendingUpload.slice(0,20).map(r=>`<tr><td>${r.first}</td><td>${r.last}</td><td>${r.email}</td><td>${r.phone}</td><td>${r.orderNo}</td></tr>`).join('')
-      +(pjPendingUpload.length>20?'<tr><td colspan="5" style="text-align:center;color:var(--ink-m);">...and '+(pjPendingUpload.length-20)+' more</td></tr>':'')
+    wrap.innerHTML='<table class="tbl"><thead><tr><th>Name / Item</th><th>Email</th><th>Phone</th><th>Order #</th></tr></thead><tbody>'
+      +pjPendingUpload.slice(0,20).map(r=>`<tr><td>${(r.first+' '+r.last).trim()}</td><td>${r.email}</td><td>${r.phone}</td><td>${r.orderNo}</td></tr>`).join('')
+      +(pjPendingUpload.length>20?'<tr><td colspan="4" style="text-align:center;color:var(--ink-m);">...and '+(pjPendingUpload.length-20)+' more</td></tr>':'')
       +'</tbody></table>';
-    document.getElementById('pj-import-count').textContent=pjPendingUpload.length+' contacts ready to import';
+    document.getElementById('pj-import-count').textContent=pjPendingUpload.length+' items ready to import';
     document.getElementById('pj-import-preview').style.display='';
     document.getElementById('pj-import-btn').style.display='';
   };
