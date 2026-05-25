@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.176</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.177</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -5482,7 +5482,11 @@ async function saveProjectItemUpdate(){
     document.getElementById('pj-item-new-msg').value='';
     renderPjItemThread(contactId);
     const c=S.projectContacts.find(x=>x.id===contactId);
-    if(c)renderProjectContacts(c.projectId);
+    if(c){
+      renderProjectContacts(c.projectId);
+      const p=S.projects.find(x=>x.id===c.projectId);
+      if(p&&p.type==='PreOrder')renderPreOrderList(c.projectId);
+    }
     showToast('Update logged');
   }catch(e){showToast('Error: '+e.message,'err');}
 }
@@ -5624,7 +5628,7 @@ function renderPreOrderList(projectId){
     el.appendChild(bar);
   }
   const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
-  tbl.innerHTML='<thead><tr><th style="width:28px;"></th><th>Customer</th><th>Email</th><th>Order #</th><th>Products</th><th>Fulfilled by</th><th></th></tr></thead>';
+  tbl.innerHTML='<thead><tr><th style="width:28px;"></th><th>Customer</th><th>Email</th><th>Order #</th><th>Products</th><th>Notes</th><th>Fulfilled by</th><th></th></tr></thead>';
   const tbody=document.createElement('tbody');
   contacts.forEach(c=>{
     let products=[];
@@ -5636,6 +5640,20 @@ function renderPreOrderList(projectId){
     const productsHtml=products.length
       ?products.map(p=>`<div style="font-size:12px;"><strong>${p.qty}×</strong> ${p.product}</div>`).join('')
       :'<span style="color:var(--ink-m);font-size:12px;">—</span>';
+    // Item notes — show all logged updates inline
+    const itemNotes=(S.projectItemNotes||[]).filter(n=>n.contactId===c.id).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+    const notesHtml=itemNotes.length
+      ?itemNotes.map(n=>{
+          const rep=TEAM[n.author]||{name:n.authorName||'',cls:'av-b',init:'?'};
+          return `<div style="margin-bottom:5px;padding:5px 8px;background:var(--cream);border-radius:5px;font-size:12px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+              <span style="font-weight:500;font-size:11px;color:var(--ink-f);">${rep.name}</span>
+              <span style="font-size:10px;color:var(--ink-m);">${n.createdAt}</span>
+            </div>
+            <div style="color:var(--ink);">${n.message}</div>
+          </div>`;
+        }).join('')
+      :'';
     const tr=document.createElement('tr');
     tr.style.cssText=`cursor:pointer;${c.done?'opacity:.55;':''}`;
     tr.onclick=(e)=>{if(e.target.tagName!=='BUTTON'&&e.target.tagName!=='A')openPjItemPanel(c.id);};
@@ -5651,6 +5669,7 @@ function renderPreOrderList(projectId){
       <td style="font-size:12px;">${c.email?`<a href="mailto:${c.email}" style="color:var(--burg);" onclick="event.stopPropagation()">${c.email}</a>`:''}</td>
       <td style="font-size:12px;">${c.orderNo||'—'}</td>
       <td>${productsHtml}</td>
+      <td style="min-width:180px;max-width:260px;">${notesHtml}</td>
       <td style="font-size:11px;color:var(--ink-m);white-space:nowrap;">${c.done&&c.completedBy?'✓ '+c.completedBy+(c.completedAt?' · '+c.completedAt:''):''}</td>
       <td onclick="event.stopPropagation()"><button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="removeProjectContact('${c.id}')">✕</button></td>`;
     tbody.appendChild(tr);
