@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.173</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.174</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -4865,52 +4865,104 @@ async function c7SyncOutreachMessage(outreach,msg){
 }
 
 // ---- Projects ----
+// Soft project colors — index wraps around
+const PROJECT_COLORS=[
+  {bg:'#FFF5F5',border:'#F5C5C5',accent:'#C0392B',text:'#7B1A1A'},
+  {bg:'#FFF8F0',border:'#F5DEB3',accent:'#B8860B',text:'#7A5000'},
+  {bg:'#F0F8F0',border:'#B7DDB7',accent:'#2E7D32',text:'#1A5C1A'},
+  {bg:'#F0F4FF',border:'#C5D0F5',accent:'#3949AB',text:'#1A2C7A'},
+  {bg:'#F8F0FF',border:'#D9C5F5',accent:'#7B1FA2',text:'#4A0E6B'},
+  {bg:'#F0FBFF',border:'#B5DFF5',accent:'#0277BD',text:'#014A75'},
+  {bg:'#FFF0F8',border:'#F5C5E8',accent:'#AD1457',text:'#6B0A36'},
+  {bg:'#F5F5F5',border:'#D0D0D0',accent:'#546E7A',text:'#2E4A52'},
+];
+
+function projectColor(idx){return PROJECT_COLORS[idx%PROJECT_COLORS.length];}
+
+function pieChartSVG(pct,color,size){
+  size=size||40;
+  const r=size/2-3;
+  const cx=size/2,cy=size/2;
+  if(pct>=100)return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity=".25"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/><text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="10" font-weight="600" fill="white">✓</text></svg>`;
+  if(pct<=0)return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="2" opacity=".3"/></svg>`;
+  const angle=(pct/100)*Math.PI*2-Math.PI/2;
+  const x=cx+r*Math.cos(angle),y=cy+r*Math.sin(angle);
+  const large=pct>50?1:0;
+  return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity=".15"/>
+    <path d="M${cx},${cy} L${cx},${cy-r} A${r},${r} 0 ${large},1 ${x},${y} Z" fill="${color}"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="1.5" opacity=".4"/>
+  </svg>`;
+}
+
 function renderProjects(){
   const el=document.getElementById('projects-list');if(!el)return;
   const active=S.projects.filter(p=>p.status!=='Archived');
   const archived=S.projects.filter(p=>p.status==='Archived');
   el.innerHTML='';
   if(!active.length&&!archived.length){el.innerHTML='<div class="empty">No projects yet. Click + New project to get started.</div>';return;}
-  active.forEach(p=>el.appendChild(buildProjectCard(p)));
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,360px));gap:14px;';
+  active.forEach((p,i)=>grid.appendChild(buildProjectCard(p,i)));
+  el.appendChild(grid);
   if(archived.length){
     const archDiv=document.createElement('div');
-    archDiv.style.cssText='margin-top:20px;';
+    archDiv.style.cssText='margin-top:24px;';
     archDiv.innerHTML='<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-f);margin-bottom:10px;">Archived ('+archived.length+')</div>';
-    archived.forEach(p=>{const c=buildProjectCard(p);c.style.opacity='.55';archDiv.appendChild(c);});
+    const archGrid=document.createElement('div');
+    archGrid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,360px));gap:14px;';
+    archived.forEach((p,i)=>{const c=buildProjectCard(p,i);c.style.opacity='.6';archGrid.appendChild(c);});
+    archDiv.appendChild(archGrid);
     el.appendChild(archDiv);
   }
 }
 
-function buildProjectCard(p){
+function buildProjectCard(p,colorIdx){
+  const col=projectColor(colorIdx===undefined?S.projects.indexOf(p):colorIdx);
   const contacts=S.projectContacts.filter(c=>c.projectId===p.id);
   const notes=S.projectNotes.filter(n=>n.projectId===p.id);
   const isInv=p.type==='Inventory';
   const invEntries=isInv?S.inventoryEntries.filter(e=>e.projectId===p.id):[];
-  const m=TEAM[p.assignee]||(p.assignee===-1?null:TEAM[0]);
-  const div=document.createElement('div');
-  div.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;padding:18px 20px;margin-bottom:12px;cursor:pointer;transition:box-shadow .15s;';
-  div.onmouseover=()=>div.style.boxShadow='0 2px 12px rgba(0,0,0,.08)';
-  div.onmouseout=()=>div.style.boxShadow='';
-  div.onclick=()=>openProjectDetail(p.id);
-  const statusColor=p.status==='Active'?'var(--s-tx)':p.status==='On Hold'?'var(--w-tx)':'var(--ink-m)';
-  const statusBg=p.status==='Active'?'var(--s-bg)':p.status==='On Hold'?'var(--w-bg)':'var(--cream)';
-  const typeTag=isInv?'<span style="background:#EEF2FF;color:#4338CA;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:600;margin-left:6px;">📦 Inventory</span>':'';
+  const m=TEAM[p.assignee]||(p.assignee===-1?null:null);
+  // Completion
+  let pct=0,doneCount=0,totalCount=0;
+  if(isInv){
+    totalCount=invEntries.length;
+    doneCount=invEntries.filter(e=>e.availableForSale!==null).length;
+  } else {
+    totalCount=contacts.length;
+    doneCount=contacts.filter(c=>c.done).length;
+  }
+  pct=totalCount>0?Math.round(doneCount/totalCount*100):0;
+  const pie=totalCount>0?pieChartSVG(pct,col.accent,44):'';
+  const typeTag=isInv?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">📦 Inventory</span>`:'';
   const statsHtml=isInv
-    ?`<span><strong style="color:var(--ink);">${invEntries.length}</strong> wines</span>`
-    :`<span><strong style="color:var(--ink);">${contacts.length}</strong> items</span>`;
-  div.innerHTML=`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-    <div style="flex:1;">
-      <div style="font-size:18px;font-weight:600;font-family:'Cormorant Garamond',serif;color:var(--burg);margin-bottom:6px;">${p.name}${typeTag}</div>
-      ${p.desc?'<div style="font-size:13px;color:var(--ink-m);line-height:1.5;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">'+p.desc+'</div>':''}
-      <div style="display:flex;gap:12px;font-size:12px;color:var(--ink-m);">
-        ${statsHtml}
-        <span><strong style="color:var(--ink);">${notes.length}</strong> notes</span>
-        ${p.startDate?'<span>📅 '+p.startDate+(p.endDate?' – '+p.endDate:'')+'</span>':''}
-        ${m?'<span><div class="av '+m.cls+'" style="width:14px;height:14px;font-size:6px;display:inline-flex;vertical-align:middle;">'+m.init+'</div> '+m.name+'</span>':''}
+    ?`${invEntries.length} wine${invEntries.length!==1?'s':''}`
+    :`${contacts.length} item${contacts.length!==1?'s':''}`;
+  const div=document.createElement('div');
+  div.style.cssText=`background:${col.bg};border:1px solid ${col.border};border-radius:12px;padding:16px 18px;cursor:pointer;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;gap:10px;`;
+  div.onmouseover=()=>{div.style.boxShadow=`0 4px 16px rgba(0,0,0,.10)`;div.style.transform='translateY(-1px)';};
+  div.onmouseout=()=>{div.style.boxShadow='';div.style.transform='';};
+  div.onclick=()=>openProjectDetail(p.id);
+  div.innerHTML=`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:16px;font-weight:600;font-family:'Cormorant Garamond',serif;color:${col.text};margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}${typeTag}</div>
+        ${p.desc?`<div style="font-size:12px;color:${col.text};opacity:.7;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${p.desc}</div>`:''}
       </div>
+      ${pie?`<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;">${pie}<div style="font-size:10px;color:${col.accent};font-weight:600;">${pct}%</div></div>`:''}
     </div>
-    <span style="background:${statusBg};color:${statusColor};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;">${p.status}</span>
-  </div>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+      <div style="display:flex;gap:10px;font-size:12px;color:${col.text};opacity:.75;">
+        <span>${statsHtml}</span>
+        ${notes.length?`<span>${notes.length} note${notes.length!==1?'s':''}</span>`:''}
+        ${p.endDate?`<span>📅 ${p.endDate}</span>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        ${m?`<div class="av ${m.cls}" style="width:18px;height:18px;font-size:7px;">${m.init}</div>`:''}
+        <span style="background:${col.border};color:${col.text};padding:2px 9px;border-radius:20px;font-size:11px;">${p.status}</span>
+      </div>
+    </div>`;
   return div;
 }
 
