@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.175</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.176</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -475,6 +475,17 @@ select.fi{cursor:pointer;}
                   </div>
                 </div>
                 <div id="pj-inventory-list"></div>
+              </div>
+              <!-- PreOrder Fulfillment project -->
+              <div id="pj-preorder-section" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                  <div>
+                    <div style="font-weight:600;font-size:14px;">PreOrder Customers</div>
+                    <div id="pj-preorder-summary" style="font-size:12px;color:var(--ink-m);margin-top:2px;"></div>
+                  </div>
+                  <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openPreOrderUpload()">↑ Import list</button>
+                </div>
+                <div id="pj-preorder-list"></div>
               </div>
             </div>
             <!-- Right: notes thread -->
@@ -884,6 +895,7 @@ select.fi{cursor:pointer;}
           <select class="fi" id="pm-type" onchange="toggleInventoryFields()">
             <option value="Standard">Standard</option>
             <option value="Inventory">Inventory</option>
+            <option value="PreOrder">PreOrder Fulfillment</option>
           </select>
         </div>
         <div class="fr"><label class="fl">Status</label>
@@ -1002,6 +1014,25 @@ select.fi{cursor:pointer;}
       </div>
     </div>
     <div class="mftr"><button class="btn" onclick="closeModal('inventory-wine-modal')">Cancel</button><button class="btn btnp" onclick="saveInventoryWine()">Save</button></div>
+  </div>
+</div>
+
+<!-- PreOrder upload modal -->
+<div id="preorder-upload-modal" class="modal-backdrop">
+  <div class="modal" style="width:600px;max-height:85vh;display:flex;flex-direction:column;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle">Import PreOrder list</div><button class="mcls" onclick="closeModal('preorder-upload-modal')">✕</button></div>
+    <div class="mbdy" style="flex:1;overflow-y:auto;">
+      <div style="font-size:13px;color:var(--ink-m);margin-bottom:12px;">Upload a CSV or Excel file with columns: <strong>Customer Full Name, Sum of Quantity, Product Title, Order Number, Customer Email</strong>. Multiple rows per customer will be grouped automatically.</div>
+      <input type="file" id="po-file-input" accept=".csv,.xlsx,.xls" class="fi" onchange="handlePreOrderUpload(this)" />
+      <div id="po-preview" style="display:none;margin-top:14px;">
+        <div style="font-size:13px;color:var(--ink-m);margin-bottom:8px;" id="po-preview-count"></div>
+        <div id="po-preview-table" style="max-height:320px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;"></div>
+      </div>
+    </div>
+    <div class="mftr">
+      <button class="btn" onclick="closeModal('preorder-upload-modal')">Cancel</button>
+      <button class="btn btnp" id="po-import-btn" onclick="confirmPreOrderImport()" style="display:none;">Import customers</button>
+    </div>
   </div>
 </div>
 
@@ -4922,22 +4953,26 @@ function buildProjectCard(p,colorIdx){
   const contacts=S.projectContacts.filter(c=>c.projectId===p.id);
   const notes=S.projectNotes.filter(n=>n.projectId===p.id);
   const isInv=p.type==='Inventory';
+  const isPO=p.type==='PreOrder';
   const invEntries=isInv?S.inventoryEntries.filter(e=>e.projectId===p.id):[];
+  const poContacts=isPO?S.projectContacts.filter(c=>c.projectId===p.id):[];
   const m=TEAM[p.assignee]||(p.assignee===-1?null:null);
   // Completion
   let pct=0,doneCount=0,totalCount=0;
-  if(isInv){
-    totalCount=invEntries.length;
-    doneCount=invEntries.filter(e=>e.availableForSale!==null).length;
-  } else {
-    totalCount=contacts.length;
-    doneCount=contacts.filter(c=>c.done).length;
-  }
+  if(isInv){totalCount=invEntries.length;doneCount=invEntries.filter(e=>e.availableForSale!==null).length;}
+  else if(isPO){totalCount=poContacts.length;doneCount=poContacts.filter(c=>c.done).length;}
+  else{totalCount=contacts.length;doneCount=contacts.filter(c=>c.done).length;}
   pct=totalCount>0?Math.round(doneCount/totalCount*100):0;
   const pie=totalCount>0?pieChartSVG(pct,col.accent,44):'';
-  const typeTag=isInv?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">📦 Inventory</span>`:'';
+  const typeTag=isInv
+    ?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">📦 Inventory</span>`
+    :isPO
+    ?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">🛒 PreOrder</span>`
+    :'';
   const statsHtml=isInv
     ?`${invEntries.length} wine${invEntries.length!==1?'s':''}`
+    :isPO
+    ?`${poContacts.length} customer${poContacts.length!==1?'s':''}`
     :`${contacts.length} item${contacts.length!==1?'s':''}`;
   const div=document.createElement('div');
   div.style.cssText=`background:${col.bg};border:1px solid ${col.border};border-radius:12px;padding:16px 18px;cursor:pointer;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;gap:10px;`;
@@ -4979,9 +5014,12 @@ function openProjectDetail(id){
 
 function showInventoryOrStandard(p){
   const isInv=p.type==='Inventory';
-  document.getElementById('pj-standard-section').style.display=isInv?'none':'';
+  const isPO=p.type==='PreOrder';
+  document.getElementById('pj-standard-section').style.display=(!isInv&&!isPO)?'':'none';
   document.getElementById('pj-inventory-section').style.display=isInv?'':'none';
+  document.getElementById('pj-preorder-section').style.display=isPO?'':'none';
   if(isInv)renderInventoryList(p.id);
+  else if(isPO)renderPreOrderList(p.id);
   else renderProjectContacts(p.id);
 }
 
@@ -5447,6 +5485,178 @@ async function saveProjectItemUpdate(){
     if(c)renderProjectContacts(c.projectId);
     showToast('Update logged');
   }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+// ---- PreOrder Fulfillment ----
+let poPendingCustomers=[];
+
+function openPreOrderUpload(){
+  poPendingCustomers=[];
+  document.getElementById('po-file-input').value='';
+  document.getElementById('po-preview').style.display='none';
+  document.getElementById('po-import-btn').style.display='none';
+  openModal('preorder-upload-modal');
+}
+
+function handlePreOrderUpload(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const data=new Uint8Array(e.target.result);
+    const wb=XLSX.read(data,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(rows.length<2){showToast('No data found','err');return;}
+    const header=rows[0].map(h=>(h||'').toString().toLowerCase().trim());
+    // Find columns — flexible matching
+    const col=terms=>header.findIndex(h=>terms.some(t=>h.includes(t)));
+    const iName=col(['customer full name','customer name','name','full name']);
+    const iQty=col(['sum of quantity','quantity','qty']);
+    const iProduct=col(['product title','product','wine','title','item']);
+    const iOrder=col(['order number','order no','order#','order']);
+    const iEmail=col(['customer email','email']);
+    if(iName<0||iProduct<0){showToast('Could not find Name or Product columns','err');return;}
+    // Group rows by customer name (case-insensitive)
+    const customerMap={};
+    rows.slice(1).forEach(r=>{
+      const name=(iName>=0?r[iName]:'').toString().trim();
+      if(!name)return;
+      const key=name.toLowerCase();
+      if(!customerMap[key]){
+        customerMap[key]={
+          name,
+          email:(iEmail>=0?r[iEmail]:'').toString().trim(),
+          orderNo:(iOrder>=0?r[iOrder]:'').toString().trim(),
+          products:[]
+        };
+      }
+      const product=(iProduct>=0?r[iProduct]:'').toString().trim();
+      const qty=(iQty>=0&&r[iQty]!=='')?parseInt(r[iQty])||1:1;
+      if(product)customerMap[key].products.push({product,qty});
+      // Fill in email/order if missing on this customer
+      if(!customerMap[key].email&&iEmail>=0)customerMap[key].email=(r[iEmail]||'').toString().trim();
+      if(!customerMap[key].orderNo&&iOrder>=0)customerMap[key].orderNo=(r[iOrder]||'').toString().trim();
+    });
+    poPendingCustomers=Object.values(customerMap);
+    // Build preview table
+    const prev=document.getElementById('po-preview-table');
+    prev.innerHTML='<table class="tbl"><thead><tr><th>Customer</th><th>Email</th><th>Order #</th><th>Products</th></tr></thead><tbody>'
+      +poPendingCustomers.slice(0,20).map(c=>`<tr>
+        <td style="font-weight:500;">${c.name}</td>
+        <td style="font-size:12px;">${c.email||'—'}</td>
+        <td style="font-size:12px;">${c.orderNo||'—'}</td>
+        <td style="font-size:12px;">${c.products.map(p=>`${p.qty}× ${p.product}`).join('<br>')}</td>
+      </tr>`).join('')
+      +(poPendingCustomers.length>20?`<tr><td colspan="4" style="text-align:center;color:var(--ink-m);">...and ${poPendingCustomers.length-20} more</td></tr>`:'')
+      +'</tbody></table>';
+    document.getElementById('po-preview-count').textContent=`${poPendingCustomers.length} customers · ${rows.length-1} product lines`;
+    document.getElementById('po-preview').style.display='';
+    document.getElementById('po-import-btn').style.display='';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function confirmPreOrderImport(){
+  if(!poPendingCustomers.length)return;
+  const projectId=S.activeProject;if(!projectId)return;
+  const btn=document.getElementById('po-import-btn');btn.disabled=true;btn.textContent='Importing...';
+  try{
+    const createdAt=today();
+    // Products stored as JSON in the notes field; first/last split on comma
+    const rows=poPendingCustomers.map(c=>{
+      const nameParts=c.name.split(',').map(s=>s.trim());
+      const last=nameParts[0]||'';
+      const first=nameParts[1]||'';
+      const productsJson=JSON.stringify(c.products);
+      return[uid(),projectId,first,last,c.email,c.phone||'',c.orderNo,'','',S.cu,createdAt,productsJson,'false','',''];
+    });
+    await sheetsAppend('ProjectContacts!A:O',rows);
+    rows.forEach(r=>S.projectContacts.push({
+      id:r[0],projectId:r[1],first:r[2],last:r[3],email:r[4],phone:r[5],
+      orderNo:r[6],c7CustomerId:'',c7OrderData:'',assignee:r[9],createdAt:r[10],
+      notes:r[11],done:false,completedBy:'',completedAt:''
+    }));
+    closeModal('preorder-upload-modal');
+    renderPreOrderList(projectId);
+    renderProjects();
+    showToast(`${poPendingCustomers.length} customers imported`);
+    poPendingCustomers=[];
+    // Enrich C7 customer IDs by email in background
+    enrichPreOrderC7(projectId);
+  }catch(err){showToast('Error: '+err.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Import customers';}
+}
+
+async function enrichPreOrderC7(projectId){
+  const contacts=S.projectContacts.filter(c=>c.projectId===projectId&&!c.c7CustomerId&&c.email);
+  for(const c of contacts){
+    try{
+      const d=await c7Req('GET','/customer?q='+encodeURIComponent(c.email)+'&limit=5',null);
+      const custs=(d&&d.customers)||[];
+      const match=custs.find(cu=>(cu.emails||[]).some(e=>e.email.toLowerCase()===c.email.toLowerCase()));
+      if(match){
+        c.c7CustomerId=match.id;
+        const allRows=await sheetsGet('ProjectContacts!A2:O');
+        const rowIdx=allRows.findIndex(r=>r[0]===c.id);
+        if(rowIdx>=0)await sheetsUpdate('ProjectContacts!H'+(rowIdx+2),[[match.id]]);
+      }
+    }catch(e){console.warn('C7 enrich failed for',c.email,e.message);}
+    await new Promise(r=>setTimeout(r,350));
+  }
+  renderPreOrderList(projectId);
+}
+
+function renderPreOrderList(projectId){
+  const contacts=S.projectContacts.filter(c=>c.projectId===projectId);
+  const el=document.getElementById('pj-preorder-list');if(!el)return;
+  if(!contacts.length){el.innerHTML='<div class="empty">No customers yet. Click ↑ Import list to get started.</div>';return;}
+  // Summary
+  const done=contacts.filter(c=>c.done).length;
+  const summary=document.getElementById('pj-preorder-summary');
+  if(summary)summary.textContent=`${done} of ${contacts.length} fulfilled`;
+  el.innerHTML='';
+  // Progress bar
+  if(contacts.length){
+    const pct=Math.round(done/contacts.length*100);
+    const bar=document.createElement('div');
+    bar.style.cssText='margin-bottom:12px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-m);';
+    bar.innerHTML=`<div style="flex:1;background:var(--bdr);border-radius:4px;height:7px;overflow:hidden;"><div style="width:${pct}%;background:var(--s-tx);height:100%;border-radius:4px;transition:width .3s;"></div></div><span>${pct}%</span>`;
+    el.appendChild(bar);
+  }
+  const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
+  tbl.innerHTML='<thead><tr><th style="width:28px;"></th><th>Customer</th><th>Email</th><th>Order #</th><th>Products</th><th>Fulfilled by</th><th></th></tr></thead>';
+  const tbody=document.createElement('tbody');
+  contacts.forEach(c=>{
+    let products=[];
+    try{if(c.notes)products=JSON.parse(c.notes);}catch(e){}
+    const displayName=((c.last?c.last+', ':'')+c.first).trim()||'—';
+    const c7Link=c.c7CustomerId&&CONFIG.C7_TENANT
+      ?`<a href="https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/crm/customer/${c.c7CustomerId}" target="_blank" style="color:var(--burg);font-size:11px;white-space:nowrap;" onclick="event.stopPropagation()">C7 profile ↗</a>`
+      :(c.email?`<span style="font-size:11px;color:var(--ink-m);">Looking up...</span>`:'');
+    const productsHtml=products.length
+      ?products.map(p=>`<div style="font-size:12px;"><strong>${p.qty}×</strong> ${p.product}</div>`).join('')
+      :'<span style="color:var(--ink-m);font-size:12px;">—</span>';
+    const tr=document.createElement('tr');
+    tr.style.cssText=`cursor:pointer;${c.done?'opacity:.55;':''}`;
+    tr.onclick=(e)=>{if(e.target.tagName!=='BUTTON'&&e.target.tagName!=='A')openPjItemPanel(c.id);};
+    tr.innerHTML=`<td onclick="event.stopPropagation()">
+        <div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;background:${c.done?'var(--s-tx)':'white'};color:white;font-size:10px;" onclick="event.stopPropagation();toggleProjectContact('${c.id}')">
+          ${c.done?'✓':''}
+        </div>
+      </td>
+      <td>
+        <div style="font-weight:500;${c.done?'text-decoration:line-through;color:var(--ink-m);':''}">${displayName}</div>
+        ${c7Link?`<div style="margin-top:2px;">${c7Link}</div>`:''}
+      </td>
+      <td style="font-size:12px;">${c.email?`<a href="mailto:${c.email}" style="color:var(--burg);" onclick="event.stopPropagation()">${c.email}</a>`:''}</td>
+      <td style="font-size:12px;">${c.orderNo||'—'}</td>
+      <td>${productsHtml}</td>
+      <td style="font-size:11px;color:var(--ink-m);white-space:nowrap;">${c.done&&c.completedBy?'✓ '+c.completedBy+(c.completedAt?' · '+c.completedAt:''):''}</td>
+      <td onclick="event.stopPropagation()"><button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="removeProjectContact('${c.id}')">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+  el.appendChild(tbl);
 }
 
 // ---- Inventory ----
