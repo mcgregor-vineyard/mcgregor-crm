@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.174</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.175</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -5450,21 +5450,58 @@ async function saveProjectItemUpdate(){
 }
 
 // ---- Inventory ----
+let invSort={col:'wineName',dir:'asc'};
+
 function renderInventoryList(projectId){
   const entries=S.inventoryEntries.filter(e=>e.projectId===projectId);
   const el=document.getElementById('pj-inventory-list');if(!el)return;
   if(!entries.length){el.innerHTML='<div class="empty">No wines yet. Click + Add wine or upload a list.</div>';return;}
   el.innerHTML='';
+
+  // Sort
+  const sorted=[...entries].sort((a,b)=>{
+    let va,vb;
+    if(invSort.col==='lastCounted'){
+      // Entries with no count go to bottom regardless of direction
+      const hasA=a.availableForSale!==null&&a.countDate;
+      const hasB=b.availableForSale!==null&&b.countDate;
+      if(!hasA&&!hasB)return 0;
+      if(!hasA)return 1;
+      if(!hasB)return -1;
+      va=a.countDate;vb=b.countDate;
+    } else {
+      va=a.wineName.toLowerCase();vb=b.wineName.toLowerCase();
+    }
+    return invSort.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+  });
+
+  const t=today();
+  const sortArrow=d=>d==='asc'?'↑':'↓';
+  const thStyle='cursor:pointer;user-select:none;white-space:nowrap;';
+
   const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
-  tbl.innerHTML='<thead><tr><th>Wine</th><th style="text-align:center;color:var(--s-tx);">Available</th><th style="text-align:center;">New count</th><th style="text-align:center;">Owed</th><th style="text-align:center;">Reserve</th><th>Last counted</th><th>Notes</th><th></th></tr></thead>';
+  const wineArrow=invSort.col==='wineName'?sortArrow(invSort.dir):'';
+  const dateArrow=invSort.col==='lastCounted'?sortArrow(invSort.dir):'';
+  tbl.innerHTML=`<thead><tr>
+    <th style="${thStyle}" onclick="toggleInvSort('wineName','${projectId}')">Wine ${wineArrow}</th>
+    <th style="text-align:center;color:var(--s-tx);">Available</th>
+    <th style="text-align:center;">New count</th>
+    <th style="text-align:center;">Owed</th>
+    <th style="text-align:center;">Reserve</th>
+    <th style="${thStyle}" onclick="toggleInvSort('lastCounted','${projectId}')">Last counted ${dateArrow}</th>
+    <th>Notes</th>
+    <th></th>
+  </tr></thead>`;
+
   const tbody=document.createElement('tbody');
-  entries.sort((a,b)=>a.wineName.localeCompare(b.wineName)).forEach(e=>{
+  sorted.forEach(e=>{
     const avail=e.availableForSale;
     const availColor=avail===null?'var(--ink-m)':avail<0?'var(--d-tx)':avail===0?'var(--w-tx)':'var(--s-tx)';
-    const t=today();
-    const daysAgo=e.countDate?(Math.floor((new Date(t)-new Date(e.countDate))/(1000*60*60*24))):null;
+    // Only show last counted when numbers have been submitted
+    const hasCounted=avail!==null&&e.countDate;
+    const daysAgo=hasCounted?Math.floor((new Date(t)-new Date(e.countDate))/(1000*60*60*24)):null;
     const dateColor=daysAgo===null?'var(--ink-m)':daysAgo>30?'var(--d-tx)':daysAgo>14?'var(--w-tx)':'var(--s-tx)';
-    const dateLabel=daysAgo===null?'—':daysAgo===0?'Today':daysAgo===1?'Yesterday':daysAgo+' days ago';
+    const daysLabel=daysAgo===null?'Not yet counted':daysAgo===0?'Today':daysAgo===1?'Yesterday':daysAgo+' days ago';
     const tr=document.createElement('tr');
     tr.style.cursor='pointer';
     tr.onclick=()=>openInventoryWineModal(e.id);
@@ -5474,9 +5511,9 @@ function renderInventoryList(projectId){
       <td style="text-align:center;font-size:13px;">${e.bottlesOwed!==null?e.bottlesOwed:'—'}</td>
       <td style="text-align:center;font-size:13px;">${e.reserveNumber!==null?e.reserveNumber:'—'}</td>
       <td>
-        <div style="font-weight:600;font-size:13px;color:${dateColor};">${dateLabel}</div>
-        <div style="font-size:11px;color:var(--ink-m);">${e.countDate||''}</div>
-        ${e.countedBy?'<div style="font-size:11px;font-weight:500;color:var(--ink);">by '+e.countedBy+'</div>':''}
+        <div style="font-weight:600;font-size:13px;color:${dateColor};">${daysLabel}</div>
+        ${hasCounted?`<div style="font-size:11px;color:var(--ink-m);">${e.countDate}</div>`:''}
+        ${hasCounted&&e.countedBy?`<div style="font-size:11px;font-weight:500;color:var(--ink);">by ${e.countedBy}</div>`:''}
       </td>
       <td style="font-size:12px;color:var(--ink-m);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.notes||''}</td>
       <td onclick="event.stopPropagation()"><button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="deleteInventoryWine('${e.id}')">✕</button></td>`;
@@ -5484,15 +5521,22 @@ function renderInventoryList(projectId){
   });
   tbl.appendChild(tbody);
   el.appendChild(tbl);
+
   // Summary bar
   const withCount=entries.filter(e=>e.availableForSale!==null);
   if(withCount.length){
     const totalAvail=withCount.reduce((s,e)=>s+(e.availableForSale||0),0);
     const bar=document.createElement('div');
     bar.style.cssText='margin-top:10px;padding:10px 14px;background:var(--cream);border:1px solid var(--bdr);border-radius:7px;font-size:13px;display:flex;gap:20px;';
-    bar.innerHTML=`<span><strong>${withCount.length}</strong> wines counted</span><span style="color:var(--s-tx);"><strong>${totalAvail}</strong> total bottles available</span>`;
+    bar.innerHTML=`<span><strong>${withCount.length}</strong> of <strong>${entries.length}</strong> wines counted</span><span style="color:var(--s-tx);"><strong>${totalAvail}</strong> total bottles available</span>`;
     el.appendChild(bar);
   }
+}
+
+function toggleInvSort(col,projectId){
+  if(invSort.col===col)invSort.dir=invSort.dir==='asc'?'desc':'asc';
+  else{invSort.col=col;invSort.dir=col==='lastCounted'?'asc':'asc';}
+  renderInventoryList(projectId);
 }
 
 function calcInventory(){
