@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.177</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.179</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -150,6 +150,14 @@ select.fi{cursor:pointer;}
       <button class="ntab" onclick="sv('outreach')">Outreach</button>
       <button class="ntab" onclick="sv('projects')">Projects</button>
       <button class="ntab" onclick="sv('reports')">Reports</button>
+    </div>
+    <!-- Global search -->
+    <div style="position:relative;">
+      <input type="text" id="global-search-input" placeholder="🔍 Search everything..." 
+        style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;border-radius:20px;padding:5px 14px;font-size:12px;width:200px;outline:none;font-family:'DM Sans',sans-serif;"
+        oninput="globalSearch(this.value)" onfocus="this.style.width='280px'" onblur="if(!this.value){this.style.width='200px';closeSearchResults()}"
+        onkeydown="if(event.key==='Escape'){this.value='';closeSearchResults();}" />
+      <div id="global-search-results" style="display:none;position:absolute;top:calc(100% + 6px);left:0;width:400px;background:white;border:1px solid var(--bdr);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:300;max-height:420px;overflow-y:auto;"></div>
     </div>
   </div>
   <div class="usr">
@@ -256,10 +264,25 @@ select.fi{cursor:pointer;}
 
       <div id="view-contacts" class="view">
         <div class="vhdr"><div class="vtitle">Contacts</div><span id="contact-count" style="font-size:12px;color:var(--ink-m);"></span></div>
+        <!-- Bulk actions toolbar -->
+        <div id="bulk-toolbar" style="display:none;padding:8px 14px;background:var(--burg-f);border:1px solid var(--bdr-s);border-radius:8px;margin-bottom:10px;display:none;align-items:center;gap:10px;">
+          <span id="bulk-count" style="font-size:13px;font-weight:500;color:var(--burg);"></span>
+          <div style="flex:1;"></div>
+          <select class="fi" id="bulk-assign" style="width:auto;font-size:12px;padding:4px 8px;">
+            <option value="">Assign to...</option>
+            <option value="0">Dan Jimerson</option>
+            <option value="1">Mike DeGaetano</option>
+            <option value="2">Ellen Quibell</option>
+            <option value="3">John McGregor</option>
+          </select>
+          <button class="btn btnp" style="font-size:12px;" onclick="bulkAssign()">Apply</button>
+          <button class="btn" style="font-size:12px;color:var(--d-tx);border-color:var(--d-tx);" onclick="bulkRemove()">Remove from campaign</button>
+          <button class="btn" style="font-size:12px;" onclick="clearBulkSelection()">✕ Clear</button>
+        </div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <colgroup><col style="width:160px"><col style="width:120px"><col style="width:160px"><col style="width:140px"><col style="width:70px"><col style="width:110px"><col style="width:90px"><col style="width:80px"><col style="width:70px"></colgroup>
-            <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Campaign</th><th>Attempts</th><th>Last outcome</th><th>Assigned</th><th>Sale $</th><th></th></tr></thead>
+            <colgroup><col style="width:28px"><col style="width:160px"><col style="width:120px"><col style="width:160px"><col style="width:140px"><col style="width:70px"><col style="width:110px"><col style="width:90px"><col style="width:80px"><col style="width:70px"></colgroup>
+            <thead><tr><th><input type="checkbox" id="bulk-select-all" onchange="toggleSelectAll(this.checked)" style="cursor:pointer;" /></th><th>Name</th><th>Phone</th><th>Email</th><th>Campaign</th><th>Attempts</th><th>Last outcome</th><th>Assigned</th><th>Sale $</th><th></th></tr></thead>
             <tbody id="contacts-tbody"></tbody>
           </table>
         </div>
@@ -445,8 +468,8 @@ select.fi{cursor:pointer;}
         <!-- Project detail (shown when a project is open) -->
         <div id="project-detail-view" style="display:none;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-            <button class="btn" onclick="closeProjectDetail()" style="font-size:12px;">← All projects</button>
-            <div id="pj-detail-title" style="font-size:20px;font-weight:600;font-family:'Cormorant Garamond',serif;flex:1;"></div>
+            <button class="btn" onclick="closeProjectDetail()" style="font-size:12px;padding:4px 10px;" title="Back to all projects">←</button>
+            <div id="pj-detail-title" style="font-size:20px;font-weight:600;font-family:'Cormorant Garamond',serif;flex:1;cursor:pointer;color:var(--burg);" onclick="closeProjectDetail()" title="Back to all projects"></div>
             <button class="btn" onclick="openEditProject(S.activeProject)" style="font-size:12px;">Edit</button>
             <button class="btn" style="font-size:12px;color:var(--d-tx);border-color:var(--d-tx);" onclick="archiveProject(S.activeProject,true)">Archive</button>
           </div>
@@ -576,7 +599,17 @@ select.fi{cursor:pointer;}
         <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--ink-f);text-transform:uppercase;letter-spacing:.05em;">Updates</div>
         <div id="pj-item-thread" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
         <textarea class="fi" id="pj-item-new-msg" rows="2" placeholder="Log an update..." style="font-size:13px;"></textarea>
-        <button class="btn btnp" style="width:100%;margin-top:6px;" onclick="saveProjectItemUpdate()">Log update</button>
+        <div id="pj-item-reminder-row" style="display:none;margin-top:6px;background:var(--cream);border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:var(--ink-f);">🔔 Remind on</span>
+            <input type="date" class="fi" id="pj-item-reminder-date" style="width:auto;font-size:12px;padding:4px 8px;" />
+          </div>
+          <input type="text" class="fi" id="pj-item-reminder-note" style="width:100%;font-size:12px;padding:4px 8px;margin-top:6px;" placeholder="Reminder note (optional)" />
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="btn" style="font-size:12px;" onclick="toggleThreadReminder('pj-item')">🔔 Remind</button>
+          <button class="btn btnp" style="flex:1;" onclick="saveProjectItemUpdate()">Log update</button>
+        </div>
       </div>
     </div>
   </div>
@@ -835,7 +868,13 @@ select.fi{cursor:pointer;}
           <option>Text message</option>
         </select>
         <textarea class="fi" id="ot-new-msg" rows="3" placeholder="Note..."></textarea>
-        <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+        <div id="ot-reminder-row" style="display:none;margin-top:6px;display:flex;align-items:center;gap:8px;background:var(--cream);border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;">
+          <span style="font-size:12px;color:var(--ink-f);">🔔 Remind on</span>
+          <input type="date" class="fi" id="ot-reminder-date" style="width:auto;font-size:12px;padding:4px 8px;" />
+          <input type="text" class="fi" id="ot-reminder-note" style="flex:1;font-size:12px;padding:4px 8px;" placeholder="Reminder note (optional)" />
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <button class="btn" style="font-size:12px;" onclick="toggleThreadReminder('ot')">🔔 Set reminder</button>
           <button class="btn btnp" onclick="addOrderMessage()">Add note</button>
         </div>
       </div>
@@ -1014,6 +1053,28 @@ select.fi{cursor:pointer;}
       </div>
     </div>
     <div class="mftr"><button class="btn" onclick="closeModal('inventory-wine-modal')">Cancel</button><button class="btn btnp" onclick="saveInventoryWine()">Save</button></div>
+  </div>
+</div>
+
+<!-- Customer profile / activity feed modal -->
+<div id="customer-profile-modal" class="modal-backdrop">
+  <div class="modal" style="width:660px;max-height:85vh;display:flex;flex-direction:column;" onclick="event.stopPropagation();">
+    <div class="mhdr">
+      <div>
+        <div class="mtitle" id="cp-name"></div>
+        <div id="cp-meta" style="font-size:12px;color:var(--ink-m);margin-top:2px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a id="cp-c7link" href="#" target="_blank" style="display:none;font-size:12px;color:var(--burg);border:1px solid var(--bdr-s);border-radius:4px;padding:3px 10px;text-decoration:none;">View in C7 ↗</a>
+        <button class="mcls" onclick="closeModal('customer-profile-modal')">✕</button>
+      </div>
+    </div>
+    <div style="padding:0 18px;border-bottom:1px solid var(--bdr);display:flex;gap:4px;">
+      <button class="tab on" id="cp-tab-activity" onclick="switchCPTab('activity',this)" style="font-size:12px;padding:8px 14px;">Activity feed</button>
+      <button class="tab" id="cp-tab-tickets" onclick="switchCPTab('tickets',this)" style="font-size:12px;padding:8px 14px;">Tickets</button>
+      <button class="tab" id="cp-tab-orders" onclick="switchCPTab('orders',this)" style="font-size:12px;padding:8px 14px;">Orders</button>
+    </div>
+    <div id="cp-content" style="flex:1;overflow-y:auto;padding:16px 18px;"></div>
   </div>
 </div>
 
@@ -1273,7 +1334,13 @@ select.fi{cursor:pointer;}
           <option>Internal note</option>
         </select>
         <textarea class="fi" id="ort-new-msg" rows="3" placeholder="Message or note..."></textarea>
-        <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+        <div id="ort-reminder-row" style="display:none;margin-top:6px;display:flex;align-items:center;gap:8px;background:var(--cream);border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;">
+          <span style="font-size:12px;color:var(--ink-f);">🔔 Remind on</span>
+          <input type="date" class="fi" id="ort-reminder-date" style="width:auto;font-size:12px;padding:4px 8px;" />
+          <input type="text" class="fi" id="ort-reminder-note" style="flex:1;font-size:12px;padding:4px 8px;" placeholder="Reminder note (optional)" />
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <button class="btn" style="font-size:12px;" onclick="toggleThreadReminder('ort')">🔔 Set reminder</button>
           <button class="btn btnp" onclick="addOutreachMessage()">Add message</button>
         </div>
       </div>
@@ -1427,13 +1494,7 @@ select.fi{cursor:pointer;}
             <option value="3">John McGregor</option>
           </select>
         </div>
-        <div class="fr"><label class="fl">Status</label>
-          <select class="fi" id="tm-status">
-            <option>Open</option>
-            <option>In Progress</option>
-            <option>Resolved</option>
-          </select>
-        </div>
+        <div class="fr"><label class="fl">Due date</label><input type="date" class="fi" id="tm-due-date" /></div>
       </div>
       <div class="fr"><label class="fl">Initial note</label><textarea class="fi" id="tm-note" rows="3" placeholder="Describe the issue..."></textarea></div>
     </div>
@@ -1481,7 +1542,13 @@ select.fi{cursor:pointer;}
           </select>
         </div>
         <textarea class="fi" id="thread-new-msg" rows="3" placeholder="Type your message or update..."></textarea>
-        <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+        <div id="thread-reminder-row" style="display:none;margin-top:6px;display:flex;align-items:center;gap:8px;background:var(--cream);border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;">
+          <span style="font-size:12px;color:var(--ink-f);">🔔 Remind on</span>
+          <input type="date" class="fi" id="thread-reminder-date" style="width:auto;font-size:12px;padding:4px 8px;" />
+          <input type="text" class="fi" id="thread-reminder-note" style="flex:1;font-size:12px;padding:4px 8px;" placeholder="Reminder note (optional)" />
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <button class="btn" style="font-size:12px;" onclick="toggleThreadReminder('thread')">🔔 Set reminder</button>
           <button class="btn btnp" onclick="addThreadMessage()">Add message</button>
         </div>
       </div>
@@ -1632,7 +1699,7 @@ async function ensureSheets(){
   if(needed.includes('Campaigns'))await sheetsUpdate('Campaigns!A1:G1',[['ID','Name','Start','End','Description','CreatedAt','Archived']]);
   if(needed.includes('Contacts'))await sheetsUpdate('Contacts!A1:K1',[['ID','CampaignID','First','Last','Phone','Email','City','Assignee','CreatedAt','C7ID','AddReason']]);
   if(needed.includes('Attempts'))await sheetsUpdate('Attempts!A1:I1',[['ID','ContactID','Method','Date','Outcome','Notes','Sales','AssignedBy','CreatedAt']]);
-  if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:L1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone']]);
+  if(needed.includes('Tickets'))await sheetsUpdate('Tickets!A1:M1',[['ID','Subject','Type','Priority','Status','CustomerID','CustomerName','OrderNo','Assignee','CreatedAt','CustomerEmail','CustomerPhone','DueDate']]);
   if(needed.includes('TicketMessages'))await sheetsUpdate('TicketMessages!A1:G1',[['ID','TicketID','Message','Author','AuthorName','CreatedAt','Method']]);
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:H1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done']]);
   if(needed.includes('ReminderNotes'))await sheetsUpdate('ReminderNotes!A1:F1',[['ID','ReminderID','Message','Author','AuthorName','CreatedAt']]);
@@ -1664,7 +1731,7 @@ async function loadFromSheets(){
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
     const attempts=attemptRows.filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',method:r[2]||'',date:r[3]||'',outcome:r[4]||'',notes:r[5]||'',sales:safeJSON(r[6]),assignedBy:parseInt(r[7])||0,createdAt:r[8]||''}));
     S.contacts.forEach(c=>{c.attempts=attempts.filter(a=>a.contactId===c.id);});
-    S.tickets=ticketRows.filter(r=>r[0]).map(r=>({id:r[0],subject:r[1]||'',type:r[2]||'',priority:r[3]||'Normal',status:r[4]||'Open',customerId:r[5]||'',customerName:r[6]||'',orderNo:r[7]||'',assignee:parseInt(r[8])||0,createdAt:r[9]||'',customerEmail:r[10]||'',customerPhone:r[11]||''}));
+    S.tickets=ticketRows.filter(r=>r[0]).map(r=>({id:r[0],subject:r[1]||'',type:r[2]||'',priority:r[3]||'Normal',status:r[4]||'Open',customerId:r[5]||'',customerName:r[6]||'',orderNo:r[7]||'',assignee:parseInt(r[8])||0,createdAt:r[9]||'',customerEmail:r[10]||'',customerPhone:r[11]||'',dueDate:r[12]||''}));
     S.ticketMsgs=ticketMsgRows.filter(r=>r[0]).map(r=>({id:r[0],ticketId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||'',method:r[6]||''}));
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true'}));
     S.reminderNotes=(reminderNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],reminderId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
@@ -2011,12 +2078,14 @@ function renderContacts(){
   const rows=document.getElementById('contacts-tbody');rows.innerHTML='';
   const cs=filteredContacts();
   document.getElementById('contact-count').textContent=cs.length+' contacts';
-  if(!cs.length){rows.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--ink-m);">No contacts match this filter.</td></tr>';return;}
+  if(!cs.length){rows.innerHTML='<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--ink-m);">No contacts match this filter.</td></tr>';return;}
   cs.forEach(c=>{
     const lo=getLastOutcome(c);const rev=getContactRevenue(c);
     const camp=S.campaigns.find(x=>x.id===c.campId);const m=TEAM[c.assignee]||TEAM[0];
-    const tr=document.createElement('tr');tr.style.cursor='pointer';tr.onclick=()=>showContactDetail(c.id);
+    const isSelected=bulkSelected.has(c.id);
+    const tr=document.createElement('tr');tr.style.cursor='pointer';tr.onclick=(e)=>{if(e.target.type!=='checkbox')showContactDetail(c.id);};
     tr.innerHTML=`
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" data-id="${c.id}" ${isSelected?'checked':''} onchange="toggleBulkSelect('${c.id}',this.checked)" style="cursor:pointer;" /></td>
       <td><div style="display:flex;align-items:center;gap:7px;"><div class="av ${m.cls}">${((c.first||'')[0]||'')+((c.last||'')[0]||'')}</div><span style="font-weight:500;">${c.first} ${c.last}</span></div></td>
       <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(c.phone)}</td>
       <td style="font-size:12px;" onclick="event.stopPropagation();">${emailLink(c.email)}</td>
@@ -2025,7 +2094,10 @@ function renderContacts(){
       <td>${outcomeBadge(lo)}</td>
       <td><div style="display:flex;align-items:center;gap:5px;"><div class="av ${m.cls}" style="width:18px;height:18px;font-size:8px;">${m.init}</div><span style="font-size:12px;">${m.name}</span></div></td>
       <td style="font-family:'Cormorant Garamond',serif;font-size:15px;color:var(--burg);">${rev>0?fmt$(rev):'—'}</td>
-      <td><button class="btn btnp" style="font-size:11px;padding:3px 8px;" onclick="event.stopPropagation();openAttempt('${c.id}')">+ Log</button></td>`;
+      <td style="display:flex;gap:4px;" onclick="event.stopPropagation();">
+        <button class="btn" style="font-size:10px;padding:2px 6px;" onclick="openCustomerProfile('${c.id}')" title="Activity feed">👤</button>
+        <button class="btn btnp" style="font-size:11px;padding:3px 8px;" onclick="openAttempt('${c.id}')">+ Log</button>
+      </td>`;
     rows.appendChild(tr);
   });
 }
@@ -2705,7 +2777,7 @@ function renderTickets(){
         ?'<div style="display:flex;align-items:center;gap:5px;"><div class="av '+m.cls+'" style="width:18px;height:18px;font-size:8px;">'+m.init+'</div><span style="font-size:12px;">'+m.name+'</span></div>'
         :'<span style="font-size:12px;color:var(--ink-f);">Unassigned</span>';
       tr.innerHTML=`
-        <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${t.subject}</td>
+        <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${t.subject}${t.dueDate?' '+ticketDueBadge(t):''}</td>
         <td style="font-size:12px;">${t.customerName||'—'}</td>
         <td><span class="bdg bdg-g" style="font-size:11px;">${t.type}</span></td>
         <td><span class="bdg ${TICKET_STATUS_COLORS[t.status]||'bdg-g'}">${t.status}</span></td>
@@ -2773,6 +2845,8 @@ function openNewTicket(customerId,customerName){
   document.getElementById('tm-order').value='';
   document.getElementById('tm-note').value='';
   document.getElementById('tm-assignee').value='-1';
+  document.getElementById('tm-due-date').value='';
+  setupMentionListener('tm-note');
   document.getElementById('tm-customer-search').value=customerName||'';
   document.getElementById('tm-customer-id').value=customerId||'';
   document.getElementById('tm-customer-name').value=customerName||'';
@@ -2860,10 +2934,10 @@ async function saveTicket(){
   const subject=document.getElementById('tm-subject').value.trim();
   if(!subject){showToast('Please enter a subject','err');return;}
   const id=uid();const createdAt=today();
-  const ticket={id,subject,type:document.getElementById('tm-type').value,priority:document.getElementById('tm-priority').value,status:document.getElementById('tm-status').value,customerId:document.getElementById('tm-customer-id').value,customerName:document.getElementById('tm-customer-name').value||document.getElementById('tm-customer-search').value,customerEmail:document.getElementById('tm-customer-email').value,customerPhone:document.getElementById('tm-customer-phone').value,orderNo:document.getElementById('tm-order').value,assignee:parseInt(document.getElementById('tm-assignee').value),createdAt};
+  const ticket={id,subject,type:document.getElementById('tm-type').value,priority:document.getElementById('tm-priority').value,status:document.getElementById('tm-status').value,customerId:document.getElementById('tm-customer-id').value,customerName:document.getElementById('tm-customer-name').value||document.getElementById('tm-customer-search').value,customerEmail:document.getElementById('tm-customer-email').value,customerPhone:document.getElementById('tm-customer-phone').value,orderNo:document.getElementById('tm-order').value,assignee:parseInt(document.getElementById('tm-assignee').value),createdAt,dueDate:document.getElementById('tm-due-date').value||''};
   const note=document.getElementById('tm-note').value.trim();
   try{
-    await sheetsAppend('Tickets!A:L',[[id,ticket.subject,ticket.type,ticket.priority,ticket.status,ticket.customerId,ticket.customerName,ticket.orderNo,ticket.assignee,createdAt,ticket.customerEmail,ticket.customerPhone]]);
+    await sheetsAppend('Tickets!A:M',[[id,ticket.subject,ticket.type,ticket.priority,ticket.status,ticket.customerId,ticket.customerName,ticket.orderNo,ticket.assignee,createdAt,ticket.customerEmail,ticket.customerPhone,ticket.dueDate]]);
     S.tickets.push(ticket);
     if(note){
       const msgId=uid();
@@ -2902,6 +2976,7 @@ function openTicketThread(id){
   document.getElementById('thread-new-msg').value='';
   renderThreadMessages(id);
   openModal('thread-modal');
+  setupMentionListener('thread-new-msg');
 }
 
 function renderThreadMessages(ticketId){
@@ -2945,11 +3020,12 @@ async function addThreadMessage(){
     }
     document.getElementById('thread-new-msg').value='';
     document.getElementById('thread-method').value='';
+    const thr=document.getElementById('thread-reminder-row');if(thr){thr.style.display='none';}
     renderThreadMessages(S.activeTicketId);
     renderTickets();
     showToast('Message added');
-    // Sync note to C7 in background
     if(t)c7SyncTicketMessage(t,newMsg).then(ok=>showC7Toast(ok)).catch(()=>showC7Toast(false));
+    await saveThreadReminderIfSet('thread','ticket',S.activeTicketId,t?t.subject:'');
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -2979,11 +3055,11 @@ async function updateTicketAssignee(){
 
 async function updateTicketInSheet(t){
   try{
-    const allRows=await sheetsGet('Tickets!A2:J');
+    const allRows=await sheetsGet('Tickets!A2:M');
     const rowIdx=allRows.findIndex(r=>r[0]===t.id);
     if(rowIdx<0)return;
     const sheetRow=rowIdx+2;
-    await sheetsUpdate('Tickets!A'+sheetRow+':L'+sheetRow,[[t.id,t.subject,t.type,t.priority,t.status,t.customerId,t.customerName,t.orderNo,t.assignee,t.createdAt,t.customerEmail||'',t.customerPhone||'']]);
+    await sheetsUpdate('Tickets!A'+sheetRow+':M'+sheetRow,[[t.id,t.subject,t.type,t.priority,t.status,t.customerId,t.customerName,t.orderNo,t.assignee,t.createdAt,t.customerEmail||'',t.customerPhone||'',t.dueDate||'']]);
   }catch(e){showToast('Error updating ticket: '+e.message,'err');}
 }
 
@@ -3337,6 +3413,7 @@ async function openOrderThread(id){
   await loadOrderThreadOrders(o);
   renderOrderMessages(id);
   openModal('order-thread-modal');
+  setupMentionListener('ot-new-msg');
 }
 
 async function loadOrderThreadOrders(o){
@@ -3481,6 +3558,8 @@ async function addOrderMessage(){
     document.getElementById('ot-new-msg').value='';document.getElementById('ot-method').value='';
     renderOrderMessages(S.activeOrderId);renderOrders();showToast('Note added');
     if(o)c7SyncOrderMessage(o,newMsg).then(ok=>showC7Toast(ok)).catch(()=>showC7Toast(false));
+    // Save reminder if set
+    await saveThreadReminderIfSet('ot','order',S.activeOrderId,o?o.customerName:'');
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -4107,15 +4186,27 @@ function showQueueCard(){
     c7el.innerHTML='<a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:12px;color:var(--burg);text-decoration:none;border:1px solid var(--bdr-s);border-radius:5px;padding:4px 10px;">View in C7 ↗</a>';
   } else { c7el.innerHTML=''; }
 
-  // History
+  // History — enhanced with last attempt detail
   const attempts=c.attempts||[];
   const histEl=document.getElementById('cq-history');
   if(!attempts.length){
-    histEl.textContent='No previous contact.';
+    histEl.innerHTML='<span style="color:var(--ink-m);">No previous contact.</span>';
   } else {
-    const last=attempts[attempts.length-1];
-    histEl.innerHTML='<span style="color:var(--ink);">'+attempts.length+' attempt'+(attempts.length!==1?'s':'')+'</span> · Last: '+last.date+' · '+outcomeLabel(last.outcome)+(last.notes?' · "'+last.notes+'"':'');
+    const sorted=[...attempts].sort((a,b)=>b.date.localeCompare(a.date));
+    const last=sorted[0];
+    const rep=TEAM[last.assignedBy]||TEAM[0];
+    const outcomeColor=last.outcome==='sold'?'var(--s-tx)':last.outcome==='notReached'?'var(--d-tx)':'var(--ink)';
+    histEl.innerHTML=`<div style="background:var(--cream);border-radius:6px;padding:8px 10px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-weight:600;font-size:12px;color:${outcomeColor};">${outcomeLabel(last.outcome)}</span>
+        <span style="font-size:11px;color:var(--ink-m);">${last.date} · ${rep.name}</span>
+      </div>
+      <div style="font-size:12px;">📞 ${last.method}${last.notes?'<br><span style="color:var(--ink-m);">"'+last.notes+'"</span>':''}</div>
+      ${attempts.length>1?'<div style="font-size:11px;color:var(--ink-m);margin-top:4px;">'+attempts.length+' total attempts</div>':''}
+    </div>`;
   }
+  // Setup @mention on notes field
+  setupMentionListener('cq-notes');
 
   // Sidebar — next 8 contacts
   const sidebar=document.getElementById('cq-sidebar');
@@ -4517,6 +4608,7 @@ function openOutreachThread(id){
   document.getElementById('ort-method').value='';
   renderOutreachMessages(id);
   openModal('outreach-thread-modal');
+  setupMentionListener('ort-new-msg');
 }
 
 function renderOutreachMessages(outreachId){
@@ -4551,8 +4643,10 @@ async function addOutreachMessage(){
     const o=S.outreach.find(x=>x.id===S.activeOutreachId);
     if(o&&o.status==='Open'){o.status='In Progress';document.getElementById('ort-status').value='In Progress';await updateOutreachInSheet(o);}
     document.getElementById('ort-new-msg').value='';document.getElementById('ort-method').value='';
+    const ortr=document.getElementById('ort-reminder-row');if(ortr){ortr.style.display='none';}
     renderOutreachMessages(S.activeOutreachId);renderOutreach();showToast('Message added');
     if(o)c7SyncOutreachMessage(o,newMsg).then(ok=>showC7Toast(ok)).catch(()=>showC7Toast(false));
+    await saveThreadReminderIfSet('ort','outreach',S.activeOutreachId,o?o.title:'');
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -4893,6 +4987,286 @@ async function c7SyncOutreachMessage(outreach,msg){
   if(msg.method)noteText+=' ('+msg.method+')';
   noteText+=' '+msg.message+' — '+rep.name;
   return await c7AddNote(outreach.contactId,noteText).then(()=>true).catch(()=>false);
+}
+
+// ---- Global Search ----
+let searchTimeout=null;
+function globalSearch(q){
+  clearTimeout(searchTimeout);
+  const el=document.getElementById('global-search-results');
+  if(!q||q.length<2){el.style.display='none';return;}
+  searchTimeout=setTimeout(()=>{
+    const qL=q.toLowerCase();
+    const results=[];
+    // Contacts
+    S.contacts.filter(c=>(c.first+' '+c.last+' '+c.email+' '+c.phone).toLowerCase().includes(qL)).slice(0,5).forEach(c=>{
+      const camp=S.campaigns.find(x=>x.id===c.campId);
+      results.push({type:'contact',icon:'👤',title:c.first+' '+c.last,sub:(camp?camp.name+' · ':'')+c.email,action:()=>{closeSearchResults();sv('contacts');setTimeout(()=>showContactDetail(c.id),100);}});
+    });
+    // Tickets
+    S.tickets.filter(t=>(t.subject+' '+t.customerName+' '+t.type).toLowerCase().includes(qL)).slice(0,4).forEach(t=>{
+      results.push({type:'ticket',icon:'🎫',title:t.subject,sub:t.customerName+' · '+t.type+' · '+t.status,action:()=>{closeSearchResults();sv('tickets');setTimeout(()=>openTicketThread(t.id),100);}});
+    });
+    // Campaigns
+    S.campaigns.filter(c=>c.name.toLowerCase().includes(qL)&&!c.archived).slice(0,3).forEach(c=>{
+      results.push({type:'campaign',icon:'📢',title:c.name,sub:'Campaign',action:()=>{closeSearchResults();sv('campaigns');setTimeout(()=>openCampDetail(c.id),100);}});
+    });
+    // Orders
+    S.orderCustomers.filter(o=>(o.customerName+' '+o.customerEmail).toLowerCase().includes(qL)&&o.status!=='Resolved').slice(0,3).forEach(o=>{
+      results.push({type:'order',icon:'📦',title:o.customerName,sub:o.customerEmail+' · '+o.status,action:()=>{closeSearchResults();sv('orders');setTimeout(()=>openOrderThread(o.id),100);}});
+    });
+    // Outreach
+    S.outreach.filter(o=>o.title.toLowerCase().includes(qL)&&o.status!=='Resolved').slice(0,3).forEach(o=>{
+      results.push({type:'outreach',icon:'📬',title:o.title,sub:o.type+' · '+o.status,action:()=>{closeSearchResults();sv('outreach');setTimeout(()=>openOutreachThread(o.id),100);}});
+    });
+    el.innerHTML='';
+    if(!results.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--ink-m);font-size:13px;">No results for "'+q+'"</div>';el.style.display='block';return;}
+    results.forEach(r=>{
+      const div=document.createElement('div');
+      div.style.cssText='padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bdr);';
+      div.onmouseover=()=>div.style.background='var(--cream)';div.onmouseout=()=>div.style.background='';
+      div.innerHTML=`<span style="font-size:16px;">${r.icon}</span><div><div style="font-size:13px;font-weight:500;">${r.title}</div><div style="font-size:11px;color:var(--ink-m);">${r.sub}</div></div>`;
+      div.onclick=r.action;
+      el.appendChild(div);
+    });
+    el.style.display='block';
+  },200);
+}
+function closeSearchResults(){document.getElementById('global-search-results').style.display='none';}
+document.addEventListener('click',e=>{if(!e.target.closest('#global-search-input')&&!e.target.closest('#global-search-results'))closeSearchResults();});
+
+// ---- Bulk Actions ----
+let bulkSelected=new Set();
+function toggleBulkSelect(id,checked){
+  if(checked)bulkSelected.add(id);else bulkSelected.delete(id);
+  updateBulkToolbar();
+}
+function toggleSelectAll(checked){
+  const cbs=document.querySelectorAll('.bulk-cb');
+  cbs.forEach(cb=>{cb.checked=checked;const id=cb.dataset.id;if(checked)bulkSelected.add(id);else bulkSelected.delete(id);});
+  updateBulkToolbar();
+}
+function clearBulkSelection(){
+  bulkSelected.clear();
+  document.querySelectorAll('.bulk-cb').forEach(cb=>cb.checked=false);
+  const sa=document.getElementById('bulk-select-all');if(sa)sa.checked=false;
+  updateBulkToolbar();
+}
+function updateBulkToolbar(){
+  const tb=document.getElementById('bulk-toolbar');
+  const cnt=document.getElementById('bulk-count');
+  if(bulkSelected.size>0){tb.style.display='flex';cnt.textContent=bulkSelected.size+' selected';}
+  else{tb.style.display='none';}
+}
+async function bulkAssign(){
+  const val=document.getElementById('bulk-assign').value;
+  if(val===''){showToast('Select a rep to assign','err');return;}
+  const assignee=parseInt(val);
+  const ids=[...bulkSelected];
+  try{
+    const allRows=await sheetsGet('Contacts!A2:K');
+    for(const id of ids){
+      const c=S.contacts.find(x=>x.id===id);if(!c)continue;
+      c.assignee=assignee;
+      const rowIdx=allRows.findIndex(r=>r[0]===id);
+      if(rowIdx>=0)await sheetsUpdate('Contacts!H'+(rowIdx+2),[[assignee]]);
+    }
+    clearBulkSelection();renderContacts();renderAll();
+    showToast(ids.length+' contacts assigned to '+TEAM[assignee].name);
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+async function bulkRemove(){
+  const ids=[...bulkSelected];
+  if(!confirm('Remove '+ids.length+' contacts from their campaigns?'))return;
+  try{
+    const allRows=await sheetsGet('Contacts!A2:K');
+    for(const id of ids){
+      const rowIdx=allRows.findIndex(r=>r[0]===id);
+      if(rowIdx>=0)await sheetsUpdate('Contacts!A'+(rowIdx+2)+':K'+(rowIdx+2),[['','','','','','','','','','','']]);
+      S.contacts=S.contacts.filter(c=>c.id!==id);
+    }
+    clearBulkSelection();renderAll();
+    showToast(ids.length+' contacts removed');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+// ---- Customer Profile / Activity Feed ----
+let cpContactId=null;
+let cpTab='activity';
+
+function openCustomerProfile(contactId){
+  const c=S.contacts.find(x=>x.id===contactId);if(!c)return;
+  cpContactId=contactId;cpTab='activity';
+  document.getElementById('cp-name').textContent=c.first+' '+c.last;
+  const parts=[];
+  if(c.email)parts.push(c.email);if(c.phone)parts.push(c.phone);
+  const camp=S.campaigns.find(x=>x.id===c.campId);
+  if(camp)parts.push(camp.name);
+  document.getElementById('cp-meta').textContent=parts.join(' · ');
+  const c7link=document.getElementById('cp-c7link');
+  if(c.c7id&&CONFIG.C7_TENANT){c7link.href='https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id;c7link.style.display='inline-block';}
+  else c7link.style.display='none';
+  document.querySelectorAll('#customer-profile-modal .tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('cp-tab-activity').classList.add('on');
+  renderCPContent();
+  openModal('customer-profile-modal');
+}
+
+function switchCPTab(tab,btn){
+  cpTab=tab;
+  document.querySelectorAll('#customer-profile-modal .tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  renderCPContent();
+}
+
+function renderCPContent(){
+  const el=document.getElementById('cp-content');if(!el)return;
+  const c=S.contacts.find(x=>x.id===cpContactId);if(!c){el.innerHTML='';return;}
+  if(cpTab==='activity'){
+    // Unified timeline — attempts + ticket messages
+    const items=[];
+    (c.attempts||[]).forEach(a=>{
+      const rep=TEAM[a.assignedBy]||TEAM[0];
+      items.push({date:a.date,html:`<div style="display:flex;gap:10px;align-items:flex-start;">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--burg);flex-shrink:0;margin-top:5px;"></div>
+        <div><div style="font-size:13px;font-weight:500;">${outcomeBadge(a.outcome)} ${a.method}</div>
+        ${a.notes?'<div style="font-size:12px;color:var(--ink-m);margin-top:2px;">'+a.notes+'</div>':''}
+        <div style="font-size:11px;color:var(--ink-f);margin-top:2px;">${a.date} · ${rep.name}</div></div></div>`});
+    });
+    // Ticket messages for tickets linked to this customer
+    const myTickets=S.tickets.filter(t=>t.customerId===c.c7id||t.customerId===c.id);
+    myTickets.forEach(t=>{
+      items.push({date:t.createdAt,html:`<div style="display:flex;gap:10px;align-items:flex-start;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#3949AB;flex-shrink:0;margin-top:5px;"></div>
+        <div><div style="font-size:13px;font-weight:500;">🎫 Ticket opened: ${t.subject}</div>
+        <div style="font-size:11px;color:var(--ink-f);margin-top:2px;">${t.createdAt} · ${t.type} · ${t.status}</div></div></div>`});
+      S.ticketMsgs.filter(m=>m.ticketId===t.id).forEach(m=>{
+        const rep=TEAM[m.author]||{name:m.authorName||'Team'};
+        items.push({date:m.createdAt,html:`<div style="display:flex;gap:10px;align-items:flex-start;padding-left:18px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#9FA8DA;flex-shrink:0;margin-top:6px;"></div>
+          <div><div style="font-size:12px;">${m.message}</div>
+          <div style="font-size:11px;color:var(--ink-f);margin-top:2px;">${m.createdAt} · ${rep.name}${m.method?' · '+m.method:''}</div></div></div>`});
+      });
+    });
+    items.sort((a,b)=>b.date.localeCompare(a.date));
+    el.innerHTML=items.length?items.map(i=>i.html).join('<div style="height:10px;"></div>')
+      :'<div style="text-align:center;color:var(--ink-m);padding:24px;">No activity yet.</div>';
+  } else if(cpTab==='tickets'){
+    const myTickets=S.tickets.filter(t=>t.customerId===c.c7id||t.customerId===c.id);
+    el.innerHTML=myTickets.length?myTickets.map(t=>`<div style="padding:10px 12px;background:var(--cream);border-radius:7px;margin-bottom:8px;cursor:pointer;" onclick="closeModal('customer-profile-modal');sv('tickets');setTimeout(()=>openTicketThread('${t.id}'),100)">
+      <div style="font-weight:500;">${t.subject}</div>
+      <div style="font-size:12px;color:var(--ink-m);">${t.type} · ${t.status}${t.dueDate?' · Due: '+t.dueDate:''}</div></div>`).join('')
+      :'<div style="text-align:center;color:var(--ink-m);padding:24px;">No tickets.</div>';
+  } else if(cpTab==='orders'){
+    const myOrders=S.orderCustomers.filter(o=>o.customerEmail===c.email||o.customerId===c.c7id);
+    el.innerHTML=myOrders.length?myOrders.map(o=>`<div style="padding:10px 12px;background:var(--cream);border-radius:7px;margin-bottom:8px;cursor:pointer;" onclick="closeModal('customer-profile-modal');sv('orders');setTimeout(()=>openOrderThread('${o.id}'),100)">
+      <div style="font-weight:500;">${o.customerName}</div>
+      <div style="font-size:12px;color:var(--ink-m);">${o.status} · Oldest order: ${o.oldestOrderDate||'—'}</div></div>`).join('')
+      :'<div style="text-align:center;color:var(--ink-m);padding:24px;">No outstanding orders.</div>';
+  }
+}
+
+// ---- @mention in notes ----
+function setupMentionListener(textareaId){
+  const el=document.getElementById(textareaId);if(!el||el._mentionSetup)return;
+  el._mentionSetup=true;
+  el.addEventListener('input',function(){
+    const val=this.value;const pos=this.selectionStart;
+    const before=val.slice(0,pos);
+    const match=before.match(/@(\w*)$/);
+    if(match){showMentionDropdown(this,match[1]);}
+    else hideMentionDropdown();
+  });
+  el.addEventListener('keydown',function(e){
+    const dd=document.getElementById('mention-dropdown');
+    if(!dd||dd.style.display==='none')return;
+    const items=dd.querySelectorAll('.mention-item');
+    let idx=[...items].findIndex(i=>i.classList.contains('active'));
+    if(e.key==='ArrowDown'){e.preventDefault();if(idx<items.length-1){items[idx]&&items[idx].classList.remove('active');items[idx+1].classList.add('active');}return;}
+    if(e.key==='ArrowUp'){e.preventDefault();if(idx>0){items[idx].classList.remove('active');items[idx-1].classList.add('active');}return;}
+    if(e.key==='Enter'&&idx>=0){e.preventDefault();items[idx].click();return;}
+    if(e.key==='Escape'){hideMentionDropdown();return;}
+  });
+}
+function showMentionDropdown(el,query){
+  let dd=document.getElementById('mention-dropdown');
+  if(!dd){dd=document.createElement('div');dd.id='mention-dropdown';dd.style.cssText='position:fixed;background:white;border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:500;min-width:180px;';document.body.appendChild(dd);}
+  const matches=TEAM.filter(t=>t.name.toLowerCase().includes(query.toLowerCase()));
+  if(!matches.length){hideMentionDropdown();return;}
+  const rect=el.getBoundingClientRect();
+  dd.style.top=(rect.bottom+4)+'px';dd.style.left=rect.left+'px';
+  dd.innerHTML=matches.map((t,i)=>`<div class="mention-item${i===0?' active':''}" data-name="${t.name}" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;"><div class="av ${t.cls}" style="width:20px;height:20px;font-size:8px;">${t.init}</div><span style="font-size:13px;">${t.name}</span></div>`).join('');
+  dd.querySelectorAll('.mention-item').forEach(item=>{
+    item.onmouseover=()=>{dd.querySelectorAll('.mention-item').forEach(i=>i.classList.remove('active'));item.classList.add('active');};
+    item.onclick=()=>{
+      const name=item.dataset.name;
+      const val=el.value;const pos=el.selectionStart;
+      const before=val.slice(0,pos).replace(/@\w*$/,'@'+name+' ');
+      el.value=before+val.slice(pos);
+      el.selectionStart=el.selectionEnd=before.length;
+      el.focus();hideMentionDropdown();
+      // Create reminder for the mentioned person
+      const mentionedIdx=TEAM.findIndex(t=>t.name===name);
+      if(mentionedIdx>=0&&mentionedIdx!==S.cu)showToast('@'+name+' mentioned — they\'ll see this in their activity');
+    };
+  });
+  dd.style.display='block';
+}
+function hideMentionDropdown(){const dd=document.getElementById('mention-dropdown');if(dd)dd.style.display='none';}
+document.addEventListener('click',e=>{if(!e.target.closest('#mention-dropdown')&&!e.target.closest('textarea'))hideMentionDropdown();});
+
+// ---- Call Queue Enhancements — show last attempt in card ----
+// (patched into buildQueue below via renderQueueCard)
+function getLastAttemptSummary(contact){
+  const attempts=(contact.attempts||[]).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!attempts.length)return null;
+  const last=attempts[0];
+  const rep=TEAM[last.assignedBy]||TEAM[0];
+  return{date:last.date,method:last.method,outcome:outcomeLabel(last.outcome),notes:last.notes||'',rep:rep.name};
+}
+
+// ---- Due date helpers ----
+function ticketDueBadge(t){
+  if(!t.dueDate)return'';
+  const today2=today();
+  if(t.dueDate<today2)return`<span style="background:var(--d-bg);color:var(--d-tx);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;">Overdue ${t.dueDate}</span>`;
+  if(t.dueDate===today2)return`<span style="background:var(--w-bg);color:var(--w-tx);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;">Due today</span>`;
+  return`<span style="background:var(--cream);color:var(--ink-m);border-radius:4px;padding:1px 6px;font-size:10px;">Due ${t.dueDate}</span>`;
+}
+
+// ---- Thread Reminder Helper ----
+function toggleThreadReminder(prefix){
+  const row=document.getElementById(prefix+'-reminder-row');
+  if(!row)return;
+  const visible=row.style.display!=='none'&&row.style.display!=='';
+  row.style.display=visible?'none':'flex';
+  if(!visible){
+    const dateEl=document.getElementById(prefix+'-reminder-date');
+    if(dateEl&&!dateEl.value)dateEl.value=today();
+  }
+}
+
+async function saveThreadReminderIfSet(prefix,refType,refId,refName){
+  const row=document.getElementById(prefix+'-reminder-row');
+  if(!row||row.style.display==='none'||row.style.display==='')return;
+  const dateEl=document.getElementById(prefix+'-reminder-date');
+  const noteEl=document.getElementById(prefix+'-reminder-note');
+  const dueDate=dateEl?dateEl.value:'';
+  if(!dueDate)return;
+  const noteText=noteEl?noteEl.value.trim():'';
+  const reminderNote=noteText||(refName?'Follow up: '+refName:'Follow up');
+  const remId=uid();const createdAt=today();
+  const rem={id:remId,note:reminderNote,dueDate,assignee:S.cu,refType,refId,refName:refName||'',done:false};
+  try{
+    await sheetsAppend('Reminders!A:H',[[remId,reminderNote,dueDate,S.cu,refType,refId,refName||'','false']]);
+    S.reminders.push(rem);
+    renderReminders();
+    showToast('Reminder set for '+dueDate);
+  }catch(e){console.warn('Reminder save failed:',e.message);}
+  // Reset reminder row
+  row.style.display='none';
+  if(dateEl)dateEl.value='';
+  if(noteEl)noteEl.value='';
 }
 
 // ---- Projects ----
@@ -5488,6 +5862,9 @@ async function saveProjectItemUpdate(){
       if(p&&p.type==='PreOrder')renderPreOrderList(c.projectId);
     }
     showToast('Update logged');
+    const contact2=S.projectContacts.find(x=>x.id===contactId);
+    const itemName=contact2?((contact2.first+' '+contact2.last).trim()||contact2.email||'Item'):'Item';
+    await saveThreadReminderIfSet('pj-item','project-item',contactId,itemName);
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
