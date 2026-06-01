@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.179</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.180</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -5762,7 +5762,10 @@ async function toggleProjectContact(contactId){
     const allRows=await sheetsGet('ProjectContacts!A2:O');
     const rowIdx=allRows.findIndex(r=>r[0]===contactId);
     if(rowIdx>=0)await sheetsUpdate('ProjectContacts!M'+(rowIdx+2)+':O'+(rowIdx+2),[[c.done.toString(),c.completedBy,c.completedAt]]);
-    renderProjectContacts(c.projectId);
+    const p=S.projects.find(x=>x.id===c.projectId);
+    if(p&&p.type==='PreOrder')renderPreOrderList(c.projectId);
+    else renderProjectContacts(c.projectId);
+    renderProjects(); // update pie chart
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -5773,12 +5776,13 @@ async function removeProjectContact(contactId){
     const rowIdx=allRows.findIndex(r=>r[0]===contactId);
     if(rowIdx>=0)await sheetsUpdate('ProjectContacts!A'+(rowIdx+2)+':O'+(rowIdx+2),[['','','','','','','','','','','','','','','']]);
     S.projectContacts=S.projectContacts.filter(c=>c.id!==contactId);
-    renderProjectContacts(S.activeProject);
+    const p2=S.projects.find(x=>x.id===S.activeProject);
+    if(p2&&p2.type==='PreOrder')renderPreOrderList(S.activeProject);
+    else renderProjectContacts(S.activeProject);
+    renderProjects();
     showToast('Contact removed');
   }catch(e){showToast('Error: '+e.message,'err');}
 }
-
-// ---- Project Item Panel ----
 function openPjItemPanel(contactId){
   const c=S.projectContacts.find(x=>x.id===contactId);if(!c)return;
   S.activeProjectItemId=contactId;
