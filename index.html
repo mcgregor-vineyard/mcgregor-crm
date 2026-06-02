@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.183</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.184</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -149,6 +149,7 @@ select.fi{cursor:pointer;}
       <button class="ntab" onclick="sv('reminders')">Reminders</button>
       <button class="ntab" onclick="sv('outreach')">Outreach</button>
       <button class="ntab" onclick="sv('projects')">Projects</button>
+      <button class="ntab" onclick="sv('club')">Club</button>
       <button class="ntab" onclick="sv('reports')">Reports</button>
     </div>
     <!-- Global search -->
@@ -518,6 +519,56 @@ select.fi{cursor:pointer;}
               <button class="btn btnp" style="width:100%;margin-top:8px;" onclick="saveProjectNote()">Add note</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Club view -->
+      <div id="view-club" class="view">
+        <div class="vhdr">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="vtitle">Club Members</div>
+            <div style="display:flex;gap:6px;">
+              <select id="club-filter-club" class="fi" style="width:auto;font-size:12px;padding:5px 9px;" onchange="renderClubView()">
+                <option value="">All clubs</option>
+              </select>
+              <select id="club-filter-status" class="fi" style="width:auto;font-size:12px;padding:5px 9px;" onchange="renderClubView()">
+                <option value="">All statuses</option>
+                <option value="Active">Active</option>
+                <option value="CancelledByMember">Cancelled</option>
+                <option value="OnHold">On Hold</option>
+              </select>
+              <select id="club-sort" class="fi" style="width:auto;font-size:12px;padding:5px 9px;" onchange="renderClubView()">
+                <option value="nextProcess">Next process date</option>
+                <option value="name">Name</option>
+                <option value="club">Club</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn" id="club-sync-btn" onclick="syncClubMembers()">⬇ Load from C7</button>
+          </div>
+        </div>
+        <div id="club-sync-status" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;"></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+          <div class="dsc"><div class="dsn" id="club-stat-active">—</div><div class="dsl">Active members</div></div>
+          <div class="dsc"><div class="dsn" id="club-stat-processing-soon">—</div><div class="dsl">Processing in 7 days</div></div>
+          <div class="dsc"><div class="dsn" id="club-stat-hold">—</div><div class="dsl">On hold</div></div>
+          <div class="dsc"><div class="dsn" id="club-stat-cancelled">—</div><div class="dsl">Cancelled</div></div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl" style="table-layout:auto;">
+            <thead><tr>
+              <th>Member</th>
+              <th>Email</th>
+              <th>Club</th>
+              <th>Status</th>
+              <th>Next process</th>
+              <th>Days away</th>
+              <th>Ship to</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="club-tbody"></tbody>
+          </table>
         </div>
       </div>
 
@@ -1193,6 +1244,7 @@ select.fi{cursor:pointer;}
             </div>
           </div>
           <div id="cq-history" style="font-size:12px;color:var(--ink-m);border-top:1px solid var(--bdr);padding-top:12px;"></div>
+  <div id="cq-club" style="display:none;border-top:1px solid var(--bdr);padding-top:12px;margin-top:12px;"></div>
         </div>
         <!-- Quick log buttons -->
         <div style="background:white;border:1px solid var(--bdr);border-radius:12px;padding:20px;">
@@ -1622,7 +1674,7 @@ function getCampColor(campId){
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
 const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages',projects:'Projects',projectContacts:'ProjectContacts',projectNotes:'ProjectNotes',projectItemNotes:'ProjectItemNotes',inventoryEntries:'InventoryEntries'};
 
-let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],projectItemNotes:[],inventoryEntries:[],activeProjectItemId:null,activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
+let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],projectItemNotes:[],inventoryEntries:[],clubMembers:[],activeProjectItemId:null,activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
 
 function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function today(){return new Date().toISOString().slice(0,10);}
@@ -1826,7 +1878,7 @@ function sv(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   document.getElementById('view-'+view).classList.add('on');
-  ['campaigns','contacts','tickets','orders','reminders','outreach','projects','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
+  ['campaigns','contacts','tickets','orders','reminders','outreach','projects','club','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
   closeDP();renderAll();
 }
 function setCU(i){S.cu=parseInt(i);document.getElementById('cuav').textContent=TEAM[S.cu].init;}
@@ -2207,6 +2259,14 @@ function showContactDetail(id){
   if(c.c7id)html+='<div style="margin-top:10px;"><a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:11px;color:'+col.text+';text-decoration:none;border:1px solid '+col.border+';border-radius:5px;padding:3px 8px;display:inline-block;">View in Commerce7</a></div>';
   html+='</div>';
 
+  // Club membership card (loaded async)
+  if(c.c7id){
+    html+='<div id="dp-club-card" style="background:var(--cream);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;">';
+    html+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);font-weight:600;margin-bottom:6px;">🍷 Club membership</div>';
+    html+='<div id="dp-club-content" style="color:var(--ink-m);">Loading...</div>';
+    html+='</div>';
+  }
+
   // Action buttons
   html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:16px;">';
   html+='<button class="btn btnp" onclick="openAttempt(\''+c.id+'\')">+ Log</button>';
@@ -2276,6 +2336,8 @@ function showContactDetail(id){
     html+='</div>';
   }
   document.getElementById('dp-body').innerHTML=html;
+  // Load club membership async
+  if(c.c7id)loadContactClubInfo(c.c7id);
   openDP();
 }
 function closeDP(){
@@ -4219,6 +4281,10 @@ function showQueueCard(){
   }
   // Setup @mention on notes field
   setupMentionListener('cq-notes');
+  // Load club membership async
+  const cqClubEl=document.getElementById('cq-club');
+  if(cqClubEl){cqClubEl.style.display='none';cqClubEl.innerHTML='';}
+  if(c.c7id)loadCQClubInfo(c.c7id);
 
   // Sidebar — next 8 contacts
   const sidebar=document.getElementById('cq-sidebar');
@@ -5244,6 +5310,164 @@ function ticketDueBadge(t){
   if(t.dueDate<today2)return`<span style="background:var(--d-bg);color:var(--d-tx);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;">Overdue ${t.dueDate}</span>`;
   if(t.dueDate===today2)return`<span style="background:var(--w-bg);color:var(--w-tx);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;">Due today</span>`;
   return`<span style="background:var(--cream);color:var(--ink-m);border-radius:4px;padding:1px 6px;font-size:10px;">Due ${t.dueDate}</span>`;
+}
+
+// ---- Club Membership ----
+
+function clubStatusBadge(status){
+  if(!status)return'';
+  const map={Active:'var(--s-bg);color:var(--s-tx)',CancelledByMember:'var(--d-bg);color:var(--d-tx)',Cancelled:'var(--d-bg);color:var(--d-tx)',OnHold:'var(--w-bg);color:var(--w-tx)',PendingCancellation:'var(--w-bg);color:var(--w-tx)'};
+  const style=map[status]||'var(--cream);color:var(--ink-m)';
+  const label=status==='CancelledByMember'?'Cancelled':status==='OnHold'?'On Hold':status;
+  return`<span style="background:${style};border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;">${label}</span>`;
+}
+
+function daysUntil(dateStr){
+  if(!dateStr)return null;
+  const diff=Math.round((new Date(dateStr)-new Date(today()))/(1000*60*60*24));
+  return diff;
+}
+
+function nextProcessLabel(dateStr){
+  if(!dateStr)return'—';
+  const days=daysUntil(dateStr);
+  if(days===null)return dateStr;
+  const color=days<0?'var(--d-tx)':days<=7?'var(--w-tx)':'var(--s-tx)';
+  const label=days<0?'Overdue ('+dateStr+')':days===0?'Today':days===1?'Tomorrow':days+' days ('+dateStr+')';
+  return`<span style="color:${color};font-weight:600;">${label}</span>`;
+}
+
+async function fetchCustomerClubMemberships(c7Id){
+  try{
+    const data=await c7Req('GET','/club-membership?customerId='+c7Id+'&limit=20',null);
+    return(data&&data.clubMemberships)||[];
+  }catch(e){console.warn('Club lookup failed:',e.message);return[];}
+}
+
+async function loadContactClubInfo(c7Id){
+  const memberships=await fetchCustomerClubMemberships(c7Id);
+  const el=document.getElementById('dp-club-content');
+  if(!el)return;
+  if(!memberships.length){el.innerHTML='<span style="color:var(--ink-m);">Not a club member.</span>';return;}
+  el.innerHTML=memberships.map(m=>`
+    <div style="margin-bottom:${memberships.length>1?'10px':'0'};">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+        <span style="font-weight:600;">${m.clubTitle||m.clubId||'Club'}</span>
+        ${clubStatusBadge(m.status)}
+      </div>
+      ${m.nextProcessDate?`<div style="font-size:12px;">Next process: ${nextProcessLabel(m.nextProcessDate)}</div>`:''}
+      ${m.shipToFullName?`<div style="font-size:12px;color:var(--ink-m);">Ship to: ${m.shipToFullName}</div>`:''}
+    </div>`).join('<hr style="border:none;border-top:1px solid var(--bdr);margin:8px 0;">');
+}
+
+async function loadCQClubInfo(c7Id){
+  const memberships=await fetchCustomerClubMemberships(c7Id);
+  const el=document.getElementById('cq-club');
+  if(!el)return;
+  if(!memberships.length){el.style.display='none';return;}
+  el.style.display='block';
+  el.innerHTML='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);font-weight:600;margin-bottom:8px;">🍷 Club membership</div>'
+    +memberships.map(m=>`
+    <div style="background:var(--cream);border-radius:7px;padding:8px 10px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;font-weight:500;">${m.clubTitle||'Club'}</span>
+        ${clubStatusBadge(m.status)}
+      </div>
+      ${m.nextProcessDate?`<div style="font-size:12px;margin-top:3px;">Next process: ${nextProcessLabel(m.nextProcessDate)}</div>`:''}
+    </div>`).join('');
+}
+
+async function syncClubMembers(){
+  if(!CONFIG.C7_WORKER_URL){showToast('C7_WORKER_URL not set','err');return;}
+  const btn=document.getElementById('club-sync-btn');
+  const statusEl=document.getElementById('club-sync-status');
+  btn.disabled=true;btn.textContent='Loading...';
+  statusEl.style.display='block';statusEl.style.background='var(--i-bg)';statusEl.style.color='var(--i-tx)';
+  statusEl.textContent='Fetching club members from Commerce7...';
+  try{
+    let allMembers=[];let page=0;let hasMore=true;
+    while(hasMore){
+      const data=await c7Req('GET','/club-membership?limit=50&page='+page,null);
+      const batch=(data&&data.clubMemberships)||[];
+      allMembers=[...allMembers,...batch];
+      hasMore=batch.length===50;page++;
+      statusEl.textContent='Loaded '+allMembers.length+' memberships...';
+      if(page>20)break; // safety limit
+      await new Promise(r=>setTimeout(r,300));
+    }
+    S.clubMembers=allMembers;
+    // Populate club filter dropdown
+    const clubs=[...new Set(allMembers.map(m=>m.clubTitle||'').filter(Boolean))].sort();
+    const sel=document.getElementById('club-filter-club');
+    sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
+    renderClubView();
+    statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
+    statusEl.textContent=allMembers.length+' memberships loaded.';
+  }catch(e){
+    statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';
+    statusEl.textContent='Error: '+e.message;
+  }finally{btn.disabled=false;btn.textContent='⬇ Load from C7';}
+}
+
+function renderClubView(){
+  const tbody=document.getElementById('club-tbody');if(!tbody)return;
+  const clubFilter=document.getElementById('club-filter-club')?.value||'';
+  const statusFilter=document.getElementById('club-filter-status')?.value||'';
+  const sortBy=document.getElementById('club-sort')?.value||'nextProcess';
+
+  let members=[...S.clubMembers];
+  if(clubFilter)members=members.filter(m=>(m.clubTitle||'')=== clubFilter);
+  if(statusFilter)members=members.filter(m=>m.status===statusFilter);
+
+  // Stats
+  const allActive=S.clubMembers.filter(m=>m.status==='Active');
+  const soon=allActive.filter(m=>{const d=daysUntil(m.nextProcessDate);return d!==null&&d>=0&&d<=7;});
+  const onHold=S.clubMembers.filter(m=>m.status==='OnHold');
+  const cancelled=S.clubMembers.filter(m=>m.status==='CancelledByMember'||m.status==='Cancelled');
+  document.getElementById('club-stat-active').textContent=allActive.length;
+  document.getElementById('club-stat-processing-soon').textContent=soon.length;
+  document.getElementById('club-stat-hold').textContent=onHold.length;
+  document.getElementById('club-stat-cancelled').textContent=cancelled.length;
+
+  // Sort
+  members.sort((a,b)=>{
+    if(sortBy==='nextProcess'){
+      const da=a.nextProcessDate||'9999-99-99',db=b.nextProcessDate||'9999-99-99';
+      return da.localeCompare(db);
+    }
+    if(sortBy==='name'){
+      const na=(a.customerLastName||a.customerFirstName||'').toLowerCase();
+      const nb=(b.customerLastName||b.customerFirstName||'').toLowerCase();
+      return na.localeCompare(nb);
+    }
+    return(a.clubTitle||'').localeCompare(b.clubTitle||'');
+  });
+
+  tbody.innerHTML='';
+  if(!members.length){
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--ink-m);">'+(S.clubMembers.length?'No members match this filter.':'Click ⬇ Load from C7 to fetch club members.')+'</td></tr>';
+    return;
+  }
+
+  members.forEach(m=>{
+    const days=daysUntil(m.nextProcessDate);
+    const daysColor=days===null?'var(--ink-m)':days<0?'var(--d-tx)':days<=7?'var(--w-tx)':'var(--s-tx)';
+    const daysLabel=days===null?'—':days<0?'Overdue':days===0?'Today':days===1?'Tomorrow':days+' days';
+    const name=[(m.customerLastName||''),(m.customerFirstName||'')].filter(Boolean).join(', ')||m.customerEmail||'—';
+    const c7Link=m.customerId&&CONFIG.C7_TENANT
+      ?`<a href="https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/crm/customer/${m.customerId}" target="_blank" style="font-size:11px;color:var(--burg);">C7 ↗</a>`:'';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td style="font-weight:500;">${name}</td>
+      <td style="font-size:12px;">${m.customerEmail?`<a href="mailto:${m.customerEmail}" style="color:var(--burg);">${m.customerEmail}</a>`:''}</td>
+      <td style="font-size:12px;">${m.clubTitle||'—'}</td>
+      <td>${clubStatusBadge(m.status)}</td>
+      <td style="font-size:13px;">${m.nextProcessDate||'—'}</td>
+      <td style="font-weight:600;color:${daysColor};">${daysLabel}</td>
+      <td style="font-size:12px;color:var(--ink-m);">${m.shipToCity||m.shipToState||'—'}</td>
+      <td>${c7Link}</td>`;
+    tbody.appendChild(tr);
+  });
 }
 
 // ---- Thread Reminder Helper ----
