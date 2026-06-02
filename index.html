@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.189</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.191</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -3804,7 +3804,7 @@ async function syncOutstandingOrders(){
     const cutoffDate=new Date(Date.now()-180*24*60*60*1000).toISOString().slice(0,10);
     let allOrders=[];let page=1;let hasMore=true;
     while(hasMore){
-      const url='https://api.commerce7.com/v1/order?limit=50&page='+page+'&orderPaidDate=lt:'+cutoffDate+'T23:59:59.000Z';
+      const url='https://api.commerce7.com/v1/order?limit=50&page='+page+'&createdAt=lt:'+cutoffDate+'T23:59:59.000Z';
       const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
       if(!res.ok){const b=await res.text();throw new Error('API error '+res.status+' '+b.slice(0,150));}
       const data=await res.json();
@@ -3816,19 +3816,9 @@ async function syncOutstandingOrders(){
       statusEl.textContent='Fetching old orders... '+allOrders.length+' so far';
     }
     console.log('Orders older than 180 days:',allOrders.length);
-    // Log first order's date fields to find correct field name
     if(allOrders.length){
       const sample=allOrders[0];
-      console.log('Order date fields:',{
-        orderPaidDate:sample.orderPaidDate,
-        paidDate:sample.paidDate,
-        datePaid:sample.datePaid,
-        createdAt:sample.createdAt,
-        updatedAt:sample.updatedAt,
-        orderDate:sample.orderDate,
-        placedAt:sample.placedAt,
-        purchasedAt:sample.purchasedAt,
-      });
+      console.log('Order date fields:',{orderPaidDate:sample.orderPaidDate,createdAt:sample.createdAt,fulfillmentStatus:sample.fulfillmentStatus});
     }
     const statuses=[...new Set(allOrders.map(o=>o.fulfillmentStatus))];
     console.log('Fulfillment statuses:',statuses,'Total orders:',allOrders.length);
@@ -3926,7 +3916,6 @@ async function checkOrdersResolved(){
           const fs=(ord.fulfillmentStatus||'').toLowerCase();
           const paid=ord.orderPaidDate||ord.createdAt||'';
           const ageDays=paid?Math.floor((Date.now()-new Date(paid))/(1000*60*60*24)):0;
-          // Only count as unfulfilled if status is explicitly unfulfilled AND order is old enough
           return (fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='not_fulfilled')&&ageDays>179;
         });
         if(unfulfilled.length===0){
@@ -5442,43 +5431,46 @@ async function syncClubMembers(){
   statusEl.textContent='Fetching club members from Commerce7...';
   const ALLOWED_CLUBS=['McGregor Vineyard Wine Club','McGregor Vineyard Library Wine Club'];
   try{
-    let allMembers=[];let page=0;let hasMore=true;
+    // Fetch ALL pages first, then filter — so pagination isn't affected by filtering
+    let allRaw=[];let page=0;let hasMore=true;
     while(hasMore){
       const data=await c7Req('GET','/club-membership?limit=50&page='+page,null);
       const batch=(data&&data.clubMemberships)||[];
-      // Filter out cancelled and non-target clubs at load time
-      const filtered=batch.filter(m=>{
-        const status=m.status||'';
-        if(status==='CancelledByMember'||status==='Cancelled')return false;
-        const title=m.club?.title||'';
-        return ALLOWED_CLUBS.includes(title);
-      });
-      allMembers=[...allMembers,...filtered];
-      hasMore=batch.length===50;page++;
-      statusEl.textContent='Loaded '+allMembers.length+' members (page '+(page)+')...';
-      if(page>20)break;
+      allRaw=[...allRaw,...batch];
+      hasMore=batch.length===50;
+      page++;
+      statusEl.textContent='Loading club members... '+allRaw.length+' fetched (page '+page+')';
+      if(page>100)break; // hard safety limit (100 pages × 50 = 5000 records)
       await new Promise(r=>setTimeout(r,300));
     }
-    S.clubMembers=allMembers;
-    // Deduplicate — one row per customer per club (keep nearest next process date)
+    console.log('Total raw memberships from C7:',allRaw.length);
+    // Filter: only target clubs, no cancelled
+    const allMembers=allRaw.filter(m=>{
+      const status=m.status||'';
+      if(status==='CancelledByMember'||status==='Cancelled')return false;
+      const title=m.club?.title||'';
+      return ALLOWED_CLUBS.includes(title);
+    });
+    console.log('After filtering (allowed clubs, non-cancelled):',allMembers.length);
+    // Deduplicate: one row per customerId per club title (keep nearest next process date)
     const seen={};
     S.clubMembers=allMembers.filter(m=>{
       const key=(m.customerId||m.id)+'|'+(m.club?.title||'');
       if(!seen[key]){seen[key]=m;return true;}
-      // Keep whichever has the sooner next process date
       const existing=seen[key];
       const da=m.subscription?.nextProcessDate||'9999';
       const db=existing.subscription?.nextProcessDate||'9999';
       if(da<db){seen[key]=m;return true;}
       return false;
     });
+    console.log('After dedup (one per customer per club):',S.clubMembers.length);
     // Populate club filter dropdown with only the allowed clubs found
     const clubs=[...new Set(allMembers.map(m=>m.club?.title||'').filter(Boolean))].sort();
     const sel=document.getElementById('club-filter-club');
     sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
     renderClubView();
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
-    statusEl.textContent=allMembers.length+' members loaded.';
+    statusEl.textContent=S.clubMembers.length+' members loaded ('+allRaw.length+' total records fetched from C7).';
   }catch(e){
     statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';
     statusEl.textContent='Error: '+e.message;
