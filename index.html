@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.186</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.187</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -538,7 +538,7 @@ select.fi{cursor:pointer;}
                 <option value="OnHold">On Hold</option>
               </select>
               <select id="club-sort" class="fi" style="width:auto;font-size:12px;padding:5px 9px;" onchange="renderClubView()">
-                <option value="nextProcess">Next process date</option>
+                <option value="nextProcess" selected>Next process date</option>
                 <option value="name">Name</option>
                 <option value="club">Club</option>
               </select>
@@ -559,13 +559,13 @@ select.fi{cursor:pointer;}
           <table class="tbl" style="table-layout:auto;">
             <thead><tr>
               <th>Member</th>
+              <th></th>
               <th>Email</th>
               <th>Club</th>
               <th>Status</th>
               <th>Next process</th>
               <th>Days away</th>
               <th>Ship to</th>
-              <th></th>
             </tr></thead>
             <tbody id="club-tbody"></tbody>
           </table>
@@ -5384,26 +5384,33 @@ async function syncClubMembers(){
   btn.disabled=true;btn.textContent='Loading...';
   statusEl.style.display='block';statusEl.style.background='var(--i-bg)';statusEl.style.color='var(--i-tx)';
   statusEl.textContent='Fetching club members from Commerce7...';
+  const ALLOWED_CLUBS=['McGregor Vineyard Wine Club','McGregor Vineyard Library Wine Club'];
   try{
     let allMembers=[];let page=0;let hasMore=true;
     while(hasMore){
       const data=await c7Req('GET','/club-membership?limit=50&page='+page,null);
       const batch=(data&&data.clubMemberships)||[];
-      allMembers=[...allMembers,...batch];
+      // Filter out cancelled and non-target clubs at load time
+      const filtered=batch.filter(m=>{
+        const status=m.status||'';
+        if(status==='CancelledByMember'||status==='Cancelled')return false;
+        const title=m.club?.title||'';
+        return ALLOWED_CLUBS.includes(title);
+      });
+      allMembers=[...allMembers,...filtered];
       hasMore=batch.length===50;page++;
-      statusEl.textContent='Loaded '+allMembers.length+' memberships...';
-      if(page>20)break; // safety limit
+      statusEl.textContent='Loaded '+allMembers.length+' members (page '+(page)+')...';
+      if(page>20)break;
       await new Promise(r=>setTimeout(r,300));
     }
     S.clubMembers=allMembers;
-    if(allMembers.length)console.log('Club membership sample fields:',JSON.stringify(allMembers[0],null,2));
-    // Populate club filter dropdown
+    // Populate club filter dropdown with only the allowed clubs found
     const clubs=[...new Set(allMembers.map(m=>m.club?.title||'').filter(Boolean))].sort();
     const sel=document.getElementById('club-filter-club');
     sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
     renderClubView();
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
-    statusEl.textContent=allMembers.length+' memberships loaded.';
+    statusEl.textContent=allMembers.length+' members loaded.';
   }catch(e){
     statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';
     statusEl.textContent='Error: '+e.message;
@@ -5417,23 +5424,23 @@ function renderClubView(){
   const sortBy=document.getElementById('club-sort')?.value||'nextProcess';
 
   let members=[...S.clubMembers];
-  if(clubFilter)members=members.filter(m=>(m.club?.title||'')=== clubFilter);
+  if(clubFilter)members=members.filter(m=>(m.club?.title||'')===clubFilter);
   if(statusFilter)members=members.filter(m=>m.status===statusFilter);
 
-  // Stats
+  // Stats (from full unfiltered set — already excludes cancelled)
   const allActive=S.clubMembers.filter(m=>m.status==='Active');
   const soon=allActive.filter(m=>{const d=daysUntil(m.subscription?.nextProcessDate?.slice(0,10));return d!==null&&d>=0&&d<=7;});
   const onHold=S.clubMembers.filter(m=>m.status==='OnHold');
-  const cancelled=S.clubMembers.filter(m=>m.status==='CancelledByMember'||m.status==='Cancelled');
   document.getElementById('club-stat-active').textContent=allActive.length;
   document.getElementById('club-stat-processing-soon').textContent=soon.length;
   document.getElementById('club-stat-hold').textContent=onHold.length;
-  document.getElementById('club-stat-cancelled').textContent=cancelled.length;
+  document.getElementById('club-stat-cancelled').textContent='—';
 
-  // Sort
+  // Sort — default nearest first; members without a next process date go to end
   members.sort((a,b)=>{
-    if(sortBy==='nextProcess'){
-      const da=a.nextProcessDate||'9999-99-99',db=b.nextProcessDate||'9999-99-99';
+    if(sortBy==='nextProcess'||sortBy==='daysAway'){
+      const da=a.subscription?.nextProcessDate?.slice(0,10)||'9999-99-99';
+      const db=b.subscription?.nextProcessDate?.slice(0,10)||'9999-99-99';
       return da.localeCompare(db);
     }
     if(sortBy==='name'){
@@ -5450,23 +5457,29 @@ function renderClubView(){
     return;
   }
 
+  const t=today();
   members.forEach(m=>{
-    const days=daysUntil(m.subscription?.nextProcessDate?.slice(0,10));
+    const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||'';
+    const days=daysUntil(nextDate);
+    const isPast=nextDate&&nextDate<t;
     const daysColor=days===null?'var(--ink-m)':days<0?'var(--d-tx)':days<=7?'var(--w-tx)':'var(--s-tx)';
     const daysLabel=days===null?'—':days<0?'Overdue':days===0?'Today':days===1?'Tomorrow':days+' days';
     const name=[(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', ')||m.customer?.emails?.[0]?.email||'—';
     const c7Link=m.customerId&&CONFIG.C7_TENANT
-      ?`<a href="https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/crm/customer/${m.customerId}" target="_blank" style="font-size:11px;color:var(--burg);">C7 ↗</a>`:'';
+      ?`<a href="https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/crm/customer/${m.customerId}" target="_blank" style="font-size:11px;color:var(--burg);white-space:nowrap;">C7 ↗</a>`:'';
+    const email=(m.customer?.emails?.[0]?.email)||'';
     const tr=document.createElement('tr');
+    // Highlight rows where next process date is in the past
+    if(isPast)tr.style.cssText='background:#FFF0F0;';
     tr.innerHTML=`
       <td style="font-weight:500;">${name}</td>
-      <td style="font-size:12px;">${(m.customer?.emails?.[0]?.email)?`<a href="mailto:${m.customer.emails[0].email}" style="color:var(--burg);">${m.customer.emails[0].email}</a>`:''}</td>
+      <td>${c7Link}</td>
+      <td style="font-size:12px;">${email?`<a href="mailto:${email}" style="color:var(--burg);">${email}</a>`:''}</td>
       <td style="font-size:12px;">${m.club?.title||'—'}</td>
       <td>${clubStatusBadge(m.status)}</td>
-      <td style="font-size:13px;">${m.subscription?.nextProcessDate?.slice(0,10)||'—'}</td>
+      <td style="font-size:13px;${isPast?'color:var(--d-tx);font-weight:600;':''}">${nextDate||'—'}</td>
       <td style="font-weight:600;color:${daysColor};">${daysLabel}</td>
-      <td style="font-size:12px;color:var(--ink-m);">${m.orderDeliveryMethod==='Pickup'?'Pickup':(m.shipTo?.city||m.shipTo?.stateCode||'—')}</td>
-      <td>${c7Link}</td>`;
+      <td style="font-size:12px;color:var(--ink-m);">${m.orderDeliveryMethod==='Pickup'?'Pickup':(m.shipTo?.city||m.shipTo?.stateCode||'—')}</td>`;
     tbody.appendChild(tr);
   });
 }
