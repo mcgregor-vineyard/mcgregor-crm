@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.180</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.183</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -356,11 +356,10 @@ select.fi{cursor:pointer;}
           </div>
         </div>
         <div id="orders-sync-status" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;"></div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
-          <div class="dsc"><div class="dsn" id="ord-open">0</div><div class="dsl">Open</div></div>
-          <div class="dsc"><div class="dsn" id="ord-inprog">0</div><div class="dsl">In progress</div></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+          <div class="dsc"><div class="dsn" id="ord-total">0</div><div class="dsl">Total Active</div></div>
+          <div class="dsc"><div class="dsn" id="ord-inprog">0</div><div class="dsl">In Progress</div></div>
           <div class="dsc"><div class="dsn" id="ord-resolved">0</div><div class="dsl">Resolved</div></div>
-          <div class="dsc"><div class="dsn" id="ord-total">0</div><div class="dsl">Total</div></div>
         </div>
         <!-- Active order followups -->
         <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;margin-bottom:8px;">Active</div>
@@ -617,7 +616,7 @@ select.fi{cursor:pointer;}
 
 <!-- Import modal -->
 <div id="import-modal" class="modal-backdrop">
-  <div class="modal">
+  <div class="modal" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle">Add contacts to campaign</div><button class="mcls" onclick="closeModal('import-modal')">✕</button></div>
     <div class="mbdy">
       <div class="fr"><label class="fl">Campaign</label><select class="fi" id="imp-camp"></select></div>
@@ -666,7 +665,7 @@ select.fi{cursor:pointer;}
 
 <!-- Campaign modal -->
 <div id="camp-modal" class="modal-backdrop">
-  <div class="modal">
+  <div class="modal" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle">New campaign</div><button class="mcls" onclick="closeModal('camp-modal')">✕</button></div>
     <div class="mbdy">
       <div class="fr"><label class="fl">Campaign name *</label><input type="text" class="fi" id="cm-name" placeholder="e.g. Spring Allocation 2026" /></div>
@@ -682,7 +681,7 @@ select.fi{cursor:pointer;}
 
 <!-- Edit campaign modal -->
 <div id="edit-camp-modal" class="modal-backdrop">
-  <div class="modal">
+  <div class="modal" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle">Edit campaign</div><button class="mcls" onclick="closeModal('edit-camp-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="ecm-id" />
@@ -699,7 +698,7 @@ select.fi{cursor:pointer;}
 
 <!-- Add contact modal -->
 <div id="contact-modal" class="modal-backdrop">
-  <div class="modal">
+  <div class="modal" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle">Add contact manually</div><button class="mcls" onclick="closeModal('contact-modal')">✕</button></div>
     <div class="mbdy">
       <div class="f2">
@@ -728,7 +727,7 @@ select.fi{cursor:pointer;}
 
 <!-- Log attempt modal -->
 <div id="attempt-modal" class="modal-backdrop">
-  <div class="modal">
+  <div class="modal" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle" id="am-title">Log contact attempt</div><button class="mcls" onclick="closeModal('attempt-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="am-cid" />
@@ -777,7 +776,7 @@ select.fi{cursor:pointer;}
 
 <!-- New order customer modal -->
 <div id="order-customer-modal" class="modal-backdrop">
-  <div class="modal" style="width:520px;">
+  <div class="modal" style="width:520px;" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle">Add customer — outstanding order</div><button class="mcls" onclick="closeModal('order-customer-modal')">✕</button></div>
     <div class="mbdy">
       <div class="fr"><label class="fl">Search customer</label>
@@ -824,7 +823,7 @@ select.fi{cursor:pointer;}
 
 <!-- Order thread modal -->
 <div id="order-thread-modal" class="modal-backdrop">
-  <div class="modal" style="width:600px;">
+  <div class="modal" style="width:600px;" onclick="event.stopPropagation();">
     <div class="mhdr">
       <div style="flex:1;">
         <div class="mtitle" id="ot-title">Order followup</div>
@@ -888,7 +887,7 @@ select.fi{cursor:pointer;}
 
 <!-- Reminder modal -->
 <div id="reminder-modal" class="modal-backdrop">
-  <div class="modal" style="width:460px;">
+  <div class="modal" style="width:460px;" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle" id="rm-modal-title">New reminder</div><button class="mcls" onclick="closeModal('reminder-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="rm-id" />
@@ -1291,7 +1290,7 @@ select.fi{cursor:pointer;}
 
 <!-- Outreach thread modal -->
 <div id="outreach-thread-modal" class="modal-backdrop">
-  <div class="modal" style="width:600px;">
+  <div class="modal" style="width:600px;" onclick="event.stopPropagation();">
     <div class="mhdr">
       <div style="flex:1;">
         <div class="mtitle" id="ort-title"></div>
@@ -1354,7 +1353,7 @@ select.fi{cursor:pointer;}
 
 <!-- Activity Log Modal -->
 <div id="activity-modal" class="modal-backdrop">
-  <div class="modal" style="width:640px;max-height:90vh;">
+  <div class="modal" style="width:640px;max-height:90vh;" onclick="event.stopPropagation();">
     <div class="mhdr">
       <div style="display:flex;align-items:center;gap:12px;flex:1;">
         <div class="mtitle">Activity log</div>
@@ -1384,7 +1383,7 @@ select.fi{cursor:pointer;}
 
 <!-- My Tasks Modal -->
 <div id="mytasks-modal" class="modal-backdrop">
-  <div class="modal" style="width:620px;max-height:90vh;">
+  <div class="modal" style="width:620px;max-height:90vh;" onclick="event.stopPropagation();">
     <div class="mhdr">
       <div class="mtitle" id="mytasks-title">My Tasks</div>
       <button class="mcls" onclick="closeModal('mytasks-modal')">✕</button>
@@ -1397,7 +1396,7 @@ select.fi{cursor:pointer;}
 
 <!-- Edit attempt modal -->
 <div id="edit-attempt-modal" class="modal-backdrop">
-  <div class="modal" style="width:460px;">
+  <div class="modal" style="width:460px;" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle">Edit attempt</div><button class="mcls" onclick="closeModal('edit-attempt-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="ea-id" />
@@ -1434,7 +1433,7 @@ select.fi{cursor:pointer;}
 
 <!-- New ticket modal -->
 <div id="ticket-modal" class="modal-backdrop">
-  <div class="modal">
+  <div class="modal" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle" id="tm-title">New ticket</div><button class="mcls" onclick="closeModal('ticket-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="tm-id" />
@@ -1504,7 +1503,7 @@ select.fi{cursor:pointer;}
 
 <!-- Ticket thread modal -->
 <div id="thread-modal" class="modal-backdrop">
-  <div class="modal" style="width:580px;">
+  <div class="modal" style="width:580px;" onclick="event.stopPropagation();">
     <div class="mhdr">
       <div style="flex:1;">
         <div class="mtitle" id="thread-title">Ticket</div>
@@ -3087,13 +3086,12 @@ function sortOrders(col){
 function renderOrders(){
   _countQueue=_countQueue.filter(()=>false); // clear pending queue on re-render
   const f=(document.getElementById('order-status-filter')||{}).value||'all';
-  const open=S.orderCustomers.filter(o=>o.status==='Open').length;
   const inprog=S.orderCustomers.filter(o=>o.status==='In Progress').length;
   const resolved=S.orderCustomers.filter(o=>o.status==='Resolved').length;
-  (document.getElementById('ord-open')||{}).textContent=open;
+  const totalActive=S.orderCustomers.filter(o=>o.status!=='Resolved').length;
   (document.getElementById('ord-inprog')||{}).textContent=inprog;
   (document.getElementById('ord-resolved')||{}).textContent=resolved;
-  (document.getElementById('ord-total')||{}).textContent=S.orderCustomers.length;
+  (document.getElementById('ord-total')||{}).textContent=totalActive;
 
   let active=S.orderCustomers.filter(o=>o.status!=='Resolved');
   let resolvedList=S.orderCustomers.filter(o=>o.status==='Resolved');
@@ -3808,7 +3806,10 @@ async function checkOrdersResolved(){
         const data=await res.json();
         const unfulfilled=(data.orders||[]).filter(ord=>{
           const fs=(ord.fulfillmentStatus||'').toLowerCase();
-          return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs===''||fs==='not_fulfilled';
+          const paid=ord.orderPaidDate||ord.createdAt||'';
+          const ageDays=paid?Math.floor((Date.now()-new Date(paid))/(1000*60*60*24)):0;
+          // Only count as unfulfilled if status is explicitly unfulfilled AND order is old enough
+          return (fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='not_fulfilled')&&ageDays>179;
         });
         if(unfulfilled.length===0){
           // All fulfilled — auto-resolve
@@ -3821,10 +3822,21 @@ async function checkOrdersResolved(){
           resolveOrderReminders(o.id).catch(()=>{});
           resolved++;
         } else {
-          // Update oldest order date if changed
+          // Update oldest order date if it changed (partial pickup)
           const dates=unfulfilled.map(ord=>(ord.orderPaidDate||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
           const oldest=dates[0]||'';
-          if(oldest&&oldest!==o.oldestOrderDate){o.oldestOrderDate=oldest;await updateOrderInSheet(o);updated++;}
+          if(oldest&&oldest!==o.oldestOrderDate){
+            const prevDate=o.oldestOrderDate;
+            o.oldestOrderDate=oldest;
+            o.unfulfilledCount=unfulfilled.length;
+            await updateOrderInSheet(o);
+            // Log an auto-note recording the date change
+            const msgId=uid();const createdAt=today();
+            const note='Oldest order date updated: '+prevDate+' → '+oldest+' ('+unfulfilled.length+' order'+(unfulfilled.length!==1?'s':'')+' remaining).';
+            await sheetsAppend('OrderMessages!A:G',[[msgId,o.id,note,-1,'System','',createdAt]]);
+            S.orderMsgs.push({id:msgId,orderCustomerId:o.id,message:note,author:-1,authorName:'System',method:'',createdAt});
+            updated++;
+          }
         }
       }catch(e){/* skip individual errors */}
       await new Promise(r=>setTimeout(r,400));
