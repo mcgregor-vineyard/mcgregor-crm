@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.185</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.186</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -5352,11 +5352,11 @@ async function loadContactClubInfo(c7Id){
   el.innerHTML=memberships.map(m=>`
     <div style="margin-bottom:${memberships.length>1?'10px':'0'};">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
-        <span style="font-weight:600;">${m.clubTitle||m.clubId||'Club'}</span>
+        <span style="font-weight:600;">${m.club?.title||m.clubId||'Club'}</span>
         ${clubStatusBadge(m.status)}
       </div>
-      ${m.nextProcessDate?`<div style="font-size:12px;">Next process: ${nextProcessLabel(m.nextProcessDate)}</div>`:''}
-      ${m.shipToFullName?`<div style="font-size:12px;color:var(--ink-m);">Ship to: ${m.shipToFullName}</div>`:''}
+      ${m.subscription?.nextProcessDate?`<div style="font-size:12px;">Next process: ${nextProcessLabel(m.subscription.nextProcessDate.slice(0,10))}</div>`:''}
+      ${m.orderDeliveryMethod==='Pickup'?`<div style="font-size:12px;color:var(--ink-m);">Pickup</div>`:m.shipTo?`<div style="font-size:12px;color:var(--ink-m);">Ship to: ${m.shipTo.firstName||''} ${m.shipTo.lastName||''}</div>`:''}
     </div>`).join('<hr style="border:none;border-top:1px solid var(--bdr);margin:8px 0;">');
 }
 
@@ -5370,10 +5370,10 @@ async function loadCQClubInfo(c7Id){
     +memberships.map(m=>`
     <div style="background:var(--cream);border-radius:7px;padding:8px 10px;margin-bottom:6px;">
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:13px;font-weight:500;">${m.clubTitle||'Club'}</span>
+        <span style="font-size:13px;font-weight:500;">${m.club?.title||'Club'}</span>
         ${clubStatusBadge(m.status)}
       </div>
-      ${m.nextProcessDate?`<div style="font-size:12px;margin-top:3px;">Next process: ${nextProcessLabel(m.nextProcessDate)}</div>`:''}
+      ${m.subscription?.nextProcessDate?`<div style="font-size:12px;margin-top:3px;">Next process: ${nextProcessLabel(m.subscription.nextProcessDate.slice(0,10))}</div>`:''}
     </div>`).join('');
 }
 
@@ -5398,7 +5398,7 @@ async function syncClubMembers(){
     S.clubMembers=allMembers;
     if(allMembers.length)console.log('Club membership sample fields:',JSON.stringify(allMembers[0],null,2));
     // Populate club filter dropdown
-    const clubs=[...new Set(allMembers.map(m=>m.clubTitle||'').filter(Boolean))].sort();
+    const clubs=[...new Set(allMembers.map(m=>m.club?.title||'').filter(Boolean))].sort();
     const sel=document.getElementById('club-filter-club');
     sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
     renderClubView();
@@ -5417,12 +5417,12 @@ function renderClubView(){
   const sortBy=document.getElementById('club-sort')?.value||'nextProcess';
 
   let members=[...S.clubMembers];
-  if(clubFilter)members=members.filter(m=>(m.clubTitle||'')=== clubFilter);
+  if(clubFilter)members=members.filter(m=>(m.club?.title||'')=== clubFilter);
   if(statusFilter)members=members.filter(m=>m.status===statusFilter);
 
   // Stats
   const allActive=S.clubMembers.filter(m=>m.status==='Active');
-  const soon=allActive.filter(m=>{const d=daysUntil(m.nextProcessDate);return d!==null&&d>=0&&d<=7;});
+  const soon=allActive.filter(m=>{const d=daysUntil(m.subscription?.nextProcessDate?.slice(0,10));return d!==null&&d>=0&&d<=7;});
   const onHold=S.clubMembers.filter(m=>m.status==='OnHold');
   const cancelled=S.clubMembers.filter(m=>m.status==='CancelledByMember'||m.status==='Cancelled');
   document.getElementById('club-stat-active').textContent=allActive.length;
@@ -5437,11 +5437,11 @@ function renderClubView(){
       return da.localeCompare(db);
     }
     if(sortBy==='name'){
-      const na=(a.customerLastName||a.customerFirstName||'').toLowerCase();
-      const nb=(b.customerLastName||b.customerFirstName||'').toLowerCase();
+      const na=(a.customer?.lastName||a.customer?.firstName||'').toLowerCase();
+      const nb=(b.customer?.lastName||b.customer?.firstName||'').toLowerCase();
       return na.localeCompare(nb);
     }
-    return(a.clubTitle||'').localeCompare(b.clubTitle||'');
+    return(a.club?.title||'').localeCompare(b.club?.title||'');
   });
 
   tbody.innerHTML='';
@@ -5451,21 +5451,21 @@ function renderClubView(){
   }
 
   members.forEach(m=>{
-    const days=daysUntil(m.nextProcessDate);
+    const days=daysUntil(m.subscription?.nextProcessDate?.slice(0,10));
     const daysColor=days===null?'var(--ink-m)':days<0?'var(--d-tx)':days<=7?'var(--w-tx)':'var(--s-tx)';
     const daysLabel=days===null?'—':days<0?'Overdue':days===0?'Today':days===1?'Tomorrow':days+' days';
-    const name=[(m.customerLastName||''),(m.customerFirstName||'')].filter(Boolean).join(', ')||m.customerEmail||'—';
+    const name=[(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', ')||m.customer?.emails?.[0]?.email||'—';
     const c7Link=m.customerId&&CONFIG.C7_TENANT
       ?`<a href="https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/crm/customer/${m.customerId}" target="_blank" style="font-size:11px;color:var(--burg);">C7 ↗</a>`:'';
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td style="font-weight:500;">${name}</td>
-      <td style="font-size:12px;">${m.customerEmail?`<a href="mailto:${m.customerEmail}" style="color:var(--burg);">${m.customerEmail}</a>`:''}</td>
-      <td style="font-size:12px;">${m.clubTitle||'—'}</td>
+      <td style="font-size:12px;">${(m.customer?.emails?.[0]?.email)?`<a href="mailto:${m.customer.emails[0].email}" style="color:var(--burg);">${m.customer.emails[0].email}</a>`:''}</td>
+      <td style="font-size:12px;">${m.club?.title||'—'}</td>
       <td>${clubStatusBadge(m.status)}</td>
-      <td style="font-size:13px;">${m.nextProcessDate||'—'}</td>
+      <td style="font-size:13px;">${m.subscription?.nextProcessDate?.slice(0,10)||'—'}</td>
       <td style="font-weight:600;color:${daysColor};">${daysLabel}</td>
-      <td style="font-size:12px;color:var(--ink-m);">${m.shipToCity||m.shipToState||'—'}</td>
+      <td style="font-size:12px;color:var(--ink-m);">${m.orderDeliveryMethod==='Pickup'?'Pickup':(m.shipTo?.city||m.shipTo?.stateCode||'—')}</td>
       <td>${c7Link}</td>`;
     tbody.appendChild(tr);
   });
