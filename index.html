@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.184</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.185</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -5396,6 +5396,7 @@ async function syncClubMembers(){
       await new Promise(r=>setTimeout(r,300));
     }
     S.clubMembers=allMembers;
+    if(allMembers.length)console.log('Club membership sample fields:',JSON.stringify(allMembers[0],null,2));
     // Populate club filter dropdown
     const clubs=[...new Set(allMembers.map(m=>m.clubTitle||'').filter(Boolean))].sort();
     const sel=document.getElementById('club-filter-club');
