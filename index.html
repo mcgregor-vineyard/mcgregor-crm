@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.191</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.192</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -549,6 +549,7 @@ select.fi{cursor:pointer;}
           </div>
         </div>
         <div id="club-sync-status" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;"></div>
+        <div id="club-last-sync" style="display:none;padding:6px 12px;background:var(--cream);border:1px solid var(--bdr);border-radius:6px;font-size:12px;color:var(--ink-m);margin-bottom:12px;"></div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
           <div class="dsc"><div class="dsn" id="club-stat-active">—</div><div class="dsl">Active members</div></div>
           <div class="dsc"><div class="dsn" id="club-stat-processing-soon">—</div><div class="dsl">Processing in 7 days</div></div>
@@ -1726,9 +1727,9 @@ function getCampColor(campId){
   return idx>=0?CAMP_COLORS[idx%CAMP_COLORS.length]:{bg:'var(--cream)',border:'var(--bdr)',text:'var(--ink-m)'};
 }
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
-const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages',projects:'Projects',projectContacts:'ProjectContacts',projectNotes:'ProjectNotes',projectItemNotes:'ProjectItemNotes',inventoryEntries:'InventoryEntries',clubComms:'ClubComms'};
+const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages',projects:'Projects',projectContacts:'ProjectContacts',projectNotes:'ProjectNotes',projectItemNotes:'ProjectItemNotes',inventoryEntries:'InventoryEntries',clubComms:'ClubComms',clubMembers:'ClubMembers'};
 
-let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],projectItemNotes:[],inventoryEntries:[],clubMembers:[],clubComms:[],activeClubMemberId:null,activeClubMember:null,activeProjectItemId:null,activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
+let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],projectItemNotes:[],inventoryEntries:[],clubMembers:[],clubComms:[],clubMembersLastSync:'',activeClubMemberId:null,activeClubMember:null,activeProjectItemId:null,activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
 
 function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function today(){return new Date().toISOString().slice(0,10);}
@@ -1811,6 +1812,7 @@ async function ensureSheets(){
   if(needed.includes('Projects'))await sheetsUpdate('Projects!A1:I1',[['ID','Name','Description','StartDate','EndDate','Assignee','Status','CreatedAt','Type']]);
   if(needed.includes('InventoryEntries'))await sheetsUpdate('InventoryEntries!A1:K1',[['ID','ProjectID','WineName','CountDate','NewBottleCount','BottlesOwed','ReserveNumber','AvailableForSale','Notes','CreatedAt','CountedBy']]);
   if(needed.includes('ClubComms'))await sheetsUpdate('ClubComms!A1:H1',[['ID','MembershipID','CustomerID','Method','Outcome','Notes','Author','CreatedAt']]);
+  if(needed.includes('ClubMembers'))await sheetsUpdate('ClubMembers!A1:K1',[['MembershipID','CustomerID','ClubTitle','Status','FirstName','LastName','Email','Phone','NextProcessDate','DeliveryMethod','LastSync']]);
   if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:O1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes','Done','CompletedBy','CompletedAt']]);
   if(needed.includes('ProjectNotes'))await sheetsUpdate('ProjectNotes!A1:F1',[['ID','ProjectID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('ProjectItemNotes'))await sheetsUpdate('ProjectItemNotes!A1:F1',[['ID','ContactID','Message','Author','AuthorName','CreatedAt']]);
@@ -1824,14 +1826,14 @@ async function loadFromSheets(){
   setSyncBar('loading','Loading from Google Sheets...');
   try{
     await ensureSheets();
-    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows,projectRows,projectContactRows,projectNoteRows,projectItemNoteRows,inventoryRows,clubCommsRows]=await Promise.all([
+    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows,projectRows,projectContactRows,projectNoteRows,projectItemNoteRows,inventoryRows,clubCommsRows,clubMemberRows]=await Promise.all([
       sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:K'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:H'),
       sheetsGet('OrderCustomers!A2:N'),sheetsGet('OrderMessages!A2:G'),
       sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
       sheetsGet('ReminderNotes!A2:F'),
       sheetsGet('Projects!A2:I'),sheetsGet('ProjectContacts!A2:O'),sheetsGet('ProjectNotes!A2:F'),sheetsGet('ProjectItemNotes!A2:F'),
-      sheetsGet('InventoryEntries!A2:K'),sheetsGet('ClubComms!A2:H')
+      sheetsGet('InventoryEntries!A2:K'),sheetsGet('ClubComms!A2:H'),sheetsGet('ClubMembers!A2:K')
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
@@ -1847,6 +1849,19 @@ async function loadFromSheets(){
     S.projectItemNotes=(projectItemNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.inventoryEntries=(inventoryRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',countDate:r[3]||'',newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:r[8]||'',createdAt:r[9]||'',countedBy:r[10]||''}));
     S.clubComms=(clubCommsRows||[]).filter(r=>r[0]).map(r=>({id:r[0],membershipId:r[1]||'',customerId:r[2]||'',method:r[3]||'',outcome:r[4]||'',notes:r[5]||'',author:parseInt(r[6])||0,createdAt:r[7]||''}));
+    // Load cached club members from sheet
+    if((clubMemberRows||[]).filter(r=>r[0]).length){
+      S.clubMembers=(clubMemberRows||[]).filter(r=>r[0]).map(r=>({
+        id:r[0],customerId:r[1]||'',
+        club:{title:r[2]||''},
+        status:r[3]||'Active',
+        customer:{firstName:r[4]||'',lastName:r[5]||'',emails:r[6]?[{email:r[6]}]:[],phones:r[7]?[{phone:r[7]}]:[]},
+        subscription:{nextProcessDate:r[8]||''},
+        orderDeliveryMethod:r[9]||'',
+        lastSync:r[10]||''
+      }));
+      S.clubMembersLastSync=(clubMemberRows||[]).filter(r=>r[10]).map(r=>r[10]).sort().pop()||'';
+    }
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
     const seen={};
@@ -1863,7 +1878,7 @@ async function loadFromSheets(){
     S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||'',website:r[12]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
-    try{renderAll();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
+    try{renderAll();if(S.clubMembers.length)renderClubView();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
   }catch(e){
     console.error('loadFromSheets error:',e);
     setSyncBar('err','Could not connect to Google Sheets: '+e.message);
@@ -5426,12 +5441,13 @@ async function syncClubMembers(){
   if(!CONFIG.C7_WORKER_URL){showToast('C7_WORKER_URL not set','err');return;}
   const btn=document.getElementById('club-sync-btn');
   const statusEl=document.getElementById('club-sync-status');
-  btn.disabled=true;btn.textContent='Loading...';
+  btn.disabled=true;btn.textContent='Refreshing...';
   statusEl.style.display='block';statusEl.style.background='var(--i-bg)';statusEl.style.color='var(--i-tx)';
   statusEl.textContent='Fetching club members from Commerce7...';
   const ALLOWED_CLUBS=['McGregor Vineyard Wine Club','McGregor Vineyard Library Wine Club'];
+  const syncedAt=new Date().toISOString().slice(0,16).replace('T',' ');
   try{
-    // Fetch ALL pages first, then filter — so pagination isn't affected by filtering
+    // Fetch ALL pages, then filter
     let allRaw=[];let page=0;let hasMore=true;
     while(hasMore){
       const data=await c7Req('GET','/club-membership?limit=50&page='+page,null);
@@ -5440,37 +5456,60 @@ async function syncClubMembers(){
       hasMore=batch.length===50;
       page++;
       statusEl.textContent='Loading club members... '+allRaw.length+' fetched (page '+page+')';
-      if(page>100)break; // hard safety limit (100 pages × 50 = 5000 records)
+      if(page>100)break;
       await new Promise(r=>setTimeout(r,300));
     }
-    console.log('Total raw memberships from C7:',allRaw.length);
     // Filter: only target clubs, no cancelled
     const allMembers=allRaw.filter(m=>{
       const status=m.status||'';
       if(status==='CancelledByMember'||status==='Cancelled')return false;
-      const title=m.club?.title||'';
-      return ALLOWED_CLUBS.includes(title);
+      return ALLOWED_CLUBS.includes(m.club?.title||'');
     });
-    console.log('After filtering (allowed clubs, non-cancelled):',allMembers.length);
-    // Deduplicate: one row per customerId per club title (keep nearest next process date)
+    // Deduplicate: one row per customerId per club
     const seen={};
-    S.clubMembers=allMembers.filter(m=>{
+    const deduped=allMembers.filter(m=>{
       const key=(m.customerId||m.id)+'|'+(m.club?.title||'');
       if(!seen[key]){seen[key]=m;return true;}
-      const existing=seen[key];
       const da=m.subscription?.nextProcessDate||'9999';
-      const db=existing.subscription?.nextProcessDate||'9999';
+      const db=seen[key].subscription?.nextProcessDate||'9999';
       if(da<db){seen[key]=m;return true;}
       return false;
     });
-    console.log('After dedup (one per customer per club):',S.clubMembers.length);
-    // Populate club filter dropdown with only the allowed clubs found
-    const clubs=[...new Set(allMembers.map(m=>m.club?.title||'').filter(Boolean))].sort();
+    // Sort nearest process date first — sheet will be ordered this way
+    deduped.sort((a,b)=>(a.subscription?.nextProcessDate||'9999').localeCompare(b.subscription?.nextProcessDate||'9999'));
+    S.clubMembers=deduped;
+    S.clubMembersLastSync=syncedAt;
+    // Populate club filter
+    const clubs=[...new Set(deduped.map(m=>m.club?.title||'').filter(Boolean))].sort();
     const sel=document.getElementById('club-filter-club');
-    sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
+    if(sel)sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
+    // Save to sheet: clear then rewrite
+    statusEl.textContent='Saving to sheet...';
+    const existingRows=await sheetsGet('ClubMembers!A2:K');
+    if(existingRows.length){
+      const blanks=existingRows.map(()=>['','','','','','','','','','','']);
+      await sheetsUpdate('ClubMembers!A2:K'+(existingRows.length+1),blanks);
+    }
+    const rows=deduped.map(m=>([
+      m.id||((m.customerId||'')+'|'+(m.club?.title||'')),
+      m.customerId||'',
+      m.club?.title||'',
+      m.status||'',
+      m.customer?.firstName||'',
+      m.customer?.lastName||'',
+      m.customer?.emails?.[0]?.email||'',
+      m.customer?.phones?.[0]?.phone||'',
+      m.subscription?.nextProcessDate?.slice(0,10)||'',
+      m.orderDeliveryMethod||'',
+      syncedAt
+    ]));
+    for(let i=0;i<rows.length;i+=200){
+      await sheetsAppend('ClubMembers!A:K',rows.slice(i,i+200));
+      statusEl.textContent='Saving... '+Math.min(i+200,rows.length)+' of '+rows.length;
+    }
     renderClubView();
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
-    statusEl.textContent=S.clubMembers.length+' members loaded ('+allRaw.length+' total records fetched from C7).';
+    statusEl.textContent=deduped.length+' members saved ('+allRaw.length+' total fetched from C7).';
   }catch(e){
     statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';
     statusEl.textContent='Error: '+e.message;
@@ -5482,6 +5521,27 @@ function renderClubView(){
   const clubFilter=document.getElementById('club-filter-club')?.value||'';
   const statusFilter=document.getElementById('club-filter-status')?.value||'';
   const sortBy=document.getElementById('club-sort')?.value||'nextProcess';
+
+  // Populate club filter dropdown from cached members if not already populated
+  const sel=document.getElementById('club-filter-club');
+  if(sel&&sel.options.length<=1&&S.clubMembers.length){
+    const clubs=[...new Set(S.clubMembers.map(m=>m.club?.title||'').filter(Boolean))].sort();
+    sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
+  }
+
+  // Last refreshed indicator
+  const syncEl=document.getElementById('club-last-sync');
+  if(syncEl){
+    if(S.clubMembersLastSync){
+      syncEl.style.display='block';
+      syncEl.innerHTML='🕐 Last refreshed: <strong>'+S.clubMembersLastSync+'</strong> · '+S.clubMembers.length+' members · <span style="color:var(--burg);cursor:pointer;text-decoration:underline;" onclick="syncClubMembers()">Refresh now</span>';
+    } else if(S.clubMembers.length===0){
+      syncEl.style.display='block';
+      syncEl.innerHTML='No data loaded yet. Click <strong>⬇ Load from C7</strong> to fetch club members.';
+    } else {
+      syncEl.style.display='none';
+    }
+  }
 
   let members=[...S.clubMembers];
   if(clubFilter)members=members.filter(m=>(m.club?.title||'')===clubFilter);
