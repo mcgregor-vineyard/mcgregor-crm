@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.202</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.203</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -512,8 +512,18 @@ select.fi{cursor:pointer;}
                 <div id="pj-preorder-list"></div>
               </div>
             </div>
-            <!-- Right: notes thread -->
+            <!-- Right: Power BI (Inventory only) + notes thread -->
             <div>
+              <!-- Power BI embed — Inventory projects only -->
+              <div id="pj-powerbi-panel" style="display:none;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                  <div style="font-weight:600;font-size:14px;">Inventory Report</div>
+                  <button class="btn" style="font-size:11px;" onclick="openPowerBISettings()" title="Set report URL">⚙</button>
+                </div>
+                <div id="pj-powerbi-frame-wrap" style="border:1px solid var(--bdr);border-radius:8px;overflow:hidden;background:var(--cream);width:330px;height:600px;display:flex;align-items:center;justify-content:center;">
+                  <span style="font-size:12px;color:var(--ink-m);text-align:center;padding:20px;">Click ⚙ to set your<br>Power BI report URL</span>
+                </div>
+              </div>
               <div style="font-weight:600;font-size:14px;margin-bottom:10px;">Notes</div>
               <div id="pj-notes-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
               <textarea class="fi" id="pj-new-note" rows="3" placeholder="Add a note..."></textarea>
@@ -528,6 +538,7 @@ select.fi{cursor:pointer;}
         <div class="vhdr">
           <div style="display:flex;align-items:center;gap:12px;">
             <div class="vtitle">Club Member — Processing Dates</div>
+            <a href="https://mcgregor-vineyard.admin.platform.commerce7.com/club/subscription-shipment?status=Active" target="_blank" style="font-size:12px;color:var(--burg);border:1px solid var(--bdr-s);border-radius:5px;padding:3px 10px;text-decoration:none;white-space:nowrap;">C7 Processing Page ↗</a>
             <div style="display:flex;gap:6px;">
               <select id="club-filter-club" class="fi" style="width:auto;font-size:12px;padding:5px 9px;" onchange="renderClubView()">
                 <option value="">All clubs</option>
@@ -1187,6 +1198,22 @@ select.fi{cursor:pointer;}
       <button class="tab" id="cp-tab-orders" onclick="switchCPTab('orders',this)" style="font-size:12px;padding:8px 14px;">Orders</button>
     </div>
     <div id="cp-content" style="flex:1;overflow-y:auto;padding:16px 18px;"></div>
+  </div>
+</div>
+
+<!-- Power BI URL settings modal -->
+<div id="powerbi-modal" class="modal-backdrop">
+  <div class="modal" style="width:500px;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle">Power BI Report URL</div><button class="mcls" onclick="closeModal('powerbi-modal')">✕</button></div>
+    <div class="mbdy">
+      <div style="font-size:12px;color:var(--ink-m);margin-bottom:10px;">Paste your Power BI embed URL. This is saved in your browser and shared across all Inventory projects.</div>
+      <div class="fr"><label class="fl">Embed URL</label><input type="text" class="fi" id="powerbi-url-input" placeholder="https://app.powerbi.com/reportEmbed?..." /></div>
+    </div>
+    <div class="mftr">
+      <button class="btn" onclick="closeModal('powerbi-modal')">Cancel</button>
+      <button class="btn" style="color:var(--d-tx);border-color:var(--d-tx);" onclick="clearPowerBIUrl()">Clear</button>
+      <button class="btn btnp" onclick="savePowerBIUrl()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -5460,6 +5487,38 @@ function ticketDueBadge(t){
   return`<span style="background:var(--cream);color:var(--ink-m);border-radius:4px;padding:1px 6px;font-size:10px;">Due ${t.dueDate}</span>`;
 }
 
+// ---- Power BI Embed ----
+function renderPowerBIFrame(){
+  const wrap=document.getElementById('pj-powerbi-frame-wrap');if(!wrap)return;
+  const url=localStorage.getItem('mcg-powerbi-url')||'';
+  if(url){
+    wrap.innerHTML=`<iframe src="${url}" width="330" height="600" frameborder="0" allowfullscreen="true"></iframe>`;
+  } else {
+    wrap.innerHTML='<span style="font-size:12px;color:var(--ink-m);text-align:center;padding:20px;">Click ⚙ to set your<br>Power BI report URL</span>';
+  }
+}
+
+function openPowerBISettings(){
+  const url=localStorage.getItem('mcg-powerbi-url')||'';
+  document.getElementById('powerbi-url-input').value=url;
+  openModal('powerbi-modal');
+}
+
+function savePowerBIUrl(){
+  const url=document.getElementById('powerbi-url-input').value.trim();
+  if(url)localStorage.setItem('mcg-powerbi-url',url);
+  closeModal('powerbi-modal');
+  renderPowerBIFrame();
+  showToast('Power BI URL saved');
+}
+
+function clearPowerBIUrl(){
+  localStorage.removeItem('mcg-powerbi-url');
+  closeModal('powerbi-modal');
+  renderPowerBIFrame();
+  showToast('Power BI URL cleared');
+}
+
 // ---- Club Instructions ----
 function openClubInstructions(){
   document.getElementById('club-instructions-input').value=S.clubInstructions||'';
@@ -5973,6 +6032,12 @@ function showInventoryOrStandard(p){
   document.getElementById('pj-standard-section').style.display=(!isInv&&!isPO)?'':'none';
   document.getElementById('pj-inventory-section').style.display=isInv?'':'none';
   document.getElementById('pj-preorder-section').style.display=isPO?'':'none';
+  // Power BI panel only for Inventory
+  const pbiPanel=document.getElementById('pj-powerbi-panel');
+  if(pbiPanel){
+    pbiPanel.style.display=isInv?'':'none';
+    if(isInv)renderPowerBIFrame();
+  }
   if(isInv)renderInventoryList(p.id);
   else if(isPO)renderPreOrderList(p.id);
   else renderProjectContacts(p.id);
