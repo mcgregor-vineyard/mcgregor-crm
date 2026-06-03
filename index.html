@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.193</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.194</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -556,11 +556,9 @@ select.fi{cursor:pointer;}
         </div>
         <div id="club-sync-status" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;"></div>
         <div id="club-last-sync" style="display:none;padding:6px 12px;background:var(--cream);border:1px solid var(--bdr);border-radius:6px;font-size:12px;color:var(--ink-m);margin-bottom:12px;"></div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
           <div class="dsc"><div class="dsn" id="club-stat-active">—</div><div class="dsl">Active members</div></div>
-          <div class="dsc"><div class="dsn" id="club-stat-processing-soon">—</div><div class="dsl">Processing in 7 days</div></div>
-          <div class="dsc"><div class="dsn" id="club-stat-hold">—</div><div class="dsl">On hold</div></div>
-          <div class="dsc"><div class="dsn" id="club-stat-cancelled">—</div><div class="dsl">Cancelled</div></div>
+          <div class="dsc"><div class="dsn" id="club-stat-processing-soon">—</div><div class="dsl">Processing in 14 days</div></div>
         </div>
         <div class="tbl-wrap">
           <table class="tbl" style="table-layout:auto;">
@@ -5626,12 +5624,9 @@ function renderClubView(){
 
   // Stats (from full unfiltered set — already excludes cancelled)
   const allActive=S.clubMembers.filter(m=>m.status==='Active');
-  const soon=allActive.filter(m=>{const d=daysUntil(m.subscription?.nextProcessDate?.slice(0,10));return d!==null&&d>=0&&d<=7;});
-  const onHold=S.clubMembers.filter(m=>m.status==='OnHold');
+  const soon=allActive.filter(m=>{const d=daysUntil(m.subscription?.nextProcessDate?.slice(0,10));return d!==null&&d>=0&&d<=14;});
   document.getElementById('club-stat-active').textContent=allActive.length;
   document.getElementById('club-stat-processing-soon').textContent=soon.length;
-  document.getElementById('club-stat-hold').textContent=onHold.length;
-  document.getElementById('club-stat-cancelled').textContent='—';
 
   // Sort — default nearest first; members without a next process date go to end
   members.sort((a,b)=>{
