@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.194</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.196</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1696,7 +1696,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
+  C7_WORKER_URL: '',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -3849,11 +3849,10 @@ async function syncOutstandingOrders(){
     statusEl.textContent='Fetching unfulfilled orders from Commerce7...';
     const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const headers={'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'};
-    // Fetch orders paginated — max 50 per page, filter client-side
-    const cutoffDate=new Date(Date.now()-180*24*60*60*1000).toISOString().slice(0,10);
+    // Use fulfillmentStatus filter directly — C7 supports this as a query param
     let allOrders=[];let page=1;let hasMore=true;
     while(hasMore){
-      const url='https://api.commerce7.com/v1/order?limit=50&page='+page+'&createdAt=lt:'+cutoffDate+'T23:59:59.000Z';
+      const url='https://api.commerce7.com/v1/order?limit=50&page='+page+'&fulfillmentStatus=Not+Fulfilled';
       const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(url),{headers});
       if(!res.ok){const b=await res.text();throw new Error('API error '+res.status+' '+b.slice(0,150));}
       const data=await res.json();
@@ -3862,20 +3861,10 @@ async function syncOutstandingOrders(){
       hasMore=batch.length===50&&allOrders.length<5000;
       page++;
       if(hasMore)await new Promise(r=>setTimeout(r,600));
-      statusEl.textContent='Fetching old orders... '+allOrders.length+' so far';
+      statusEl.textContent='Fetching unfulfilled orders... '+allOrders.length+' so far';
     }
-    console.log('Orders older than 180 days:',allOrders.length);
-    if(allOrders.length){
-      const sample=allOrders[0];
-      console.log('Order date fields:',{orderPaidDate:sample.orderPaidDate,createdAt:sample.createdAt,fulfillmentStatus:sample.fulfillmentStatus});
-    }
-    const statuses=[...new Set(allOrders.map(o=>o.fulfillmentStatus))];
-    console.log('Fulfillment statuses:',statuses,'Total orders:',allOrders.length);
-    const orders=allOrders.filter(o=>{
-      const fs=(o.fulfillmentStatus||'').toLowerCase();
-      return fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='';
-    });
-    if(!orders.length){statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';statusEl.textContent='No unfulfilled orders found in Commerce7.';return;}
+    console.log('Unfulfilled orders from C7:',allOrders.length);
+    const orders=allOrders;
     // Group by customer
     const byCustomer={};
     orders.forEach(ord=>{
@@ -3885,7 +3874,8 @@ async function syncOutstandingOrders(){
     });
     let created=0,skippedAge=0,skippedDupe=0;
     const newCustRows=[];const newMsgRows=[];
-    console.log('Customers with unfulfilled orders older than 180 days:',Object.keys(byCustomer).length);
+    const cutoffMs=180*24*60*60*1000;
+    console.log('Customers with unfulfilled orders:',Object.keys(byCustomer).length,'(will filter to 180+ days old)');
     for(const cid of Object.keys(byCustomer)){
       const cust=byCustomer[cid];
       const dates=cust.orders.map(ord=>{
@@ -3893,6 +3883,9 @@ async function syncOutstandingOrders(){
         return d.slice(0,10);
       }).filter(Boolean).sort();
       const oldestDate=dates[0]||'';
+      // Only include customers whose oldest unfulfilled order is 180+ days old
+      const oldestMs=oldestDate?Date.now()-new Date(oldestDate).getTime():0;
+      if(!oldestDate||oldestMs<cutoffMs){skippedAge++;continue;}
       // If customer already has an active entry, update it rather than create a duplicate
       const existingActive=S.orderCustomers.find(o=>o.customerId===cid&&o.status!=='Resolved');
       if(existingActive){
@@ -3958,15 +3951,10 @@ async function checkOrdersResolved(){
       const o=active[i];
       statusEl.textContent='Checking '+(i+1)+' of '+active.length+': '+o.customerName+'...';
       try{
-        const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent('https://api.commerce7.com/v1/order?customerId='+o.customerId+'&limit=50'),{headers});
+        const res=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent('https://api.commerce7.com/v1/order?customerId='+o.customerId+'&fulfillmentStatus=Not+Fulfilled&limit=50'),{headers});
         if(!res.ok)continue;
         const data=await res.json();
-        const unfulfilled=(data.orders||[]).filter(ord=>{
-          const fs=(ord.fulfillmentStatus||'').toLowerCase();
-          const paid=ord.orderPaidDate||ord.createdAt||'';
-          const ageDays=paid?Math.floor((Date.now()-new Date(paid))/(1000*60*60*24)):0;
-          return (fs==='not fulfilled'||fs==='unfulfilled'||fs==='pending'||fs==='not_fulfilled')&&ageDays>179;
-        });
+        const unfulfilled=data.orders||[];
         if(unfulfilled.length===0){
           // All fulfilled — auto-resolve
           o.status='Resolved';o.resolvedAt=today();
