@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.198</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.199</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -3331,6 +3331,8 @@ function buildOrderRow(o,showStatus){
   const ageHtml=ageDays!==null
     ?'<span style="font-size:12px;font-weight:500;color:'+(ageDays>=180?'var(--d-tx)':ageDays>=90?'var(--w-tx)':'var(--ink-m)')+';">'+ageDays+'d</span>'
     :'<span style="font-size:12px;color:var(--ink-f);">—</span>';
+  // Club process date badge — ship only, from cached members
+  const clubBadge=getOrderClubBadge(o);
   const tr=document.createElement('tr');tr.style.cursor='pointer';tr.onclick=()=>openOrderThread(o.id);
   // Show cached count immediately, queue background refresh
   const cachedCount=o.unfulfilledCount;
@@ -3341,7 +3343,7 @@ function buildOrderRow(o,showStatus){
     const pd=o.pickupDate||'';
     const pdDisplay=pd?(pd<today()?'<span style="color:var(--d-tx);font-weight:500;">⚠ '+pd+'</span>':pd):'<span style="color:var(--ink-f);">—</span>';
     tr.innerHTML=`
-      <td style="font-weight:500;">${o.customerName||'—'}</td>
+      <td style="font-weight:500;">${o.customerName||'—'}${clubBadge?'<br>'+clubBadge:''}</td>
       <td style="font-size:12px;" onclick="event.stopPropagation();">${emailLink(o.customerEmail)}</td>
       <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(o.customerPhone)}</td>
       <td>${countDisplay}</td>
@@ -3364,6 +3366,29 @@ function buildOrderRow(o,showStatus){
   }
   if(o.customerId&&showStatus&&o.unfulfilledCount<0)queueUnfulfilledCount(o);
   return tr;
+}
+
+function getOrderClubBadge(o){
+  if(!S.clubMembers||!S.clubMembers.length)return'';
+  const t=today();
+  const matches=S.clubMembers.filter(m=>{
+    if(m.orderDeliveryMethod==='Pickup')return false;
+    const mEmail=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
+    const oEmail=(o.customerEmail||'').toLowerCase();
+    const mCid=m.customerId||'';
+    const oCid=o.customerId||'';
+    return(mCid&&oCid&&mCid===oCid)||(mEmail&&oEmail&&mEmail===oEmail);
+  });
+  if(!matches.length)return'';
+  return matches.map(m=>{
+    const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
+    if(!nextDate)return'';
+    const days=daysUntil(nextDate);
+    const color=days<0?'var(--d-tx)':days<=14?'var(--w-tx)':'#1A4731';
+    const bg=days<0?'#FFF0F0':days<=14?'var(--w-bg)':'#F0FFF4';
+    const label=days<0?'Club overdue':days===0?'Club: today':days===1?'Club: tomorrow':'Club: '+days+'d ('+nextDate+')';
+    return`<span style="font-size:10px;font-weight:600;background:${bg};color:${color};border-radius:4px;padding:1px 6px;white-space:nowrap;">🍷 ${label}</span>`;
+  }).filter(Boolean).join(' ');
 }
 
 // Sequential queue for unfulfilled count lookups to avoid rate limiting
@@ -3565,8 +3590,8 @@ async function openOrderThread(id){
   // Club process date (from cached club members, ship only)
   const clubCardEl=document.getElementById('ot-club-card');
   if(clubCardEl){
-    const matches=S.clubMembers.filter(m=>{
-      const memberEmail=(m.customer?.emails?.[0]?.email||'').toLowerCase();
+  const matches=S.clubMembers.filter(m=>{
+      const memberEmail=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
       const orderEmail=(o.customerEmail||'').toLowerCase();
       const idMatch=m.customerId&&o.customerId&&m.customerId===o.customerId;
       const emailMatch=memberEmail&&orderEmail&&memberEmail===orderEmail;
@@ -3575,7 +3600,7 @@ async function openOrderThread(id){
     if(matches.length){
       const t=today();
       const html=matches.map(m=>{
-        const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||'';
+        const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
         const days=daysUntil(nextDate);
         const isPast=nextDate&&nextDate<t;
         const color=days===null?'var(--ink-m)':days<0?'var(--d-tx)':days<=14?'var(--w-tx)':'var(--s-tx)';
