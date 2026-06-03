@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.196</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.198</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -944,6 +944,8 @@ select.fi{cursor:pointer;}
       <button class="mcls" onclick="closeModal('order-thread-modal')">✕</button>
     </div>
     <div class="mbdy" style="max-height:60vh;overflow-y:auto;">
+      <!-- Club process date (ship only) -->
+      <div id="ot-club-card" style="display:none;background:#F0FFF4;border:1px solid #B7DDB7;border-radius:7px;padding:10px 14px;margin-bottom:14px;"></div>
       <!-- Unfulfilled orders panel -->
       <div id="ot-orders-panel" style="margin-bottom:14px;"></div>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
@@ -1865,7 +1867,8 @@ async function loadFromSheets(){
       sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
       sheetsGet('ReminderNotes!A2:F'),
       sheetsGet('Projects!A2:I'),sheetsGet('ProjectContacts!A2:O'),sheetsGet('ProjectNotes!A2:F'),sheetsGet('ProjectItemNotes!A2:F'),
-      sheetsGet('InventoryEntries!A2:K'),sheetsGet('ClubComms!A2:H'),sheetsGet('ClubMembers!A2:K'),sheetsGet('ClubSettings!A2:B')
+      sheetsGet('InventoryEntries!A2:K'),sheetsGet('ClubComms!A2:H'),
+      sheetsGet('ClubMembers!A2:K').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[])
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
@@ -3559,10 +3562,41 @@ async function openOrderThread(id){
   const c7link=document.getElementById('ot-c7link');
   if(o.customerId){c7link.href='https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+o.customerId;c7link.style.display='inline';}
   else c7link.style.display='none';
+  // Club process date (from cached club members, ship only)
+  const clubCardEl=document.getElementById('ot-club-card');
+  if(clubCardEl){
+    const matches=S.clubMembers.filter(m=>{
+      const memberEmail=(m.customer?.emails?.[0]?.email||'').toLowerCase();
+      const orderEmail=(o.customerEmail||'').toLowerCase();
+      const idMatch=m.customerId&&o.customerId&&m.customerId===o.customerId;
+      const emailMatch=memberEmail&&orderEmail&&memberEmail===orderEmail;
+      return (idMatch||emailMatch)&&m.orderDeliveryMethod!=='Pickup';
+    });
+    if(matches.length){
+      const t=today();
+      const html=matches.map(m=>{
+        const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||'';
+        const days=daysUntil(nextDate);
+        const isPast=nextDate&&nextDate<t;
+        const color=days===null?'var(--ink-m)':days<0?'var(--d-tx)':days<=14?'var(--w-tx)':'var(--s-tx)';
+        const label=days===null?'—':days<0?'Overdue ('+nextDate+')':days===0?'Today':days===1?'Tomorrow — '+nextDate:days+' days — '+nextDate;
+        return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;${matches.length>1?'margin-bottom:4px;':''}">
+          <span style="font-size:12px;font-weight:500;">🍷 ${m.club?.title||'Club'}</span>
+          <span style="font-size:12px;font-weight:600;color:${color};">${label}</span>
+        </div>`;
+      }).join('');
+      clubCardEl.style.display='block';
+      clubCardEl.innerHTML='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-f);font-weight:600;margin-bottom:6px;">Club next process (ship)</div>'+html;
+    } else {
+      clubCardEl.style.display='none';
+    }
+  }
   document.getElementById('ot-status').value=o.status;
   document.getElementById('ot-assignee').value=o.assignee;
   document.getElementById('ot-new-msg').value='';
   document.getElementById('ot-method').value='';
+  const clubCardReset=document.getElementById('ot-club-card');
+  if(clubCardReset)clubCardReset.style.display='none';
   // Populate pickup date
   const pd=document.getElementById('ot-pickup-date');
   const ps=document.getElementById('ot-pickup-status');
@@ -5545,11 +5579,7 @@ async function syncClubMembers(){
     if(sel)sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
     // Save to sheet: clear then rewrite
     statusEl.textContent='Saving to sheet...';
-    const existingRows=await sheetsGet('ClubMembers!A2:K');
-    if(existingRows.length){
-      const blanks=existingRows.map(()=>['','','','','','','','','','','']);
-      await sheetsUpdate('ClubMembers!A2:K'+(existingRows.length+1),blanks);
-    }
+    await sheetsClear('ClubMembers!A2:K');
     const rows=deduped.map(m=>([
       m.id||((m.customerId||'')+'|'+(m.club?.title||'')),
       m.customerId||'',
