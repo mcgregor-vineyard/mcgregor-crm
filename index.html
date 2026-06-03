@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.200</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.202</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -372,7 +372,7 @@ select.fi{cursor:pointer;}
               <th>Phone</th>
               <th onclick="sortOrders('orderCount')" style="cursor:pointer;user-select:none;">Total orders <span id="sort-orderCount"></span></th>
               <th onclick="sortOrders('oldestOrderDate')" style="cursor:pointer;user-select:none;">Oldest order age <span id="sort-oldestOrderDate">▲</span></th>
-              <th>Club next process</th>
+              <th style="white-space:nowrap;width:1%;">Club next process</th>
               <th onclick="sortOrders('pickupDate')" style="cursor:pointer;user-select:none;">Promised pickup <span id="sort-pickupDate"></span></th>
               <th onclick="sortOrders('status')" style="cursor:pointer;user-select:none;">Status <span id="sort-status"></span></th>
               <th onclick="sortOrders('lastFollowup')" style="cursor:pointer;user-select:none;">Last followup <span id="sort-lastFollowup"></span></th>
@@ -3349,7 +3349,7 @@ function buildOrderRow(o,showStatus){
       <td style="font-size:12px;" onclick="event.stopPropagation();">${phoneLink(o.customerPhone)}</td>
       <td>${countDisplay}</td>
       <td>${ageHtml}</td>
-      <td>${clubBadge||'<span style="color:var(--ink-f);font-size:12px;">—</span>'}</td>
+      <td style="white-space:nowrap;width:1%;">${clubBadge||'<span style="color:var(--ink-f);font-size:12px;">—</span>'}</td>
       <td style="font-size:12px;">${pdDisplay}</td>
       <td><span class="bdg ${TICKET_STATUS_COLORS[o.status]||'bdg-g'}">${o.status}</span></td>
       <td style="font-size:12px;color:var(--ink-m);">${lastMsg?lastMsg.createdAt:o.createdAt}</td>
@@ -3592,6 +3592,11 @@ async function openOrderThread(id){
   // Club process date (from cached club members, ship only)
   const clubCardEl=document.getElementById('ot-club-card');
   if(clubCardEl){
+    console.log('Club match debug — order email:',o.customerEmail,'order customerId:',o.customerId,'total club members:',S.clubMembers.length);
+    if(S.clubMembers.length){
+      const sample=S.clubMembers[0];
+      console.log('Sample club member fields:',{customerId:sample.customerId,email:sample.customer?.emails?.[0]?.email,delivery:sample.orderDeliveryMethod,nextProcess:sample.subscription?.nextProcessDate});
+    }
   const matches=S.clubMembers.filter(m=>{
       const memberEmail=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
       const orderEmail=(o.customerEmail||'').toLowerCase();
