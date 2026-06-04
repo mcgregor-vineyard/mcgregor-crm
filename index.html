@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.205</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.206</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -557,6 +557,7 @@ select.fi{cursor:pointer;}
             </div>
           </div>
           <div style="display:flex;gap:8px;">
+            <button class="btn" onclick="openClubPrintModal()">🖨 Print list</button>
             <button class="btn" id="club-sync-btn" onclick="syncClubMembers()">⬇ Load from C7</button>
           </div>
         </div>
@@ -1198,6 +1199,64 @@ select.fi{cursor:pointer;}
       <button class="tab" id="cp-tab-orders" onclick="switchCPTab('orders',this)" style="font-size:12px;padding:8px 14px;">Orders</button>
     </div>
     <div id="cp-content" style="flex:1;overflow-y:auto;padding:16px 18px;"></div>
+  </div>
+</div>
+
+<!-- Club print options modal -->
+<div id="club-print-modal" class="modal-backdrop">
+  <div class="modal" style="width:480px;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle">Print call list</div><button class="mcls" onclick="closeModal('club-print-modal')">✕</button></div>
+    <div class="mbdy">
+      <div class="f2">
+        <div class="fr">
+          <label class="fl">Contacts per page</label>
+          <select class="fi" id="cp-per-page">
+            <option value="10" selected>10 per page</option>
+            <option value="15">15 per page</option>
+            <option value="20">20 per page</option>
+            <option value="25">25 per page</option>
+          </select>
+        </div>
+        <div class="fr">
+          <label class="fl">Number of pages</label>
+          <select class="fi" id="cp-pages">
+            <option value="all">All pages</option>
+            <option value="1">1 page</option>
+            <option value="2">2 pages</option>
+            <option value="3">3 pages</option>
+            <option value="4">4 pages</option>
+            <option value="5">5 pages</option>
+            <option value="10">10 pages</option>
+          </select>
+        </div>
+      </div>
+      <div class="fr">
+        <label class="fl">Contacts to include</label>
+        <select class="fi" id="cp-contact-filter">
+          <option value="all">All contacts</option>
+          <option value="unreached">Not yet contacted (no logged communications)</option>
+        </select>
+      </div>
+      <div class="fr">
+        <label class="fl">Delivery method</label>
+        <select class="fi" id="cp-delivery-filter">
+          <option value="all">All (Ship & Pickup)</option>
+          <option value="ship">Ship only</option>
+          <option value="pickup">Pickup only</option>
+        </select>
+      </div>
+      <div class="fr">
+        <label class="fl">Club</label>
+        <select class="fi" id="cp-club-filter">
+          <option value="all">All clubs</option>
+        </select>
+      </div>
+      <div id="cp-preview-count" style="margin-top:10px;padding:8px 12px;background:var(--cream);border-radius:6px;font-size:13px;color:var(--ink-m);"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn" onclick="closeModal('club-print-modal')">Cancel</button>
+      <button class="btn btnp" onclick="generateClubPrintPage()">🖨 Open print page</button>
+    </div>
   </div>
 </div>
 
@@ -5485,6 +5544,166 @@ function ticketDueBadge(t){
   if(t.dueDate<today2)return`<span style="background:var(--d-bg);color:var(--d-tx);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;">Overdue ${t.dueDate}</span>`;
   if(t.dueDate===today2)return`<span style="background:var(--w-bg);color:var(--w-tx);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;">Due today</span>`;
   return`<span style="background:var(--cream);color:var(--ink-m);border-radius:4px;padding:1px 6px;font-size:10px;">Due ${t.dueDate}</span>`;
+}
+
+// ---- Club Print ----
+function openClubPrintModal(){
+  if(!S.clubMembers.length){showToast('Load club members first','err');return;}
+  // Populate club filter
+  const sel=document.getElementById('cp-club-filter');
+  const clubs=[...new Set(S.clubMembers.map(m=>m.club?.title||'').filter(Boolean))].sort();
+  sel.innerHTML='<option value="all">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
+  updatePrintPreview();
+  // Live preview count on change
+  ['cp-per-page','cp-pages','cp-contact-filter','cp-delivery-filter','cp-club-filter'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.onchange=updatePrintPreview;
+  });
+  openModal('club-print-modal');
+}
+
+function getClubPrintMembers(){
+  const contactFilter=document.getElementById('cp-contact-filter').value;
+  const deliveryFilter=document.getElementById('cp-delivery-filter').value;
+  const clubFilter=document.getElementById('cp-club-filter').value;
+  const perPage=parseInt(document.getElementById('cp-per-page').value)||10;
+  const pagesVal=document.getElementById('cp-pages').value;
+  const maxPages=pagesVal==='all'?99999:parseInt(pagesVal);
+  const maxContacts=maxPages*perPage;
+
+  // Start with currently sorted/filtered club members
+  let members=[...S.clubMembers].sort((a,b)=>{
+    const da=a.subscription?.nextProcessDate||a.nextProcessDate||'9999';
+    const db=b.subscription?.nextProcessDate||b.nextProcessDate||'9999';
+    return da.localeCompare(db);
+  });
+
+  // Club filter
+  if(clubFilter!=='all')members=members.filter(m=>(m.club?.title||m.clubTitle||'')=== clubFilter);
+
+  // Delivery filter
+  if(deliveryFilter==='ship')members=members.filter(m=>m.orderDeliveryMethod!=='Pickup');
+  else if(deliveryFilter==='pickup')members=members.filter(m=>m.orderDeliveryMethod==='Pickup');
+
+  // Contact filter — unreached = no ClubComms entry for this customer
+  if(contactFilter==='unreached'){
+    const contactedIds=new Set((S.clubComms||[]).map(c=>c.customerId));
+    members=members.filter(m=>!contactedIds.has(m.customerId));
+  }
+
+  return members.slice(0,maxContacts);
+}
+
+function updatePrintPreview(){
+  const el=document.getElementById('cp-preview-count');if(!el)return;
+  const perPage=parseInt(document.getElementById('cp-per-page').value)||10;
+  const members=getClubPrintMembers();
+  const pages=Math.ceil(members.length/perPage);
+  el.textContent=members.length+' contacts · '+pages+' page'+(pages!==1?'s':'');
+  el.style.color=members.length?'var(--ink)':'var(--d-tx)';
+}
+
+function generateClubPrintPage(){
+  const members=getClubPrintMembers();
+  if(!members.length){showToast('No contacts match these filters','err');return;}
+  const perPage=parseInt(document.getElementById('cp-per-page').value)||10;
+  const instructions=S.clubInstructions||'';
+  const t=today();
+  const deliveryFilter=document.getElementById('cp-delivery-filter').value;
+  const contactFilter=document.getElementById('cp-contact-filter').value;
+  const deliveryLabel=deliveryFilter==='ship'?'Ship only':deliveryFilter==='pickup'?'Pickup only':'All';
+  const contactLabel=contactFilter==='unreached'?'Not yet contacted':'All contacts';
+
+  // Build pages
+  const pages=[];
+  for(let i=0;i<members.length;i+=perPage)pages.push(members.slice(i,i+perPage));
+
+  const pageHtml=pages.map((page,pi)=>`
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">McGregor Vineyard Wine Club — Call List</div>
+          <div class="page-sub">Printed: ${t} · Delivery: ${deliveryLabel} · ${contactLabel} · Page ${pi+1} of ${pages.length}</div>
+          ${instructions?`<div class="instructions">${instructions}</div>`:''}
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:18%;">Member</th>
+            <th style="width:20%;">Email</th>
+            <th style="width:13%;">Phone</th>
+            <th style="width:11%;">Club</th>
+            <th style="width:10%;">Next Process</th>
+            <th style="width:8%;">Delivery</th>
+            <th style="width:20%;">Notes / Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${page.map(m=>{
+            const name=[(m.customer?.lastName||m.customerLastName||''),(m.customer?.firstName||m.customerFirstName||'')].filter(Boolean).join(', ')||'—';
+            const email=m.customer?.emails?.[0]?.email||m.customerEmail||'';
+            const phone=m.customer?.phones?.[0]?.phone||m.customerPhone||'';
+            const club=(m.club?.title||m.clubTitle||'').replace('McGregor Vineyard ','');
+            const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'—';
+            const days=daysUntil(nextDate==='—'?null:nextDate);
+            const daysStr=days===null?'':days===0?' (Today)':days===1?' (Tomorrow)':' ('+days+'d)';
+            const delivery=m.orderDeliveryMethod==='Pickup'?'Pickup':'Ship';
+            const pastDue=nextDate!=='—'&&nextDate<t;
+            // Last comm logged
+            const lastComm=(S.clubComms||[]).filter(c=>c.customerId===m.customerId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
+            const lastCommHtml=lastComm?`<div class="last-comm">${lastComm.createdAt}: ${lastComm.method} — ${lastComm.outcome}${lastComm.notes?' — '+lastComm.notes:''}</div>`:'';
+            return`<tr${pastDue?' class="past-due"':''}>
+              <td class="name">${name}</td>
+              <td class="email">${email}</td>
+              <td>${phone}</td>
+              <td>${club}</td>
+              <td>${nextDate}${daysStr}</td>
+              <td>${delivery}</td>
+              <td>${lastCommHtml}<div class="note-line"></div></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`).join('<div class="page-break"></div>');
+
+  const html=`<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>McGregor Club Call List — ${t}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#1a1a1a;background:white;}
+  .page{padding:14mm 12mm;min-height:100vh;}
+  .page-header{margin-bottom:10px;border-bottom:2px solid #6B1A2A;padding-bottom:8px;}
+  .page-title{font-size:14px;font-weight:700;color:#6B1A2A;letter-spacing:.02em;}
+  .page-sub{font-size:9px;color:#666;margin-top:3px;}
+  .instructions{margin-top:6px;padding:6px 8px;background:#FFF5F5;border-left:3px solid #6B1A2A;font-size:9px;color:#333;line-height:1.4;}
+  table{width:100%;border-collapse:collapse;margin-top:6px;}
+  th{background:#6B1A2A;color:white;padding:4px 5px;text-align:left;font-size:8.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  td{padding:5px 5px;border-bottom:1px solid #e5e5e5;vertical-align:top;font-size:9.5px;line-height:1.3;}
+  tr:nth-child(even) td{background:#FAFAFA;}
+  tr.past-due td{background:#FFF0F0;}
+  .name{font-weight:600;}
+  .email{color:#6B1A2A;}
+  .last-comm{font-size:8.5px;color:#666;margin-bottom:2px;font-style:italic;}
+  .note-line{border-bottom:1px solid #ccc;margin-top:8px;height:1px;}
+  .page-break{page-break-after:always;}
+  @media print{
+    .page{padding:10mm 10mm;}
+    .page-break{page-break-after:always;height:0;display:block;}
+    body{font-size:9px;}
+  }
+</style>
+</head>
+<body>
+${pageHtml}
+<script>window.onload=()=>window.print();<\/script>
+</body></html>`;
+
+  const win=window.open('','_blank');
+  if(win){win.document.write(html);win.document.close();}
+  closeModal('club-print-modal');
 }
 
 // ---- Power BI Embed ----
