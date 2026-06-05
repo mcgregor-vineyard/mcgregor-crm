@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.209</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.210</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -5828,11 +5828,23 @@ function selectRmC7Customer(cu,name,email){
   const selDiv=document.getElementById('rm-c7-selected');
   selDiv.style.display='flex';
   document.getElementById('rm-c7-selected-name').textContent=name+(email?' ('+email+')':'');
-  // Also look up their club next process date and pre-fill due date
+  // Look up their club next process date — always set it
   const member=S.clubMembers.find(m=>m.customerId===cu.id);
   const nextDate=member?.subscription?.nextProcessDate?.slice(0,10)||member?.nextProcessDate||'';
-  if(nextDate&&!document.getElementById('rm-date').value){
+  if(nextDate){
     document.getElementById('rm-date').value=nextDate;
+  } else {
+    // Not in cache — fetch from C7
+    c7Req('GET','/club-membership?customerId='+cu.id+'&limit=10',null).then(data=>{
+      const memberships=(data&&data.clubMemberships)||[];
+      const active=memberships.filter(m=>m.status==='Active'&&m.subscription?.nextProcessDate);
+      if(active.length){
+        const soonest=active.sort((a,b)=>a.subscription.nextProcessDate.localeCompare(b.subscription.nextProcessDate))[0];
+        const nd=soonest.subscription.nextProcessDate.slice(0,10);
+        document.getElementById('rm-date').value=nd;
+        showToast('Next process date: '+nd);
+      }
+    }).catch(()=>{});
   }
 }
 
