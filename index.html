@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.208</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.209</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1013,7 +1013,7 @@ select.fi{cursor:pointer;}
 
 <!-- Reminder modal -->
 <div id="reminder-modal" class="modal-backdrop">
-  <div class="modal" style="width:460px;" onclick="event.stopPropagation();">
+  <div class="modal" style="width:480px;" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle" id="rm-modal-title">New reminder</div><button class="mcls" onclick="closeModal('reminder-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="rm-id" />
@@ -1031,7 +1031,7 @@ select.fi{cursor:pointer;}
       </div>
       <div class="f2">
         <div class="fr"><label class="fl">Related to</label>
-          <select class="fi" id="rm-type">
+          <select class="fi" id="rm-type" onchange="onRmTypeChange()">
             <option value="">None</option>
             <option value="contact">Contact</option>
             <option value="ticket">Ticket</option>
@@ -1040,6 +1040,19 @@ select.fi{cursor:pointer;}
           </select>
         </div>
         <div class="fr"><label class="fl">Reference</label><input type="text" class="fi" id="rm-ref-name" placeholder="Name or subject" readonly style="background:var(--cream);" /></div>
+      </div>
+      <!-- C7 customer search — shown for Club Combined Shipping -->
+      <div id="rm-c7-search-section" style="display:none;margin-top:4px;background:var(--cream);border:1px solid var(--bdr);border-radius:7px;padding:10px 12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#1A4731;margin-bottom:8px;">Search Commerce7 customer</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input type="text" class="fi" id="rm-c7-search" placeholder="Name or email..." onkeydown="if(event.key==='Enter')searchRmC7()" style="flex:1;font-size:12px;" />
+          <button class="btn" style="font-size:12px;" onclick="searchRmC7()">Search</button>
+        </div>
+        <div id="rm-c7-results" style="max-height:200px;overflow-y:auto;border:1px solid var(--bdr);border-radius:5px;background:white;display:none;"></div>
+        <div id="rm-c7-selected" style="display:none;margin-top:8px;padding:7px 10px;background:#F0FFF4;border:1px solid #B7DDB7;border-radius:5px;font-size:12px;align-items:center;justify-content:space-between;">
+          <span id="rm-c7-selected-name" style="font-weight:600;color:#1A4731;"></span>
+          <button onclick="clearRmC7Selection()" style="background:none;border:none;cursor:pointer;color:var(--ink-m);font-size:13px;">✕</button>
+        </div>
       </div>
       <input type="hidden" id="rm-ref-id" />
       <input type="hidden" id="rm-customer-id" />
@@ -4211,6 +4224,11 @@ function openNewReminder(refType,refId,refName){
   document.getElementById('rm-type').value=refType||'';
   document.getElementById('rm-ref-id').value=refId||'';
   document.getElementById('rm-ref-name').value=refName||'';
+  document.getElementById('rm-customer-id').value='';
+  clearRmC7Selection();
+  // Show C7 search if type is club-combined-shipping
+  const section=document.getElementById('rm-c7-search-section');
+  if(section)section.style.display=refType==='club-combined-shipping'?'block':'none';
   openModal('reminder-modal');
 }
 
@@ -4224,6 +4242,14 @@ function openEditReminder(id){
   document.getElementById('rm-type').value=r.refType||'';
   document.getElementById('rm-ref-id').value=r.refId||'';
   document.getElementById('rm-ref-name').value=r.refName||'';
+  document.getElementById('rm-customer-id').value=r.customerId||'';
+  clearRmC7Selection();
+  const section=document.getElementById('rm-c7-search-section');
+  if(section)section.style.display=r.refType==='club-combined-shipping'?'block':'none';
+  if(r.refType==='club-combined-shipping'&&r.refName){
+    const selDiv=document.getElementById('rm-c7-selected');
+    if(selDiv){selDiv.style.display='flex';document.getElementById('rm-c7-selected-name').textContent=r.refName;}
+  }
   openModal('reminder-modal');
 }
 
@@ -5751,8 +5777,79 @@ function clearPowerBIUrl(){
   showToast('Power BI URL cleared');
 }
 
+// ---- Reminder modal C7 search (Club Combined Shipping) ----
+function onRmTypeChange(){
+  const type=document.getElementById('rm-type').value;
+  const section=document.getElementById('rm-c7-search-section');
+  if(section){
+    section.style.display=type==='club-combined-shipping'?'block':'none';
+    if(type!=='club-combined-shipping'){
+      // Clear any C7 selection
+      clearRmC7Selection();
+    }
+  }
+}
+
+async function searchRmC7(){
+  const q=document.getElementById('rm-c7-search').value.trim();if(!q)return;
+  const el=document.getElementById('rm-c7-results');
+  el.style.display='block';
+  el.innerHTML='<div style="padding:10px;color:var(--ink-m);font-size:12px;">Searching...</div>';
+  try{
+    const data=await c7Req('GET','/customer?q='+encodeURIComponent(q)+'&limit=15',null);
+    const custs=(data&&data.customers)||[];
+    if(!custs.length){el.innerHTML='<div style="padding:10px;color:var(--ink-m);font-size:12px;">No results.</div>';return;}
+    el.innerHTML='';
+    custs.forEach(cu=>{
+      const name=((cu.firstName||'')+' '+(cu.lastName||'')).trim()||'Unknown';
+      const email=(cu.emails&&cu.emails[0])?cu.emails[0].email:'';
+      const div=document.createElement('div');
+      div.style.cssText='padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--bdr);font-size:12px;';
+      div.onmouseover=()=>div.style.background='var(--cream)';
+      div.onmouseout=()=>div.style.background='';
+      div.innerHTML=`<div style="font-weight:600;">${name}</div><div style="color:var(--ink-m);font-size:11px;">${email}</div>`;
+      div.onclick=()=>selectRmC7Customer(cu,name,email);
+      el.appendChild(div);
+    });
+  }catch(e){el.innerHTML='<div style="padding:10px;color:var(--d-tx);font-size:12px;">Error: '+e.message+'</div>';}
+}
+
+function selectRmC7Customer(cu,name,email){
+  // Set hidden fields
+  document.getElementById('rm-customer-id').value=cu.id||'';
+  document.getElementById('rm-ref-id').value=cu.id||'';
+  document.getElementById('rm-ref-name').value=name;
+  // Auto-fill reminder note if empty
+  const noteEl=document.getElementById('rm-note');
+  if(!noteEl.value)noteEl.value='Combined Shipping — '+name;
+  // Show selected
+  document.getElementById('rm-c7-results').style.display='none';
+  document.getElementById('rm-c7-search').value='';
+  const selDiv=document.getElementById('rm-c7-selected');
+  selDiv.style.display='flex';
+  document.getElementById('rm-c7-selected-name').textContent=name+(email?' ('+email+')':'');
+  // Also look up their club next process date and pre-fill due date
+  const member=S.clubMembers.find(m=>m.customerId===cu.id);
+  const nextDate=member?.subscription?.nextProcessDate?.slice(0,10)||member?.nextProcessDate||'';
+  if(nextDate&&!document.getElementById('rm-date').value){
+    document.getElementById('rm-date').value=nextDate;
+  }
+}
+
+function clearRmC7Selection(){
+  document.getElementById('rm-customer-id').value='';
+  document.getElementById('rm-ref-id').value='';
+  document.getElementById('rm-ref-name').value='';
+  const selDiv=document.getElementById('rm-c7-selected');
+  if(selDiv)selDiv.style.display='none';
+  const resDiv=document.getElementById('rm-c7-results');
+  if(resDiv){resDiv.style.display='none';resDiv.innerHTML='';}
+  const searchEl=document.getElementById('rm-c7-search');
+  if(searchEl)searchEl.value='';
+}
+
+// ---- Club Combined Shipping ----
 function openClubCombinedShippingReminder(){
-  const m=S.activeClubMember;if(!m)return;
   const name=[(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', ')||'Member';
   const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
   // Pre-fill the reminder modal
