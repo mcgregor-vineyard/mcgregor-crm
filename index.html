@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.217</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.220</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -515,7 +515,10 @@ select.fi{cursor:pointer;}
               <div id="pj-winerelease-section" style="display:none;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                   <div style="font-weight:600;font-size:14px;">Wines</div>
-                  <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openAddWineModal()">+ Add wine</button>
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn" style="font-size:12px;color:var(--ink-m);" onclick="syncWineReleaseTasks()" title="Sync all wines to current checklist template">Adjust task names</button>
+                    <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openAddWineModal()">+ Add wine</button>
+                  </div>
                 </div>
                 <div id="pj-winerelease-list"></div>
               </div>
@@ -5807,6 +5810,67 @@ const WINE_RELEASE_CHECKLIST=[
   {task:'Website: Remove from Our Wines and wine type page, keep on varietal page',instructions:'On the website: (1) Remove from the "Our Wines" page, (2) Remove from the wine type page (e.g. "Red Wines"), (3) Leave it on the varietal page (e.g. Chardonnay) so it remains searchable as part of the wine\'s history.'},
 ];
 
+// Sync all wines in this project to the current checklist template.
+// - Updates task names that have changed (matched by position within each part)
+// - Adds any new tasks from the template that don't exist yet
+// - Preserves done status, assignee, and completion info on existing tasks
+async function syncWineReleaseTasks(){
+  const projectId=S.activeProject;
+  const wines=(S.wineReleaseWines||[]).filter(w=>w.projectId===projectId);
+  if(!wines.length){showToast('No wines to update','err');return;}
+  if(!confirm('This will update all task names in this project to match the current checklist template. Done status and assignees will be preserved. Continue?'))return;
+  showToast('Updating tasks...');
+  let updated=0,added=0;
+  try{
+    const allRows=await sheetsGet('WineReleaseItems!A2:H');
+    for(const wine of wines){
+      const existingItems=(S.wineReleaseItems||[]).filter(i=>i.wineId===wine.id);
+      // Separate headers and checkable items from template
+      const templateCheckable=WINE_RELEASE_CHECKLIST.filter(c=>!c.isHeader);
+      const templateHeaders=WINE_RELEASE_CHECKLIST.filter(c=>c.isHeader);
+      const existingCheckable=existingItems.filter(i=>!i.isHeader);
+      const existingHeaders=existingItems.filter(i=>i.isHeader);
+      // Update checkable tasks by position
+      for(let i=0;i<templateCheckable.length;i++){
+        const tmpl=templateCheckable[i];
+        if(i<existingCheckable.length){
+          const item=existingCheckable[i];
+          if(item.task!==tmpl.task){
+            item.task=tmpl.task;
+            const ri=allRows.findIndex(r=>r[0]===item.id);
+            if(ri>=0)await sheetsUpdate('WineReleaseItems!D'+(ri+2),[[tmpl.task]]);
+            updated++;
+          }
+        } else {
+          // New task — add it
+          const newId=uid();
+          await sheetsAppend('WineReleaseItems!A:H',[[newId,wine.id,projectId,tmpl.task,-1,'false','','']]);
+          S.wineReleaseItems.push({id:newId,wineId:wine.id,projectId,task:tmpl.task,assignee:-1,done:false,completedBy:'',completedAt:''});
+          added++;
+        }
+      }
+      // Update header tasks by position
+      for(let i=0;i<templateHeaders.length;i++){
+        const tmpl=templateHeaders[i];
+        if(i<existingHeaders.length){
+          const item=existingHeaders[i];
+          if(item.task!==tmpl.task){
+            item.task=tmpl.task;
+            const ri=allRows.findIndex(r=>r[0]===item.id);
+            if(ri>=0)await sheetsUpdate('WineReleaseItems!D'+(ri+2),[[tmpl.task]]);
+            updated++;
+          }
+        }
+      }
+    }
+    renderWineReleaseList(projectId);
+    const msg=[];
+    if(updated)msg.push(updated+' task'+(updated!==1?'s':'')+' renamed');
+    if(added)msg.push(added+' new task'+(added!==1?'s':'')+' added');
+    showToast(msg.length?msg.join(', '):'Tasks are already up to date');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
 function openAddWineModal(wineId){
   document.getElementById('wr-wine-id').value=wineId||'';
   document.getElementById('wr-modal-title').textContent=wineId?'Rename wine':'Add wine';
@@ -5948,13 +6012,18 @@ function renderWineReleaseList(projectId){
         </div>
         ${!isOpen?`<div style="font-size:12px;opacity:.75;margin-top:3px;">Next: <span style="font-style:italic;">${nextTaskText}</span></div>`:''}
       </div>
-      <div style="display:flex;align-items:center;gap:4px;" onclick="event.stopPropagation()">
-        <button onclick="moveWineRelease('${wine.id}','${projectId}',-1)" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:13px;border-radius:4px;padding:2px 7px;" title="Move up">↑</button>
-        <button onclick="moveWineRelease('${wine.id}','${projectId}',1)" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:13px;border-radius:4px;padding:2px 7px;" title="Move down">↓</button>
-        <button onclick="openAddWineModal('${wine.id}')" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:12px;border-radius:4px;padding:3px 8px;">✏️</button>
-        <button onclick="deleteWineReleaseWine('${wine.id}')" style="background:rgba(255,255,255,.15);border:none;cursor:pointer;color:white;font-size:12px;border-radius:4px;padding:3px 8px;">✕</button>
+      <div id="wine-btns-${wine.id}" style="display:flex;align-items:center;gap:4px;">
+        <button data-action="up" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:13px;border-radius:4px;padding:2px 7px;" title="Move up">↑</button>
+        <button data-action="down" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:13px;border-radius:4px;padding:2px 7px;" title="Move down">↓</button>
+        <button data-action="edit" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:12px;border-radius:4px;padding:3px 8px;">✏️</button>
+        <button data-action="delete" style="background:rgba(255,255,255,.15);border:none;cursor:pointer;color:white;font-size:12px;border-radius:4px;padding:3px 8px;">✕</button>
         <span style="font-size:14px;opacity:.8;">${isOpen?'▲':'▼'}</span>
       </div>`;
+    // Wire buttons via addEventListener to avoid onclick string issues
+    header.querySelector('[data-action="up"]').addEventListener('click',e=>{e.stopPropagation();moveWineRelease(wine.id,projectId,-1);});
+    header.querySelector('[data-action="down"]').addEventListener('click',e=>{e.stopPropagation();moveWineRelease(wine.id,projectId,1);});
+    header.querySelector('[data-action="edit"]').addEventListener('click',e=>{e.stopPropagation();openAddWineModal(wine.id);});
+    header.querySelector('[data-action="delete"]').addEventListener('click',e=>{e.stopPropagation();deleteWineReleaseWine(wine.id);});
     wineDiv.appendChild(header);
     if(isOpen){
       const list=document.createElement('div');
