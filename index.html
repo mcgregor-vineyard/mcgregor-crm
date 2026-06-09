@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.220</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.221</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -5911,25 +5911,28 @@ await sheetsAppend('WineReleaseWines!A:E',[[wineId,projectId,name,createdAt,newS
 }
 
 async function moveWineRelease(wineId,projectId,dir){
-  dir=parseInt(dir); // ensure numeric — comes as string from onclick attribute
-  const wines=(S.wineReleaseWines||[]).filter(w=>w.projectId===projectId).sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
-  const idx=wines.findIndex(w=>w.id===wineId);
+  dir=parseInt(dir);
+  const wines=(S.wineReleaseWines||[]).filter(w=>w.projectId===projectId);
+  // Normalize sortOrders — assign 0,1,2... if any are missing or duplicated
+  const sorted=[...wines].sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
+  sorted.forEach((w,i)=>{w.sortOrder=i;});
+  const idx=sorted.findIndex(w=>w.id===wineId);
   const swapIdx=idx+dir;
-  if(swapIdx<0||swapIdx>=wines.length)return;
-  // Swap sort orders
-  const a=wines[idx],b=wines[swapIdx];
-  const aOrder=a.sortOrder!==undefined?a.sortOrder:idx;
-  const bOrder=b.sortOrder!==undefined?b.sortOrder:swapIdx;
-  a.sortOrder=bOrder;
-  b.sortOrder=aOrder;
-  // Save both to sheet
+  if(idx<0||swapIdx<0||swapIdx>=sorted.length)return;
+  // Swap
+  const a=sorted[idx],b=sorted[swapIdx];
+  const tmp=a.sortOrder;
+  a.sortOrder=b.sortOrder;
+  b.sortOrder=tmp;
+  // Save to sheet
   try{
     const allRows=await sheetsGet('WineReleaseWines!A2:E');
     for(const wine of [a,b]){
       const ri=allRows.findIndex(r=>r[0]===wine.id);
       if(ri>=0)await sheetsUpdate('WineReleaseWines!E'+(ri+2),[[wine.sortOrder]]);
     }
-  }catch(e){showToast('Error saving order: '+e.message,'err');}
+    showToast('Order updated');
+  }catch(e){showToast('Error: '+e.message,'err');}
   renderWineReleaseList(projectId);
 }
 
