@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.214</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.216</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1980,7 +1980,7 @@ async function ensureSheets(){
   if(needed.includes('ClubComms'))await sheetsUpdate('ClubComms!A1:H1',[['ID','MembershipID','CustomerID','Method','Outcome','Notes','Author','CreatedAt']]);
   if(needed.includes('ClubMembers'))await sheetsUpdate('ClubMembers!A1:K1',[['MembershipID','CustomerID','ClubTitle','Status','FirstName','LastName','Email','Phone','NextProcessDate','DeliveryMethod','LastSync']]);
   if(needed.includes('ClubSettings'))await sheetsUpdate('ClubSettings!A1:B1',[['Key','Value']]);
-  if(needed.includes('WineReleaseWines'))await sheetsUpdate('WineReleaseWines!A1:D1',[['ID','ProjectID','WineName','CreatedAt']]);
+  if(needed.includes('WineReleaseWines'))await sheetsUpdate('WineReleaseWines!A1:E1',[['ID','ProjectID','WineName','CreatedAt','SortOrder']]);
   if(needed.includes('WineReleaseItems'))await sheetsUpdate('WineReleaseItems!A1:H1',[['ID','WineID','ProjectID','Task','Assignee','Done','CompletedBy','CompletedAt']]);
   if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:O1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes','Done','CompletedBy','CompletedAt']]);
   if(needed.includes('ProjectNotes'))await sheetsUpdate('ProjectNotes!A1:F1',[['ID','ProjectID','Message','Author','AuthorName','CreatedAt']]);
@@ -2004,7 +2004,7 @@ async function loadFromSheets(){
       sheetsGet('Projects!A2:I'),sheetsGet('ProjectContacts!A2:O'),sheetsGet('ProjectNotes!A2:F'),sheetsGet('ProjectItemNotes!A2:F'),
       sheetsGet('InventoryEntries!A2:K'),sheetsGet('ClubComms!A2:H'),
       sheetsGet('ClubMembers!A2:K').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[]),
-      sheetsGet('WineReleaseWines!A2:D').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[])
+      sheetsGet('WineReleaseWines!A2:E').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[])
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true'}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',attempts:[]}));
@@ -2035,7 +2035,7 @@ async function loadFromSheets(){
     // Load club settings (instructions)
     const instrRow=(clubSettingsRows||[]).find(r=>r[0]==='instructions');
     S.clubInstructions=instrRow?instrRow[1]||'':'';
-    S.wineReleaseWines=(wineReleaseWineRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',createdAt:r[3]||''}));
+    S.wineReleaseWines=(wineReleaseWineRows||[]).filter(r=>r[0]).map((r,i)=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',createdAt:r[3]||'',sortOrder:r[4]!==''?parseInt(r[4]):i}));
     S.wineReleaseItems=(wineReleaseItemRows||[]).filter(r=>r[0]).map(r=>({id:r[0],wineId:r[1]||'',projectId:r[2]||'',task:r[3]||'',assignee:parseInt(r[4])||0,done:r[5]==='true',completedBy:r[6]||'',completedAt:r[7]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
@@ -5776,35 +5776,35 @@ ${pageHtml}
 const WINE_RELEASE_CHECKLIST=[
   // Part 1
   {task:'Part 1 — Barrel Tasting and Wine Futures',instructions:'Complete these tasks during the barrel tasting / futures phase, before the wine is bottled.',isHeader:true},
-  {task:'1a. Create Preorder SKU',instructions:'In Commerce7 → Products, create a new product with a PREORDER prefix in the SKU. Set status to Available and configure pricing. This allows futures sales before bottling is complete.'},
-  {task:'1b. Create Wine Sales SKU',instructions:'Create the main retail SKU for this wine in Commerce7. Set status to Unavailable for now — it will be activated in Part 2. Use standard SKU naming convention (e.g. 2024-RIESLING-RESERVE).'},
+  {task:'Create Preorder SKU',instructions:'In Commerce7 → Products, create a new product with a PREORDER prefix in the SKU. Set status to Available and configure pricing. This allows futures sales before bottling is complete.'},
+  {task:'Create Wine Sales SKU',instructions:'Create the main retail SKU for this wine in Commerce7. Set status to Unavailable for now — it will be activated in Part 2. Use standard SKU naming convention (e.g. 2024-RIESLING-RESERVE).'},
   // Part 2
   {task:'Part 2 — Complete as soon as wine is bottled',instructions:'Complete these tasks immediately after bottling.',isHeader:true},
-  {task:'2a. Deactivate Preorder SKU',instructions:'In Commerce7 → Products, find the PREORDER SKU and set its Web Status to Unavailable. Do not delete it — it is needed for order history.'},
-  {task:'2b. Verify library reserves moved to Barn Library',instructions:'Confirm with the winemaker that all library reserve bottles have been physically moved to the Barn Library location and that inventory is updated accordingly in Commerce7.'},
-  {task:'2c-i. Get Full Wine Description',instructions:'Obtain the complete wine description from the winemaker. This should cover appearance, aroma, palate, finish, and any production notes. Used for the product page and marketing.'},
-  {task:'2c-ii. Bottle photo',instructions:'Ensure a high-resolution bottle photo is available (minimum 2000px tall). Coordinate with photographer if needed. Both portrait and landscape versions are useful. Upload to Commerce7 product.'},
-  {task:'2c-iii. Wine Description Teaser',instructions:'Write a short teaser version of the full description (1–2 sentences max). This appears in search results, email previews, and category pages. Compelling and concise.'},
-  {task:'2c-iv. Fill in Alcohol Percentage',instructions:'Enter the ABV on the product summary in Commerce7. Get the exact figure from the winemaker or lab analysis. Required for compliance on some markets.'},
-  {task:'2c-v. Make Web Status Available',instructions:'In Commerce7 → Products → [this wine], set Web Status to Available. Confirm inventory quantity is correct before making live. The wine is now purchasable online.'},
-  {task:'2d-i. Check Department',instructions:'In the Advanced tab of the Commerce7 product, verify the Department field is set correctly (e.g. Wine). This should already be configured but confirm.'},
-  {task:'2d-ii. Website Product Template = WGM Custom Detail',instructions:'In the Advanced tab, confirm the Website Product Template is set to "WGM Custom Detail". This ensures the wine displays with the correct layout on the website.'},
-  {task:'2d-iii. Fill in all Wine Properties',instructions:'In the Advanced tab, complete all Wine Properties fields: varietal(s), appellation, vintage year, wine type (Red/White/Rosé/Sparkling), region, and any other applicable fields. These power filtering and SEO.'},
+  {task:'Deactivate Preorder SKU',instructions:'In Commerce7 → Products, find the PREORDER SKU and set its Web Status to Unavailable. Do not delete it — it is needed for order history.'},
+  {task:'Verify library reserves moved to Barn Library',instructions:'Confirm with the winemaker that all library reserve bottles have been physically moved to the Barn Library location and that inventory is updated accordingly in Commerce7.'},
+  {task:'Get Full Wine Description',instructions:'Obtain the complete wine description from the winemaker. This should cover appearance, aroma, palate, finish, and any production notes. Used for the product page and marketing.'},
+  {task:'Bottle photo',instructions:'Ensure a high-resolution bottle photo is available (minimum 2000px tall). Coordinate with photographer if needed. Both portrait and landscape versions are useful. Upload to Commerce7 product.'},
+  {task:'Wine Description Teaser',instructions:'Write a short teaser version of the full description (1–2 sentences max). This appears in search results, email previews, and category pages. Compelling and concise.'},
+  {task:'Fill in Alcohol Percentage',instructions:'Enter the ABV on the product summary in Commerce7. Get the exact figure from the winemaker or lab analysis. Required for compliance on some markets.'},
+  {task:'Make Web Status Available',instructions:'In Commerce7 → Products → [this wine], set Web Status to Available. Confirm inventory quantity is correct before making live. The wine is now purchasable online.'},
+  {task:'Check Department',instructions:'In the Advanced tab of the Commerce7 product, verify the Department field is set correctly (e.g. Wine). This should already be configured but confirm.'},
+  {task:'Website Product Template = WGM Custom Detail',instructions:'In the Advanced tab, confirm the Website Product Template is set to "WGM Custom Detail". This ensures the wine displays with the correct layout on the website.'},
+  {task:'Fill in all Wine Properties',instructions:'In the Advanced tab, complete all Wine Properties fields: varietal(s), appellation, vintage year, wine type (Red/White/Rosé/Sparkling), region, and any other applicable fields. These power filtering and SEO.'},
   // Part 3
   {task:'Part 3 — Service and Wine by the Glass',instructions:'Create the service products needed for tasting room sales.',isHeader:true},
-  {task:'3a. Create Wine by the Glass product',instructions:'Create a new product in Commerce7 for wine by the glass sales. Link to the main wine SKU where possible. Set appropriate glass pour price. Assign to the correct POS category.'},
-  {task:'3b. Create SERVICE bottle sales product',instructions:'Create a SERVICE SKU for bottle sales at the tasting room (separate from the retail web SKU). This allows tracking tasting room bottle sales independently. Set price and assign to POS Service category.'},
+  {task:'Create Wine by the Glass product',instructions:'Create a new product in Commerce7 for wine by the glass sales. Link to the main wine SKU where possible. Set appropriate glass pour price. Assign to the correct POS category.'},
+  {task:'Create SERVICE bottle sales product',instructions:'Create a SERVICE SKU for bottle sales at the tasting room (separate from the retail web SKU). This allows tracking tasting room bottle sales independently. Set price and assign to POS Service category.'},
   // Part 4
   {task:'Part 4 — Releasing in Tasting Room & making it a current release',instructions:'Complete these tasks to make the wine available in the tasting room and on the website.',isHeader:true},
-  {task:'4a. Add bottle SKU to Current Tasting List, arrange order',instructions:'In Commerce7 POS, add the wine bottle SKU to the "Current Tasting List" category. Arrange the product order on screen to match the printed tasting list order.'},
-  {task:'4b. Add Service & Wine by Glass SKUs to Service category, arrange order',instructions:'Add both the Service SKU and Wine by the Glass SKU to the POS Service category. Arrange product order to be consistent with the tasting list.'},
-  {task:'4c. Website: Add to Our Wines, wine type, and varietal pages',instructions:'On the website, add the new wine to three places: (1) the "Our Wines" category page, (2) the appropriate wine type page (Red, White, Rosé, or Sparkling Wine), and (3) the varietal page (e.g. Chardonnay, Pinot Noir). Confirm correct sort order on each page.'},
+  {task:'Add bottle SKU to Current Tasting List, arrange order',instructions:'In Commerce7 POS, add the wine bottle SKU to the "Current Tasting List" category. Arrange the product order on screen to match the printed tasting list order.'},
+  {task:'Add Service & Wine by Glass SKUs to Service category, arrange order',instructions:'Add both the Service SKU and Wine by the Glass SKU to the POS Service category. Arrange product order to be consistent with the tasting list.'},
+  {task:'Website: Add to Our Wines, wine type, and varietal pages',instructions:'On the website, add the new wine to three places: (1) the "Our Wines" category page, (2) the appropriate wine type page (Red, White, Rosé, or Sparkling Wine), and (3) the varietal page (e.g. Chardonnay, Pinot Noir). Confirm correct sort order on each page.'},
   // Part 5
   {task:'Part 5 — Selling Out: Removing from Tasting and moving to Library',instructions:'Complete these tasks when the wine is selling out and transitioning to library status.',isHeader:true},
-  {task:'5a. Remove bottle SKU from POS Home Screen',instructions:'In Commerce7 POS settings, remove the wine bottle SKU from the POS Home Screen / tasting deck. The product remains active for web sales until inventory is depleted.'},
-  {task:'5b. Remove & deactivate Service SKU from POS Deck',instructions:'Remove the Service SKU from the POS Deck Menu. Then deactivate (set to Unavailable) the Service SKU in Commerce7 Products. Do not delete — needed for sales history.'},
-  {task:'5c. Remove & deactivate Wine by the Glass SKU from POS Deck',instructions:'Remove the Wine by the Glass SKU from the POS Deck Menu. Then deactivate the SKU in Commerce7 Products.'},
-  {task:'5d. Website: Remove from Our Wines and wine type page, keep on varietal page',instructions:'On the website: (1) Remove from the "Our Wines" page, (2) Remove from the wine type page (e.g. "Red Wines"), (3) Leave it on the varietal page (e.g. Chardonnay) so it remains searchable as part of the wine\'s history.'},
+  {task:'Remove bottle SKU from POS Home Screen',instructions:'In Commerce7 POS settings, remove the wine bottle SKU from the POS Home Screen / tasting deck. The product remains active for web sales until inventory is depleted.'},
+  {task:'Remove & deactivate Service SKU from POS Deck',instructions:'Remove the Service SKU from the POS Deck Menu. Then deactivate (set to Unavailable) the Service SKU in Commerce7 Products. Do not delete — needed for sales history.'},
+  {task:'Remove & deactivate Wine by the Glass SKU from POS Deck',instructions:'Remove the Wine by the Glass SKU from the POS Deck Menu. Then deactivate the SKU in Commerce7 Products.'},
+  {task:'Website: Remove from Our Wines and wine type page, keep on varietal page',instructions:'On the website: (1) Remove from the "Our Wines" page, (2) Remove from the wine type page (e.g. "Red Wines"), (3) Leave it on the varietal page (e.g. Chardonnay) so it remains searchable as part of the wine\'s history.'},
 ];
 
 function openAddWineModal(wineId){
@@ -5829,11 +5829,12 @@ async function saveWineReleaseWine(){
       if(rowIdx>=0)await sheetsUpdate('WineReleaseWines!C'+(rowIdx+2),[[name]]);
     } else {
       const wineId=uid();const createdAt=today();
-      await sheetsAppend('WineReleaseWines!A:D',[[wineId,projectId,name,createdAt]]);
+      const newSortOrder=(S.wineReleaseWines||[]).filter(w=>w.projectId===projectId).length;
+await sheetsAppend('WineReleaseWines!A:E',[[wineId,projectId,name,createdAt,newSortOrder]]);
       if(!S.wineReleaseWines)S.wineReleaseWines=[];
-      S.wineReleaseWines.push({id:wineId,projectId,wineName:name,createdAt});
+      S.wineReleaseWines.push({id:wineId,projectId,wineName:name,createdAt,sortOrder:newSortOrder});
       // Create checklist items for this wine
-      const itemRows=WINE_RELEASE_CHECKLIST.map(c=>[uid(),wineId,projectId,c.task,S.cu,'false','','']);
+      const itemRows=WINE_RELEASE_CHECKLIST.map(c=>[uid(),wineId,projectId,c.task,-1,'false','','']);
       await sheetsAppend('WineReleaseItems!A:H',itemRows);
       if(!S.wineReleaseItems)S.wineReleaseItems=[];
       itemRows.forEach(r=>S.wineReleaseItems.push({id:r[0],wineId:r[1],projectId:r[2],task:r[3],assignee:parseInt(r[4]),done:false,completedBy:'',completedAt:''}));
@@ -5843,6 +5844,27 @@ async function saveWineReleaseWine(){
     renderProjects();
     showToast(editId?'Wine updated':'Wine added — checklist created');
   }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+async function moveWineRelease(wineId,projectId,dir){
+  const wines=(S.wineReleaseWines||[]).filter(w=>w.projectId===projectId).sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
+  const idx=wines.findIndex(w=>w.id===wineId);
+  const swapIdx=idx+dir;
+  if(swapIdx<0||swapIdx>=wines.length)return;
+  // Swap sort orders
+  const a=wines[idx],b=wines[swapIdx];
+  const tmp=a.sortOrder??idx;
+  a.sortOrder=b.sortOrder??swapIdx;
+  b.sortOrder=tmp;
+  // Save both to sheet
+  try{
+    const allRows=await sheetsGet('WineReleaseWines!A2:E');
+    for(const wine of [a,b]){
+      const ri=allRows.findIndex(r=>r[0]===wine.id);
+      if(ri>=0)await sheetsUpdate('WineReleaseWines!E'+(ri+2),[[wine.sortOrder]]);
+    }
+  }catch(e){showToast('Error saving order: '+e.message,'err');}
+  renderWineReleaseList(projectId);
 }
 
 async function deleteWineReleaseWine(wineId){
@@ -5891,72 +5913,80 @@ async function assignWineReleaseItem(itemId,assignee){
 
 function renderWineReleaseList(projectId){
   const el=document.getElementById('pj-winerelease-list');if(!el)return;
-  const wines=(S.wineReleaseWines||[]).filter(w=>w.projectId===projectId);
+  const wines=(S.wineReleaseWines||[]).filter(w=>w.projectId===projectId).sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
   if(!wines.length){el.innerHTML='<div class="empty">No wines yet. Click + Add wine to get started.</div>';return;}
+  const openWines=new Set([...(el._openWines||[])]);
   el.innerHTML='';
+  el._openWines=openWines;
   wines.forEach(wine=>{
     const items=(S.wineReleaseItems||[]).filter(i=>i.wineId===wine.id);
     const checkableItems=items.filter(i=>!WINE_RELEASE_CHECKLIST.find(c=>c.task===i.task&&c.isHeader));
     const doneCount=checkableItems.filter(i=>i.done).length;
     const pct=checkableItems.length?Math.round(doneCount/checkableItems.length*100):0;
+    const isOpen=openWines.has(wine.id);
+    const nextItem=checkableItems.find(i=>!i.done);
+    const nextTaskText=nextItem?nextItem.task:'All tasks complete ✓';
     const wineDiv=document.createElement('div');
-    wineDiv.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden;';
-    // Wine header
+    wineDiv.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;overflow:hidden;';
     const header=document.createElement('div');
-    header.style.cssText='padding:14px 16px;background:var(--burg);color:white;display:flex;align-items:center;gap:12px;';
+    header.style.cssText='padding:14px 16px;background:var(--burg);color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;';
+    header.onclick=()=>{
+      if(openWines.has(wine.id))openWines.delete(wine.id);else openWines.add(wine.id);
+      el._openWines=openWines;
+      renderWineReleaseList(projectId);
+    };
     header.innerHTML=`
-      <div style="flex:1;">
-        <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;">🍷 ${wine.wineName}</div>
-        <div style="font-size:12px;opacity:.8;margin-top:2px;">${doneCount} of ${checkableItems.length} tasks complete</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:80px;background:rgba(255,255,255,.25);border-radius:4px;height:6px;overflow:hidden;">
-          <div style="width:${pct}%;background:white;height:100%;border-radius:4px;transition:width .3s;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;">🍷 ${wine.wineName}</span>
+          <div style="flex:1;max-width:120px;background:rgba(255,255,255,.25);border-radius:4px;height:5px;overflow:hidden;">
+            <div style="width:${pct}%;background:white;height:100%;border-radius:4px;transition:width .3s;"></div>
+          </div>
+          <span style="font-size:11px;opacity:.85;">${doneCount}/${checkableItems.length}</span>
         </div>
-        <span style="font-size:12px;opacity:.9;">${pct}%</span>
+        ${!isOpen?`<div style="font-size:12px;opacity:.75;margin-top:3px;">Next: <span style="font-style:italic;">${nextTaskText}</span></div>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;" onclick="event.stopPropagation()">
+        <button onclick="moveWineRelease('${wine.id}','${projectId}',-1)" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:13px;border-radius:4px;padding:2px 7px;" title="Move up">↑</button>
+        <button onclick="moveWineRelease('${wine.id}','${projectId}',1)" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:13px;border-radius:4px;padding:2px 7px;" title="Move down">↓</button>
         <button onclick="openAddWineModal('${wine.id}')" style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:12px;border-radius:4px;padding:3px 8px;">✏️</button>
         <button onclick="deleteWineReleaseWine('${wine.id}')" style="background:rgba(255,255,255,.15);border:none;cursor:pointer;color:white;font-size:12px;border-radius:4px;padding:3px 8px;">✕</button>
+        <span style="font-size:14px;opacity:.8;">${isOpen?'▲':'▼'}</span>
       </div>`;
     wineDiv.appendChild(header);
-    // Checklist
-    const list=document.createElement('div');
-    list.style.cssText='padding:8px 0;';
-    items.forEach(item=>{
-      const tmpl=WINE_RELEASE_CHECKLIST.find(c=>c.task===item.task);
-      const isHeader=tmpl?.isHeader||false;
-      const instrId='instr-'+item.id;
-      const row=document.createElement('div');
-      if(isHeader){
-        row.style.cssText='padding:8px 16px;background:var(--cream);border-bottom:1px solid var(--bdr);';
-        row.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--burg);">${item.task}</div>
-          ${tmpl?.instructions?`<div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${tmpl.instructions}</div>`:''}`;
-      } else {
-        const rep=TEAM[item.assignee]||TEAM[0];
-        row.style.cssText=`padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:flex-start;gap:12px;${item.done?'opacity:.55;':''}`;
-        row.innerHTML=`
-          <div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;background:${item.done?'var(--s-tx)':'white'};color:white;font-size:10px;flex-shrink:0;margin-top:2px;"
-            onclick="toggleWineReleaseItem('${item.id}')">
-            ${item.done?'✓':''}
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:13px;font-weight:500;${item.done?'text-decoration:line-through;color:var(--ink-m);':''}">${item.task}</span>
-              ${item.done&&item.completedBy?`<span style="font-size:11px;color:var(--s-tx);">✓ ${item.completedBy} · ${item.completedAt}</span>`:''}
+    if(isOpen){
+      const list=document.createElement('div');
+      list.style.cssText='padding:8px 0;';
+      items.forEach(item=>{
+        const tmpl=WINE_RELEASE_CHECKLIST.find(c=>c.task===item.task);
+        const isHeaderItem=tmpl&&tmpl.isHeader;
+        const instrId='instr-'+item.id;
+        const row=document.createElement('div');
+        if(isHeaderItem){
+          row.style.cssText='padding:8px 16px;background:var(--cream);border-bottom:1px solid var(--bdr);';
+          row.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--burg);">${item.task}</div>${tmpl.instructions?`<div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${tmpl.instructions}</div>`:''}`;
+        } else {
+          const assigneeVal=parseInt(item.assignee);
+          const hasAssignee=assigneeVal>=0&&TEAM[assigneeVal];
+          row.style.cssText=`padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:flex-start;gap:12px;${item.done?'opacity:.55;':''}`;
+          row.innerHTML=`
+            <div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;background:${item.done?'var(--s-tx)':'white'};color:white;font-size:10px;flex-shrink:0;margin-top:2px;" onclick="toggleWineReleaseItem('${item.id}')">${item.done?'✓':''}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="font-size:13px;font-weight:500;${item.done?'text-decoration:line-through;color:var(--ink-m);':''}">${item.task}</span>
+                ${item.done&&item.completedBy?`<span style="font-size:11px;color:var(--s-tx);">✓ ${item.completedBy} · ${item.completedAt}</span>`:''}
+              </div>
+              ${tmpl&&tmpl.instructions?`<button onclick="document.getElementById('${instrId}').style.display=document.getElementById('${instrId}').style.display==='none'?'block':'none'" style="background:none;border:none;cursor:pointer;color:var(--burg);font-size:11px;padding:2px 0;margin-top:2px;">📋 Instructions</button><div id="${instrId}" style="display:none;margin-top:6px;padding:8px 10px;background:var(--cream);border-radius:6px;font-size:12px;color:var(--ink);line-height:1.5;border-left:3px solid var(--burg);">${tmpl.instructions}</div>`:''}
             </div>
-            ${tmpl&&tmpl.instructions?`<button onclick="document.getElementById('${instrId}').style.display=document.getElementById('${instrId}').style.display==='none'?'block':'none'"
-              style="background:none;border:none;cursor:pointer;color:var(--burg);font-size:11px;padding:2px 0;margin-top:2px;">📋 Instructions</button>
-              <div id="${instrId}" style="display:none;margin-top:6px;padding:8px 10px;background:var(--cream);border-radius:6px;font-size:12px;color:var(--ink);line-height:1.5;border-left:3px solid var(--burg);">${tmpl.instructions}</div>`:''}
-          </div>
-          <div style="flex-shrink:0;">
-            <select style="font-size:11px;border:1px solid var(--bdr);border-radius:5px;padding:2px 5px;background:white;cursor:pointer;"
-              onchange="assignWineReleaseItem('${item.id}',this.value)">
-              ${TEAM.map((t,i)=>`<option value="${i}"${item.assignee===i?' selected':''}>${t.name.split(' ')[0]}</option>`).join('')}
-            </select>
-          </div>`;
-      }
-      list.appendChild(row);
-    });
-    wineDiv.appendChild(list);
+            <select style="font-size:11px;border:1px solid var(--bdr);border-radius:5px;padding:2px 5px;background:white;cursor:pointer;flex-shrink:0;" onchange="assignWineReleaseItem('${item.id}',this.value)">
+              <option value="-1"${!hasAssignee?' selected':''}>Unassigned</option>
+              ${TEAM.map((t,i)=>`<option value="${i}"${assigneeVal===i?' selected':''}>${t.name.split(' ')[0]}</option>`).join('')}
+            </select>`;
+        }
+        list.appendChild(row);
+      });
+      wineDiv.appendChild(list);
+    }
     el.appendChild(wineDiv);
   });
 }
