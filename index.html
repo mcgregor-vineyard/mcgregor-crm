@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.221</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.222</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -494,6 +494,7 @@ select.fi{cursor:pointer;}
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                   <div style="font-weight:600;font-size:14px;">Wine Inventory</div>
                   <div style="display:flex;gap:6px;">
+                    <button class="btn" style="font-size:12px;" onclick="openInventoryPrintModal()">🖨 Print</button>
                     <button class="btn" style="font-size:12px;" onclick="openInventoryUpload()">Upload list</button>
                     <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openInventoryWineModal()">+ Add wine</button>
                   </div>
@@ -1167,13 +1168,36 @@ select.fi{cursor:pointer;}
   </div>
 </div>
 
+<!-- Inventory print modal -->
+<div id="inventory-print-modal" class="modal-backdrop">
+  <div class="modal" style="width:420px;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle">Print inventory sheet</div><button class="mcls" onclick="closeModal('inventory-print-modal')">✕</button></div>
+    <div class="mbdy">
+      <div class="fr"><label class="fl">Wines to include</label>
+        <select class="fi" id="inv-print-filter">
+          <option value="all">All wines</option>
+          <option value="due">Due or overdue only</option>
+        </select>
+      </div>
+      <div id="inv-print-count" style="padding:8px 12px;background:var(--cream);border-radius:6px;font-size:13px;color:var(--ink-m);margin-top:4px;"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn" onclick="closeModal('inventory-print-modal')">Cancel</button>
+      <button class="btn btnp" onclick="generateInventoryPrint()">🖨 Open print page</button>
+    </div>
+  </div>
+</div>
+
 <!-- Inventory wine entry modal -->
 <div id="inventory-wine-modal" class="modal-backdrop">
   <div class="modal" style="width:520px;" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle" id="iw-title">Add Wine</div><button class="mcls" onclick="closeModal('inventory-wine-modal')">✕</button></div>
     <div class="mbdy">
       <input type="hidden" id="iw-id" />
-      <div class="fr"><label class="fl">Wine name *</label><input type="text" class="fi" id="iw-name" placeholder="e.g. 2022 Riesling Reserve" /></div>
+      <div class="f2">
+        <div class="fr"><label class="fl">Wine name *</label><input type="text" class="fi" id="iw-name" placeholder="e.g. 2022 Riesling Reserve" /></div>
+        <div class="fr"><label class="fl">Count frequency (days)</label><input type="number" class="fi" id="iw-frequency" min="1" max="365" placeholder="30" value="30" /></div>
+      </div>
       <div class="fr"><label class="fl">Count date</label><input type="date" class="fi" id="iw-date" /></div>
       <div style="background:var(--cream);border:1px solid var(--bdr);border-radius:8px;padding:14px;margin-top:4px;">
         <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-f);margin-bottom:10px;">Inventory Calculator</div>
@@ -1979,7 +2003,7 @@ async function ensureSheets(){
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:I1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done','CustomerID']]);
   if(needed.includes('ReminderNotes'))await sheetsUpdate('ReminderNotes!A1:F1',[['ID','ReminderID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('Projects'))await sheetsUpdate('Projects!A1:I1',[['ID','Name','Description','StartDate','EndDate','Assignee','Status','CreatedAt','Type']]);
-  if(needed.includes('InventoryEntries'))await sheetsUpdate('InventoryEntries!A1:K1',[['ID','ProjectID','WineName','CountDate','NewBottleCount','BottlesOwed','ReserveNumber','AvailableForSale','Notes','CreatedAt','CountedBy']]);
+  if(needed.includes('InventoryEntries'))await sheetsUpdate('InventoryEntries!A1:L1',[['ID','ProjectID','WineName','CountDate','NewBottleCount','BottlesOwed','ReserveNumber','AvailableForSale','Notes','CreatedAt','CountedBy','FrequencyDays']]);
   if(needed.includes('ClubComms'))await sheetsUpdate('ClubComms!A1:H1',[['ID','MembershipID','CustomerID','Method','Outcome','Notes','Author','CreatedAt']]);
   if(needed.includes('ClubMembers'))await sheetsUpdate('ClubMembers!A1:K1',[['MembershipID','CustomerID','ClubTitle','Status','FirstName','LastName','Email','Phone','NextProcessDate','DeliveryMethod','LastSync']]);
   if(needed.includes('ClubSettings'))await sheetsUpdate('ClubSettings!A1:B1',[['Key','Value']]);
@@ -2005,7 +2029,7 @@ async function loadFromSheets(){
       sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
       sheetsGet('ReminderNotes!A2:F'),
       sheetsGet('Projects!A2:I'),sheetsGet('ProjectContacts!A2:O'),sheetsGet('ProjectNotes!A2:F'),sheetsGet('ProjectItemNotes!A2:F'),
-      sheetsGet('InventoryEntries!A2:K'),sheetsGet('ClubComms!A2:H'),
+      sheetsGet('InventoryEntries!A2:L'),sheetsGet('ClubComms!A2:H'),
       sheetsGet('ClubMembers!A2:K').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[]),
       sheetsGet('WineReleaseWines!A2:E').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[])
     ]);
@@ -2021,7 +2045,7 @@ async function loadFromSheets(){
     S.projectContacts=(projectContactRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',first:r[2]||'',last:r[3]||'',email:r[4]||'',phone:r[5]||'',orderNo:r[6]||'',c7CustomerId:r[7]||'',c7OrderData:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',notes:r[11]||'',done:r[12]==='true',completedBy:r[13]||'',completedAt:r[14]||''}));
     S.projectNotes=(projectNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.projectItemNotes=(projectItemNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
-    S.inventoryEntries=(inventoryRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',countDate:r[3]||'',newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:r[8]||'',createdAt:r[9]||'',countedBy:r[10]||''}));
+    S.inventoryEntries=(inventoryRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',countDate:r[3]||'',newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:r[8]||'',createdAt:r[9]||'',countedBy:r[10]||'',frequencyDays:r[11]!==''&&r[11]!==undefined?parseInt(r[11]):30}));
     S.clubComms=(clubCommsRows||[]).filter(r=>r[0]).map(r=>({id:r[0],membershipId:r[1]||'',customerId:r[2]||'',method:r[3]||'',outcome:r[4]||'',notes:r[5]||'',author:parseInt(r[6])||0,createdAt:r[7]||''}));
     // Load cached club members from sheet
     if((clubMemberRows||[]).filter(r=>r[0]).length){      S.clubMembers=(clubMemberRows||[]).filter(r=>r[0]).map(r=>({
@@ -7432,7 +7456,18 @@ function renderPreOrderList(projectId){
 }
 
 // ---- Inventory ----
-let invSort={col:'wineName',dir:'asc'};
+let invSort={col:'due',dir:'asc'};
+
+function invDueStatus(e){
+  // Returns {isDue, isOverdue, daysUntilDue} based on lastCounted + frequencyDays
+  const freq=e.frequencyDays||30;
+  const hasCounted=e.availableForSale!==null&&e.countDate;
+  if(!hasCounted)return{isDue:true,isOverdue:false,daysUntilDue:-9999,daysAgo:null};
+  const t=today();
+  const daysAgo=Math.floor((new Date(t)-new Date(e.countDate))/(1000*60*60*24));
+  const daysUntilDue=freq-daysAgo;
+  return{isDue:daysUntilDue<=0,isOverdue:daysAgo>freq,daysUntilDue,daysAgo};
+}
 
 function renderInventoryList(projectId){
   const entries=S.inventoryEntries.filter(e=>e.projectId===projectId);
@@ -7440,37 +7475,43 @@ function renderInventoryList(projectId){
   if(!entries.length){el.innerHTML='<div class="empty">No wines yet. Click + Add wine or upload a list.</div>';return;}
   el.innerHTML='';
 
-  // Sort
+  // Sort — due always bubble to top
   const sorted=[...entries].sort((a,b)=>{
-    let va,vb;
+    const da=invDueStatus(a),db=invDueStatus(b);
+    if(invSort.col==='due'){
+      // Due/overdue first, then by daysUntilDue ascending
+      if(da.isDue&&!db.isDue)return -1;
+      if(!da.isDue&&db.isDue)return 1;
+      return(da.daysUntilDue??0)-(db.daysUntilDue??0);
+    }
     if(invSort.col==='lastCounted'){
-      // Entries with no count go to bottom regardless of direction
       const hasA=a.availableForSale!==null&&a.countDate;
       const hasB=b.availableForSale!==null&&b.countDate;
-      if(!hasA&&!hasB)return 0;
-      if(!hasA)return 1;
-      if(!hasB)return -1;
-      va=a.countDate;vb=b.countDate;
-    } else {
-      va=a.wineName.toLowerCase();vb=b.wineName.toLowerCase();
+      if(!hasA&&!hasB)return 0;if(!hasA)return 1;if(!hasB)return -1;
+      return invSort.dir==='asc'?a.countDate.localeCompare(b.countDate):b.countDate.localeCompare(a.countDate);
     }
+    if(invSort.col==='frequency'){
+      const fa=a.frequencyDays||30,fb=b.frequencyDays||30;
+      return invSort.dir==='asc'?fa-fb:fb-fa;
+    }
+    const va=a.wineName.toLowerCase(),vb=b.wineName.toLowerCase();
     return invSort.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
   });
 
   const t=today();
-  const sortArrow=d=>d==='asc'?'↑':'↓';
-  const thStyle='cursor:pointer;user-select:none;white-space:nowrap;';
+  const sa=col=>invSort.col===col?(invSort.dir==='asc'?'↑':'↓'):'';
+  const th=`cursor:pointer;user-select:none;white-space:nowrap;`;
 
   const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
-  const wineArrow=invSort.col==='wineName'?sortArrow(invSort.dir):'';
-  const dateArrow=invSort.col==='lastCounted'?sortArrow(invSort.dir):'';
   tbl.innerHTML=`<thead><tr>
-    <th style="${thStyle}" onclick="toggleInvSort('wineName','${projectId}')">Wine ${wineArrow}</th>
+    <th style="${th}" onclick="toggleInvSort('wineName','${projectId}')">Wine ${sa('wineName')}</th>
     <th style="text-align:center;color:var(--s-tx);">Available</th>
     <th style="text-align:center;">New count</th>
     <th style="text-align:center;">Owed</th>
     <th style="text-align:center;">Reserve</th>
-    <th style="${thStyle}" onclick="toggleInvSort('lastCounted','${projectId}')">Last counted ${dateArrow}</th>
+    <th style="${th}" onclick="toggleInvSort('lastCounted','${projectId}')">Last counted ${sa('lastCounted')}</th>
+    <th style="${th};text-align:center;" onclick="toggleInvSort('due','${projectId}')">Due ${sa('due')}</th>
+    <th style="${th};text-align:center;" onclick="toggleInvSort('frequency','${projectId}')">Every (days) ${sa('frequency')}</th>
     <th>Notes</th>
     <th></th>
   </tr></thead>`;
@@ -7479,13 +7520,15 @@ function renderInventoryList(projectId){
   sorted.forEach(e=>{
     const avail=e.availableForSale;
     const availColor=avail===null?'var(--ink-m)':avail<0?'var(--d-tx)':avail===0?'var(--w-tx)':'var(--s-tx)';
-    // Only show last counted when numbers have been submitted
     const hasCounted=avail!==null&&e.countDate;
-    const daysAgo=hasCounted?Math.floor((new Date(t)-new Date(e.countDate))/(1000*60*60*24)):null;
-    const dateColor=daysAgo===null?'var(--ink-m)':daysAgo>30?'var(--d-tx)':daysAgo>14?'var(--w-tx)':'var(--s-tx)';
+    const {isDue,isOverdue,daysUntilDue,daysAgo}=invDueStatus(e);
+    const dateColor=daysAgo===null?'var(--ink-m)':daysAgo>(e.frequencyDays||30)?'var(--d-tx)':daysAgo>(e.frequencyDays||30)*0.75?'var(--w-tx)':'var(--s-tx)';
     const daysLabel=daysAgo===null?'Not yet counted':daysAgo===0?'Today':daysAgo===1?'Yesterday':daysAgo+' days ago';
+    const dueLabel=daysAgo===null?'—':isOverdue?'Overdue':isDue?'Due now':daysUntilDue===1?'1 day':daysUntilDue+' days';
+    const dueColor=isOverdue?'var(--d-tx)':isDue?'var(--w-tx)':'var(--ink-m)';
+    const rowBg=isOverdue?'background:#FFF0F0;':isDue?'background:#FFFBF0;':'';
     const tr=document.createElement('tr');
-    tr.style.cursor='pointer';
+    tr.style.cssText='cursor:pointer;'+rowBg;
     tr.onclick=()=>openInventoryWineModal(e.id);
     tr.innerHTML=`<td style="font-weight:500;">${e.wineName}</td>
       <td style="text-align:center;font-size:18px;font-weight:700;color:${availColor};">${avail!==null?avail:'—'}</td>
@@ -7497,7 +7540,14 @@ function renderInventoryList(projectId){
         ${hasCounted?`<div style="font-size:11px;color:var(--ink-m);">${e.countDate}</div>`:''}
         ${hasCounted&&e.countedBy?`<div style="font-size:11px;font-weight:500;color:var(--ink);">by ${e.countedBy}</div>`:''}
       </td>
-      <td style="font-size:12px;color:var(--ink-m);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.notes||''}</td>
+      <td style="text-align:center;font-weight:600;font-size:12px;color:${dueColor};">${dueLabel}</td>
+      <td style="text-align:center;" onclick="event.stopPropagation()">
+        <input type="number" min="1" max="365" value="${e.frequencyDays||30}"
+          style="width:54px;border:1px solid var(--bdr);border-radius:5px;padding:3px 5px;font-size:12px;text-align:center;"
+          onchange="saveInventoryFrequency('${e.id}',this.value)"
+          onclick="event.stopPropagation()" />
+      </td>
+      <td style="font-size:12px;color:var(--ink-m);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.notes||''}</td>
       <td onclick="event.stopPropagation()"><button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="deleteInventoryWine('${e.id}')">✕</button></td>`;
     tbody.appendChild(tr);
   });
@@ -7506,19 +7556,121 @@ function renderInventoryList(projectId){
 
   // Summary bar
   const withCount=entries.filter(e=>e.availableForSale!==null);
-  if(withCount.length){
-    const totalAvail=withCount.reduce((s,e)=>s+(e.availableForSale||0),0);
-    const bar=document.createElement('div');
-    bar.style.cssText='margin-top:10px;padding:10px 14px;background:var(--cream);border:1px solid var(--bdr);border-radius:7px;font-size:13px;display:flex;gap:20px;';
-    bar.innerHTML=`<span><strong>${withCount.length}</strong> of <strong>${entries.length}</strong> wines counted</span><span style="color:var(--s-tx);"><strong>${totalAvail}</strong> total bottles available</span>`;
-    el.appendChild(bar);
-  }
+  const dueCount=entries.filter(e=>invDueStatus(e).isDue).length;
+  const bar=document.createElement('div');
+  bar.style.cssText='margin-top:10px;padding:10px 14px;background:var(--cream);border:1px solid var(--bdr);border-radius:7px;font-size:13px;display:flex;gap:20px;flex-wrap:wrap;';
+  bar.innerHTML=`<span><strong>${withCount.length}</strong> of <strong>${entries.length}</strong> wines counted</span>${withCount.length?`<span style="color:var(--s-tx);"><strong>${withCount.reduce((s,e)=>s+(e.availableForSale||0),0)}</strong> total available</span>`:''}${dueCount?`<span style="color:var(--w-tx);"><strong>${dueCount}</strong> due to count</span>`:''}`;
+  el.appendChild(bar);
 }
 
 function toggleInvSort(col,projectId){
   if(invSort.col===col)invSort.dir=invSort.dir==='asc'?'desc':'asc';
-  else{invSort.col=col;invSort.dir=col==='lastCounted'?'asc':'asc';}
+  else{invSort.col=col;invSort.dir='asc';}
   renderInventoryList(projectId);
+}
+
+async function saveInventoryFrequency(entryId,val){
+  const e=S.inventoryEntries.find(x=>x.id===entryId);if(!e)return;
+  const freq=parseInt(val)||30;
+  e.frequencyDays=freq;
+  try{
+    const allRows=await sheetsGet('InventoryEntries!A2:L');
+    const rowIdx=allRows.findIndex(r=>r[0]===entryId);
+    if(rowIdx>=0)await sheetsUpdate('InventoryEntries!L'+(rowIdx+2),[[freq]]);
+  }catch(err){showToast('Error: '+err.message,'err');}
+}
+
+function openInventoryPrintModal(){
+  const projectId=S.activeProject;
+  const entries=S.inventoryEntries.filter(e=>e.projectId===projectId);
+  const due=entries.filter(e=>invDueStatus(e).isDue).length;
+  const countEl=document.getElementById('inv-print-count');
+  if(countEl)countEl.textContent=`${entries.length} total wines · ${due} due or overdue`;
+  document.getElementById('inv-print-filter').onchange=()=>{
+    const filter=document.getElementById('inv-print-filter').value;
+    const count=filter==='due'?due:entries.length;
+    if(countEl)countEl.textContent=`${count} wine${count!==1?'s':''} will be printed`;
+  };
+  openModal('inventory-print-modal');
+}
+
+function generateInventoryPrint(){
+  const projectId=S.activeProject;
+  const p=S.projects.find(x=>x.id===projectId);
+  const filter=document.getElementById('inv-print-filter').value;
+  const t=today();
+  let entries=S.inventoryEntries.filter(e=>e.projectId===projectId);
+  if(filter==='due')entries=entries.filter(e=>invDueStatus(e).isDue);
+  // Sort: overdue first, then due, then by wine name
+  entries=[...entries].sort((a,b)=>{
+    const da=invDueStatus(a),db=invDueStatus(b);
+    if(da.isOverdue&&!db.isOverdue)return -1;
+    if(!da.isOverdue&&db.isOverdue)return 1;
+    if(da.isDue&&!db.isDue)return -1;
+    if(!da.isDue&&db.isDue)return 1;
+    return a.wineName.localeCompare(b.wineName);
+  });
+  const filterLabel=filter==='due'?'Due/Overdue only':'All wines';
+  const rows=entries.map(e=>{
+    const {isDue,isOverdue,daysAgo}=invDueStatus(e);
+    const statusLabel=isOverdue?'OVERDUE':isDue?'DUE':'OK';
+    const statusColor=isOverdue?'#C62828':isDue?'#E65100':'#2E7D32';
+    const hasCounted=e.availableForSale!==null&&e.countDate;
+    return`<tr${isOverdue?' style="background:#FFF0F0;"':isDue?' style="background:#FFFBF0;"':''}>
+      <td class="wine-name">${e.wineName}</td>
+      <td style="text-align:center;font-weight:700;color:${statusColor};">${statusLabel}</td>
+      <td style="text-align:center;">${hasCounted?e.countDate:'—'}</td>
+      <td style="text-align:center;">${e.frequencyDays||30}d</td>
+      <td style="text-align:center;border:1px solid #ccc;min-width:50px;"> </td>
+      <td style="text-align:center;border:1px solid #ccc;min-width:50px;"> </td>
+      <td style="text-align:center;border:1px solid #ccc;min-width:50px;"> </td>
+      <td style="text-align:center;border:1px solid #ccc;min-width:60px;font-weight:700;"> </td>
+    </tr>`;
+  }).join('');
+
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${p?p.name:'Inventory'} — Count Sheet ${t}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#1a1a1a;}
+  .page{padding:12mm 10mm;}
+  .header{border-bottom:2px solid #6B1A2A;padding-bottom:8px;margin-bottom:10px;}
+  .title{font-size:15px;font-weight:700;color:#6B1A2A;}
+  .sub{font-size:9px;color:#666;margin-top:3px;}
+  table{width:100%;border-collapse:collapse;margin-top:8px;}
+  th{background:#6B1A2A;color:white;padding:4px 6px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.04em;}
+  td{padding:6px 6px;border-bottom:1px solid #e5e5e5;font-size:10px;vertical-align:middle;}
+  tr:nth-child(even) td{background:#FAFAFA;}
+  .wine-name{font-weight:600;min-width:160px;}
+  .formula{font-size:8px;color:#999;margin-top:2px;}
+  @media print{body{font-size:9px;}}
+</style>
+</head><body><div class="page">
+<div class="header">
+  <div class="title">${p?p.name:'Wine Inventory'} — Count Sheet</div>
+  <div class="sub">Date: ${t} · ${filterLabel} · ${entries.length} wines</div>
+</div>
+<table>
+  <thead><tr>
+    <th>Wine</th>
+    <th>Status</th>
+    <th>Last counted</th>
+    <th>Frequency</th>
+    <th style="text-align:center;">New bottle<br>count</th>
+    <th style="text-align:center;">Bottles<br>owed</th>
+    <th style="text-align:center;">Reserve<br>number</th>
+    <th style="text-align:center;">Available<br>for sale</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="formula" style="margin-top:8px;color:#999;">Formula: New Bottle Count − Bottles Owed − Reserve Number = Available for Sale</div>
+</div>
+<script>window.onload=()=>window.print();<\/script>
+</body></html>`;
+
+  const win=window.open('','_blank');
+  if(win){win.document.write(html);win.document.close();}
+  closeModal('inventory-print-modal');
 }
 
 function calcInventory(){
@@ -7542,6 +7694,7 @@ function openInventoryWineModal(entryId){
   document.getElementById('iw-owed').value=e&&e.bottlesOwed!==null?e.bottlesOwed:'';
   document.getElementById('iw-reserve').value=e&&e.reserveNumber!==null?e.reserveNumber:'';
   document.getElementById('iw-notes').value=e?e.notes||'':'';
+  document.getElementById('iw-frequency').value=e&&e.frequencyDays!==undefined?e.frequencyDays:30;
   let countedByIdx=S.cu;
   if(e&&e.countedBy){const idx=TEAM.findIndex(t=>t.name===e.countedBy);if(idx>=0)countedByIdx=idx;}
   document.getElementById('iw-counted-by').value=countedByIdx;
@@ -7559,20 +7712,21 @@ async function saveInventoryWine(){
   const reserveNumber=document.getElementById('iw-reserve').value!==''?parseInt(document.getElementById('iw-reserve').value):null;
   const availableForSale=(newBottleCount!==null&&bottlesOwed!==null&&reserveNumber!==null)?newBottleCount-bottlesOwed-reserveNumber:null;
   const notes=document.getElementById('iw-notes').value.trim();
+  const frequencyDays=parseInt(document.getElementById('iw-frequency').value)||30;
   const projectId=S.activeProject;
   const countedByIdx=parseInt(document.getElementById('iw-counted-by').value);
   const countedBy=TEAM[countedByIdx]?TEAM[countedByIdx].name:'';
   try{
     if(editId){
       const e=S.inventoryEntries.find(x=>x.id===editId);if(!e)return;
-      e.wineName=name;e.countDate=countDate;e.newBottleCount=newBottleCount;e.bottlesOwed=bottlesOwed;e.reserveNumber=reserveNumber;e.availableForSale=availableForSale;e.notes=notes;e.countedBy=countedBy;
-      const allRows=await sheetsGet('InventoryEntries!A2:K');
+      e.wineName=name;e.countDate=countDate;e.newBottleCount=newBottleCount;e.bottlesOwed=bottlesOwed;e.reserveNumber=reserveNumber;e.availableForSale=availableForSale;e.notes=notes;e.frequencyDays=frequencyDays;e.countedBy=countedBy;
+      const allRows=await sheetsGet('InventoryEntries!A2:L');
       const rowIdx=allRows.findIndex(r=>r[0]===editId);
-      if(rowIdx>=0)await sheetsUpdate('InventoryEntries!A'+(rowIdx+2)+':K'+(rowIdx+2),[[e.id,e.projectId,name,countDate,newBottleCount??'',bottlesOwed??'',reserveNumber??'',availableForSale??'',notes,e.createdAt,countedBy]]);
+      if(rowIdx>=0)await sheetsUpdate('InventoryEntries!A'+(rowIdx+2)+':L'+(rowIdx+2),[[e.id,e.projectId,name,countDate,newBottleCount??'',bottlesOwed??'',reserveNumber??'',availableForSale??'',notes,e.createdAt,countedBy,frequencyDays]]);
     } else {
       const id=uid();const createdAt=today();
-      await sheetsAppend('InventoryEntries!A:K',[[id,projectId,name,countDate,newBottleCount??'',bottlesOwed??'',reserveNumber??'',availableForSale??'',notes,createdAt,countedBy]]);
-      S.inventoryEntries.push({id,projectId,wineName:name,countDate,newBottleCount,bottlesOwed,reserveNumber,availableForSale,notes,createdAt,countedBy});
+      await sheetsAppend('InventoryEntries!A:L',[[id,projectId,name,countDate,newBottleCount??'',bottlesOwed??'',reserveNumber??'',availableForSale??'',notes,createdAt,countedBy,frequencyDays]]);
+      S.inventoryEntries.push({id,projectId,wineName:name,countDate,newBottleCount,bottlesOwed,reserveNumber,availableForSale,notes,createdAt,countedBy,frequencyDays});
     }
     closeModal('inventory-wine-modal');
     renderInventoryList(projectId);
@@ -7583,9 +7737,9 @@ async function saveInventoryWine(){
 async function deleteInventoryWine(entryId){
   if(!confirm('Remove this wine?'))return;
   try{
-    const allRows=await sheetsGet('InventoryEntries!A2:K');
+    const allRows=await sheetsGet('InventoryEntries!A2:L');
     const rowIdx=allRows.findIndex(r=>r[0]===entryId);
-    if(rowIdx>=0)await sheetsUpdate('InventoryEntries!A'+(rowIdx+2)+':K'+(rowIdx+2),[['','','','','','','','','','','']]);
+    if(rowIdx>=0)await sheetsUpdate('InventoryEntries!A'+(rowIdx+2)+':L'+(rowIdx+2),[['','','','','','','','','','','','']]);
     S.inventoryEntries=S.inventoryEntries.filter(e=>e.id!==entryId);
     renderInventoryList(S.activeProject);
     showToast('Wine removed');
@@ -7641,8 +7795,8 @@ async function confirmInventoryUpload(){
   const projectId=S.activeProject;const createdAt=today();
   try{
     const rows=invPendingUpload.map(w=>[uid(),projectId,w.wineName,today(),w.newBottleCount??'',w.bottlesOwed??'',w.reserveNumber??'',w.availableForSale??'','',createdAt,TEAM[S.cu]?TEAM[S.cu].name:'']);
-    await sheetsAppend('InventoryEntries!A:K',rows);
-    rows.forEach(r=>S.inventoryEntries.push({id:r[0],projectId:r[1],wineName:r[2],countDate:r[3],newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:'',createdAt:r[9],countedBy:r[10]}));
+    await sheetsAppend('InventoryEntries!A:L',rows);
+    rows.forEach(r=>S.inventoryEntries.push({id:r[0],projectId:r[1],wineName:r[2],countDate:r[3],newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:'',createdAt:r[9],countedBy:r[10]||'',frequencyDays:30}));
     closeModal('inventory-upload-modal');
     renderInventoryList(projectId);
     showToast(invPendingUpload.length+' wines imported');
