@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.222</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.223</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -2003,7 +2003,7 @@ async function ensureSheets(){
   if(needed.includes('Reminders'))await sheetsUpdate('Reminders!A1:I1',[['ID','Note','DueDate','Assignee','RefType','RefId','RefName','Done','CustomerID']]);
   if(needed.includes('ReminderNotes'))await sheetsUpdate('ReminderNotes!A1:F1',[['ID','ReminderID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('Projects'))await sheetsUpdate('Projects!A1:I1',[['ID','Name','Description','StartDate','EndDate','Assignee','Status','CreatedAt','Type']]);
-  if(needed.includes('InventoryEntries'))await sheetsUpdate('InventoryEntries!A1:L1',[['ID','ProjectID','WineName','CountDate','NewBottleCount','BottlesOwed','ReserveNumber','AvailableForSale','Notes','CreatedAt','CountedBy','FrequencyDays']]);
+  if(needed.includes('InventoryEntries'))await sheetsUpdate('InventoryEntries!A1:M1',[['ID','ProjectID','WineName','CountDate','NewBottleCount','BottlesOwed','ReserveNumber','AvailableForSale','Notes','CreatedAt','CountedBy','FrequencyDays','Active']]);
   if(needed.includes('ClubComms'))await sheetsUpdate('ClubComms!A1:H1',[['ID','MembershipID','CustomerID','Method','Outcome','Notes','Author','CreatedAt']]);
   if(needed.includes('ClubMembers'))await sheetsUpdate('ClubMembers!A1:K1',[['MembershipID','CustomerID','ClubTitle','Status','FirstName','LastName','Email','Phone','NextProcessDate','DeliveryMethod','LastSync']]);
   if(needed.includes('ClubSettings'))await sheetsUpdate('ClubSettings!A1:B1',[['Key','Value']]);
@@ -2029,7 +2029,7 @@ async function loadFromSheets(){
       sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
       sheetsGet('ReminderNotes!A2:F'),
       sheetsGet('Projects!A2:I'),sheetsGet('ProjectContacts!A2:O'),sheetsGet('ProjectNotes!A2:F'),sheetsGet('ProjectItemNotes!A2:F'),
-      sheetsGet('InventoryEntries!A2:L'),sheetsGet('ClubComms!A2:H'),
+      sheetsGet('InventoryEntries!A2:M'),sheetsGet('ClubComms!A2:H'),
       sheetsGet('ClubMembers!A2:K').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[]),
       sheetsGet('WineReleaseWines!A2:E').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[])
     ]);
@@ -2045,7 +2045,7 @@ async function loadFromSheets(){
     S.projectContacts=(projectContactRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',first:r[2]||'',last:r[3]||'',email:r[4]||'',phone:r[5]||'',orderNo:r[6]||'',c7CustomerId:r[7]||'',c7OrderData:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',notes:r[11]||'',done:r[12]==='true',completedBy:r[13]||'',completedAt:r[14]||''}));
     S.projectNotes=(projectNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.projectItemNotes=(projectItemNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
-    S.inventoryEntries=(inventoryRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',countDate:r[3]||'',newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:r[8]||'',createdAt:r[9]||'',countedBy:r[10]||'',frequencyDays:r[11]!==''&&r[11]!==undefined?parseInt(r[11]):30}));
+    S.inventoryEntries=(inventoryRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',countDate:r[3]||'',newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:r[8]||'',createdAt:r[9]||'',countedBy:r[10]||'',frequencyDays:r[11]!==''&&r[11]!==undefined?parseInt(r[11]):30,active:r[12]!=='false'}));
     S.clubComms=(clubCommsRows||[]).filter(r=>r[0]).map(r=>({id:r[0],membershipId:r[1]||'',customerId:r[2]||'',method:r[3]||'',outcome:r[4]||'',notes:r[5]||'',author:parseInt(r[6])||0,createdAt:r[7]||''}));
     // Load cached club members from sheet
     if((clubMemberRows||[]).filter(r=>r[0]).length){      S.clubMembers=(clubMemberRows||[]).filter(r=>r[0]).map(r=>({
@@ -7469,10 +7469,24 @@ function invDueStatus(e){
   return{isDue:daysUntilDue<=0,isOverdue:daysAgo>freq,daysUntilDue,daysAgo};
 }
 
+async function toggleInventoryActive(entryId){
+  const e=S.inventoryEntries.find(x=>x.id===entryId);if(!e)return;
+  e.active=!e.active;
+  try{
+    const allRows=await sheetsGet('InventoryEntries!A2:M');
+    const rowIdx=allRows.findIndex(r=>r[0]===entryId);
+    if(rowIdx>=0)await sheetsUpdate('InventoryEntries!M'+(rowIdx+2),[[e.active?'true':'false']]);
+    renderInventoryList(e.projectId);
+    showToast(e.active?'Wine moved to active':'Wine moved to inactive');
+  }catch(err){showToast('Error: '+err.message,'err');}
+}
+
 function renderInventoryList(projectId){
-  const entries=S.inventoryEntries.filter(e=>e.projectId===projectId);
+  const allEntries=S.inventoryEntries.filter(e=>e.projectId===projectId);
+  const entries=allEntries.filter(e=>e.active!==false);
+  const inactiveEntries=allEntries.filter(e=>e.active===false);
   const el=document.getElementById('pj-inventory-list');if(!el)return;
-  if(!entries.length){el.innerHTML='<div class="empty">No wines yet. Click + Add wine or upload a list.</div>';return;}
+  if(!allEntries.length){el.innerHTML='<div class="empty">No wines yet. Click + Add wine or upload a list.</div>';return;}
   el.innerHTML='';
 
   // Sort — due always bubble to top
@@ -7548,7 +7562,10 @@ function renderInventoryList(projectId){
           onclick="event.stopPropagation()" />
       </td>
       <td style="font-size:12px;color:var(--ink-m);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.notes||''}</td>
-      <td onclick="event.stopPropagation()"><button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="deleteInventoryWine('${e.id}')">✕</button></td>`;
+      <td onclick="event.stopPropagation()">
+        <button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="deleteInventoryWine('${e.id}')">✕</button>
+        <button class="btn" style="font-size:10px;padding:2px 6px;color:var(--ink-m);margin-top:2px;" onclick="toggleInventoryActive('${e.id}')" title="Move to inactive">Archive</button>
+      </td>`;
     tbody.appendChild(tr);
   });
   tbl.appendChild(tbody);
@@ -7561,6 +7578,46 @@ function renderInventoryList(projectId){
   bar.style.cssText='margin-top:10px;padding:10px 14px;background:var(--cream);border:1px solid var(--bdr);border-radius:7px;font-size:13px;display:flex;gap:20px;flex-wrap:wrap;';
   bar.innerHTML=`<span><strong>${withCount.length}</strong> of <strong>${entries.length}</strong> wines counted</span>${withCount.length?`<span style="color:var(--s-tx);"><strong>${withCount.reduce((s,e)=>s+(e.availableForSale||0),0)}</strong> total available</span>`:''}${dueCount?`<span style="color:var(--w-tx);"><strong>${dueCount}</strong> due to count</span>`:''}`;
   el.appendChild(bar);
+
+  // Inactive wines section — collapsed by default
+  if(inactiveEntries.length){
+    const inactiveId='inv-inactive-'+projectId;
+    const isOpen=el._inactiveOpen||false;
+    const toggleDiv=document.createElement('div');
+    toggleDiv.style.cssText='margin-top:16px;';
+    toggleDiv.innerHTML=`<button style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-m);padding:6px 0;display:flex;align-items:center;gap:6px;" onclick="document.getElementById('${inactiveId}').style.display=document.getElementById('${inactiveId}').style.display==='none'?'block':'none';this.querySelector('span').textContent=document.getElementById('${inactiveId}').style.display==='none'?'▶':'▼'">
+      <span>▶</span> Inactive wines (${inactiveEntries.length})
+    </button>
+    <div id="${inactiveId}" style="display:none;">
+      <table class="tbl" style="table-layout:auto;margin-top:6px;opacity:.75;">
+        <thead><tr style="background:var(--cream);">
+          <th>Wine</th>
+          <th style="text-align:center;">Available</th>
+          <th>Last counted</th>
+          <th>Notes</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${inactiveEntries.map(e=>{
+            const hasCounted=e.availableForSale!==null&&e.countDate;
+            const avail=e.availableForSale;
+            const availColor=avail===null?'var(--ink-m)':avail<0?'var(--d-tx)':avail===0?'var(--w-tx)':'var(--s-tx)';
+            return`<tr style="cursor:pointer;" onclick="openInventoryWineModal('${e.id}')">
+              <td style="font-weight:500;">${e.wineName}</td>
+              <td style="text-align:center;font-weight:700;color:${availColor};">${avail!==null?avail:'—'}</td>
+              <td style="font-size:12px;">${hasCounted?e.countDate+' — by '+(e.countedBy||'?'):'Never'}</td>
+              <td style="font-size:12px;color:var(--ink-m);">${e.notes||''}</td>
+              <td onclick="event.stopPropagation()">
+                <button class="btn" style="font-size:10px;padding:2px 6px;color:var(--s-tx);border-color:var(--s-tx);" onclick="toggleInventoryActive('${e.id}')">Restore</button>
+                <button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="deleteInventoryWine('${e.id}')">✕</button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+    el.appendChild(toggleDiv);
+  }
 }
 
 function toggleInvSort(col,projectId){
@@ -7574,7 +7631,7 @@ async function saveInventoryFrequency(entryId,val){
   const freq=parseInt(val)||30;
   e.frequencyDays=freq;
   try{
-    const allRows=await sheetsGet('InventoryEntries!A2:L');
+    const allRows=await sheetsGet('InventoryEntries!A2:M');
     const rowIdx=allRows.findIndex(r=>r[0]===entryId);
     if(rowIdx>=0)await sheetsUpdate('InventoryEntries!L'+(rowIdx+2),[[freq]]);
   }catch(err){showToast('Error: '+err.message,'err');}
@@ -7720,13 +7777,13 @@ async function saveInventoryWine(){
     if(editId){
       const e=S.inventoryEntries.find(x=>x.id===editId);if(!e)return;
       e.wineName=name;e.countDate=countDate;e.newBottleCount=newBottleCount;e.bottlesOwed=bottlesOwed;e.reserveNumber=reserveNumber;e.availableForSale=availableForSale;e.notes=notes;e.frequencyDays=frequencyDays;e.countedBy=countedBy;
-      const allRows=await sheetsGet('InventoryEntries!A2:L');
+      const allRows=await sheetsGet('InventoryEntries!A2:M');
       const rowIdx=allRows.findIndex(r=>r[0]===editId);
-      if(rowIdx>=0)await sheetsUpdate('InventoryEntries!A'+(rowIdx+2)+':L'+(rowIdx+2),[[e.id,e.projectId,name,countDate,newBottleCount??'',bottlesOwed??'',reserveNumber??'',availableForSale??'',notes,e.createdAt,countedBy,frequencyDays]]);
+      if(rowIdx>=0)await sheetsUpdate('InventoryEntries!A'+(rowIdx+2)+':M'+(rowIdx+2),[[e.id,e.projectId,name,countDate,newBottleCount??'',bottlesOwed??'',reserveNumber??'',availableForSale??'',notes,e.createdAt,countedBy,frequencyDays,e.active!==false?'true':'false']]);
     } else {
       const id=uid();const createdAt=today();
-      await sheetsAppend('InventoryEntries!A:L',[[id,projectId,name,countDate,newBottleCount??'',bottlesOwed??'',reserveNumber??'',availableForSale??'',notes,createdAt,countedBy,frequencyDays]]);
-      S.inventoryEntries.push({id,projectId,wineName:name,countDate,newBottleCount,bottlesOwed,reserveNumber,availableForSale,notes,createdAt,countedBy,frequencyDays});
+      await sheetsAppend('InventoryEntries!A:M',[[id,projectId,name,countDate,newBottleCount??'',bottlesOwed??'',reserveNumber??'',availableForSale??'',notes,createdAt,countedBy,frequencyDays,'true']]);
+      S.inventoryEntries.push({id,projectId,wineName:name,countDate,newBottleCount,bottlesOwed,reserveNumber,availableForSale,notes,createdAt,countedBy,frequencyDays,active:true});
     }
     closeModal('inventory-wine-modal');
     renderInventoryList(projectId);
@@ -7737,9 +7794,9 @@ async function saveInventoryWine(){
 async function deleteInventoryWine(entryId){
   if(!confirm('Remove this wine?'))return;
   try{
-    const allRows=await sheetsGet('InventoryEntries!A2:L');
+    const allRows=await sheetsGet('InventoryEntries!A2:M');
     const rowIdx=allRows.findIndex(r=>r[0]===entryId);
-    if(rowIdx>=0)await sheetsUpdate('InventoryEntries!A'+(rowIdx+2)+':L'+(rowIdx+2),[['','','','','','','','','','','','']]);
+    if(rowIdx>=0)await sheetsUpdate('InventoryEntries!A'+(rowIdx+2)+':M'+(rowIdx+2),[['','','','','','','','','','','','','']]);
     S.inventoryEntries=S.inventoryEntries.filter(e=>e.id!==entryId);
     renderInventoryList(S.activeProject);
     showToast('Wine removed');
@@ -7795,8 +7852,8 @@ async function confirmInventoryUpload(){
   const projectId=S.activeProject;const createdAt=today();
   try{
     const rows=invPendingUpload.map(w=>[uid(),projectId,w.wineName,today(),w.newBottleCount??'',w.bottlesOwed??'',w.reserveNumber??'',w.availableForSale??'','',createdAt,TEAM[S.cu]?TEAM[S.cu].name:'']);
-    await sheetsAppend('InventoryEntries!A:L',rows);
-    rows.forEach(r=>S.inventoryEntries.push({id:r[0],projectId:r[1],wineName:r[2],countDate:r[3],newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:'',createdAt:r[9],countedBy:r[10]||'',frequencyDays:30}));
+    await sheetsAppend('InventoryEntries!A:M',rows);
+    rows.forEach(r=>S.inventoryEntries.push({id:r[0],projectId:r[1],wineName:r[2],countDate:r[3],newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:'',createdAt:r[9],countedBy:r[10]||'',frequencyDays:30,active:true}));
     closeModal('inventory-upload-modal');
     renderInventoryList(projectId);
     showToast(invPendingUpload.length+' wines imported');
