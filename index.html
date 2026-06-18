@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.235</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.236</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -2184,7 +2184,12 @@ function sv(view){
   document.getElementById('view-'+view).classList.add('on');
   ['home','campaigns','contacts','tickets','orders','reminders','outreach','projects','club','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
   const campSection=document.getElementById('sb-campaigns-section');
-  if(campSection)campSection.style.display=(view==='campaigns'||view==='contacts')?'block':'none';
+  const sbToday=document.getElementById('sb-today');
+  const sbActivityWrap=document.getElementById('sb-activity')?.parentElement;
+  const isCampView=view==='campaigns'||view==='contacts';
+  if(campSection)campSection.style.display=isCampView?'block':'none';
+  if(sbToday)sbToday.parentElement.style.display=isCampView?'none':'block';
+  if(sbActivityWrap)sbActivityWrap.style.display=isCampView?'none':'block';
   closeDP();if(view==='home')renderHome();else renderAll();
   renderSidebar();
 }
@@ -5898,7 +5903,7 @@ function renderSidebar(){
           <span style="font-size:9px;font-weight:700;color:${tc};text-transform:uppercase;">${c._type}</span>
           <div class="av ${rep.cls}" style="width:14px;height:14px;font-size:6px;margin-left:auto;">${rep.init}</div>
         </div>
-        ${c._subject?`<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c._subject}</div>`:''}
+        ${c._subject?`<div style="font-size:12px;font-weight:500;color:var(--ink-f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c._subject}</div>`:''}
         <div style="font-size:11px;color:var(--ink-m);">${c.createdAt}</div>
       </div>`;
     }).join(''):'<div style="font-size:12px;color:var(--ink-m);padding:8px 0;">No recent activity</div>';
@@ -6061,7 +6066,7 @@ function renderHome(){
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
               <span style="font-size:10px;font-weight:600;background:${bg};color:${tc};border-radius:4px;padding:1px 6px;">${c._type}</span>
-              ${c._subject?`<span style="font-size:13px;font-weight:600;">${c._subject}</span>`:''}
+              ${c._subject?`<span style="font-size:13px;font-weight:500;color:var(--ink-f);">${c._subject}</span>`:''}
               ${method?`<span style="font-size:11px;color:var(--ink-m);">· ${method}</span>`:''}
               ${outcome?`<span style="font-size:11px;color:var(--ink-m);">${method?'—':'·'} ${outcome}</span>`:''}
             </div>
