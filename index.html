@@ -37,6 +37,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);f
 @keyframes spin{to{transform:rotate(360deg);}}
 .layout{display:flex;height:calc(100vh - 52px);}
 .sidebar{width:210px;background:white;border-right:1px solid var(--bdr);flex-shrink:0;padding:14px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
+.ss-row{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:7px;cursor:pointer;transition:background .12s;}
+.ss-row:hover{background:var(--burg-f);}
+.ss-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;}
+.ss-label{font-size:12px;color:var(--ink-f);flex:1;}
+.ss-val{font-size:13px;font-weight:700;color:var(--burg);min-width:20px;text-align:right;}
 .sl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-f);margin-bottom:6px;}
 .sstat{display:flex;justify-content:space-between;gap:6px;}
 .ss{flex:1;text-align:center;}
@@ -140,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.231</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.233</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -180,16 +185,53 @@ select.fi{cursor:pointer;}
 
 <div class="layout">
   <div class="sidebar">
+    <!-- Persistent summary strip -->
     <div>
+      <div class="sl">Today</div>
+      <div id="sb-today" style="display:flex;flex-direction:column;gap:6px;">
+        <div class="ss-row" onclick="sv('reminders')" title="Reminders due">
+          <span class="ss-icon">🔔</span>
+          <span class="ss-label">Reminders due</span>
+          <span class="ss-val" id="sb-reminders-due">0</span>
+        </div>
+        <div class="ss-row" onclick="sv('tickets')" title="Open tickets">
+          <span class="ss-icon">🎫</span>
+          <span class="ss-label">Open tickets</span>
+          <span class="ss-val" id="sb-tickets-open">0</span>
+        </div>
+        <div class="ss-row" onclick="sv('orders')" title="Outstanding orders">
+          <span class="ss-icon">📦</span>
+          <span class="ss-label">Orders</span>
+          <span class="ss-val" id="sb-orders-active">0</span>
+        </div>
+        <div class="ss-row" onclick="sv('club')" title="Club processing soon">
+          <span class="ss-icon">🍷</span>
+          <span class="ss-label">Club processing</span>
+          <span class="ss-val" id="sb-club-due">0</span>
+        </div>
+        <div class="ss-row" onclick="sv('projects')" title="Inventory due">
+          <span class="ss-icon">📋</span>
+          <span class="ss-label">Inventory due</span>
+          <span class="ss-val" id="sb-inv-due">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent activity feed -->
+    <div style="flex:1;min-height:0;">
+      <div class="sl">Recent activity</div>
+      <div id="sb-activity" style="display:flex;flex-direction:column;gap:1px;"></div>
+    </div>
+
+    <!-- Campaign-specific filters (shown only on Campaigns tab) -->
+    <div id="sb-campaigns-section" style="display:none;">
       <div class="sl">Summary</div>
       <div class="sstat">
         <div class="ss"><div class="ssn" id="sb-camps">0</div><div class="ssl">Campaigns</div></div>
         <div class="ss"><div class="ssn" id="sb-contacts">0</div><div class="ssl">Contacts</div></div>
         <div class="ss"><div class="ssn" id="sb-rev">$0</div><div class="ssl">Revenue</div></div>
       </div>
-    </div>
-    <div>
-      <div class="sl">Filter contacts</div>
+      <div class="sl" style="margin-top:10px;">Filter contacts</div>
       <button class="fbtn on" onclick="sv('contacts');setF('all',this)">All contacts <span class="fc" id="fc-all">0</span></button>
       <button class="fbtn" onclick="sv('contacts');setF('pending',this)">Not contacted <span class="fc" id="fc-pending">0</span></button>
       <button class="fbtn" onclick="sv('contacts');setF('reached',this)">Reached <span class="fc" id="fc-reached">0</span></button>
@@ -197,16 +239,12 @@ select.fi{cursor:pointer;}
       <button class="fbtn" onclick="sv('contacts');setF('noanswer',this)">No answer <span class="fc" id="fc-noanswer">0</span></button>
       <button class="fbtn" onclick="sv('contacts');setF('sold',this)">Sold <span class="fc" id="fc-sold">0</span></button>
       <button class="fbtn" onclick="sv('contacts');setF('nosale',this)">No sale <span class="fc" id="fc-nosale">0</span></button>
-    </div>
-    <div>
-      <div class="sl">Ticket status</div>
+      <div class="sl" style="margin-top:10px;">Ticket status</div>
       <button class="fbtn on" id="tf-all" onclick="sv('tickets');setTF('all',this)">All tickets <span class="fc" id="tfc-all">0</span></button>
       <button class="fbtn" id="tf-open" onclick="sv('tickets');setTF('Open',this)">Open <span class="fc" id="tfc-open">0</span></button>
       <button class="fbtn" id="tf-inprog" onclick="sv('tickets');setTF('In Progress',this)">In progress <span class="fc" id="tfc-inprog">0</span></button>
       <button class="fbtn" id="tf-resolved" onclick="sv('tickets');setTF('Resolved',this)">Resolved</button>
-    </div>
-    <div>
-      <div class="sl">Campaigns</div>
+      <div class="sl" style="margin-top:10px;">Campaigns</div>
       <div id="camp-sidebar"></div>
       <button class="fbtn" style="color:var(--burg);margin-top:4px;" onclick="openNewCamp()">+ New campaign</button>
     </div>
@@ -2073,7 +2111,7 @@ async function loadFromSheets(){
     S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||'',website:r[12]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
-    try{renderAll();if(S.clubMembers.length)renderClubView();renderHome();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
+    try{renderAll();if(S.clubMembers.length)renderClubView();renderHome();renderSidebar();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
   }catch(e){
     console.error('loadFromSheets error:',e);
     setSyncBar('err','Could not connect to Google Sheets: '+e.message);
@@ -2145,7 +2183,10 @@ function sv(view){
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   document.getElementById('view-'+view).classList.add('on');
   ['home','campaigns','contacts','tickets','orders','reminders','outreach','projects','club','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
+  const campSection=document.getElementById('sb-campaigns-section');
+  if(campSection)campSection.style.display=(view==='campaigns'||view==='contacts')?'block':'none';
   closeDP();if(view==='home')renderHome();else renderAll();
+  renderSidebar();
 }
 function setCU(i){S.cu=parseInt(i);document.getElementById('cuav').textContent=TEAM[S.cu].init;}
 function setF(f,el){S.filter=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderContacts();}
@@ -3947,7 +3988,7 @@ async function addOrderMessage(){
 async function updateOrderStatus(){
   const o=S.orderCustomers.find(x=>x.id===S.activeOrderId);if(!o)return;
   o.status=document.getElementById('ot-status').value;
-  if(o.status==='Resolved'&&!o.resolvedAt)o.resolvedAt=today();
+  if(o.status==='Resolved'&&!o.resolvedAt)o.resolvedAt=o.oldestOrderDate||today();
   else if(o.status!=='Resolved')o.resolvedAt='';
   await updateOrderInSheet(o);renderOrders();
   if(o.status==='Resolved')resolveOrderReminders(o.id).catch(()=>{});
@@ -4136,7 +4177,7 @@ async function syncOutstandingOrders(){
 
 async function autoResolveOrderCustomer(){
   const o=S.orderCustomers.find(x=>x.id===S.activeOrderId);if(!o)return;
-  o.status='Resolved';o.resolvedAt=today();
+  o.status='Resolved';o.resolvedAt=o.oldestOrderDate||today();
   document.getElementById('ot-status').value='Resolved';
   await updateOrderInSheet(o);
   // Add auto note
@@ -4172,8 +4213,11 @@ async function checkOrdersResolved(){
         const data=await res.json();
         const unfulfilled=data.orders||[];
         if(unfulfilled.length===0){
-          // All fulfilled — auto-resolve
-          o.status='Resolved';o.resolvedAt=today();
+          // All fulfilled — use the most recent order's date as resolvedAt
+          const allOrders=data.orders||[];
+          const fulfilledDates=allOrders.map(ord=>(ord.orderPaidDate||ord.updatedAt||ord.createdAt||'').slice(0,10)).filter(Boolean).sort();
+          const resolvedDate=fulfilledDates.length?fulfilledDates[fulfilledDates.length-1]:today();
+          o.status='Resolved';o.resolvedAt=resolvedDate;
           await updateOrderInSheet(o);
           const msgId=uid();const createdAt=today();
           const note='Auto-resolved: all orders fulfilled in Commerce7.';
@@ -4752,7 +4796,7 @@ function renderActivityLog(){
     S.reminders.forEach(r=>{
       if(repFilter!=='all'&&String(r.assignee)!==repFilter)return;
       events.push({
-        ts:(()=>{const ms=parseInt((r.id||'x0').slice(1));return ms?new Date(ms).toISOString():''})(),
+        ts:r.dueDate||'',
         type:'reminder',
         icon:'🔔',
         color:'var(--s-bg)',
@@ -5799,7 +5843,68 @@ ${pageHtml}
   closeModal('club-print-modal');
 }
 
-// ---- Home Dashboard ----
+function renderSidebar(){
+  const t=today();
+  // Counts
+  const remDue=(S.reminders||[]).filter(r=>!r.done&&r.dueDate&&r.dueDate<=t).length;
+  const ticketsOpen=(S.tickets||[]).filter(t=>t.status==='Open'||t.status==='In Progress').length;
+  const ordersActive=(S.orderCustomers||[]).filter(o=>o.status!=='Resolved').length;
+  const clubDue=(S.clubMembers||[]).filter(m=>{
+    const d=daysUntil(m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate);
+    return d!==null&&d<=14&&d>=0;
+  }).length;
+  const invDueCount=(S.inventoryEntries||[]).filter(e=>e.active!==false&&invDueStatus(e).isDue).length;
+  const set=(id,val,warn)=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.textContent=val;
+    el.style.color=warn&&val>0?'var(--d-tx)':'var(--burg)';
+  };
+  set('sb-reminders-due',remDue,true);
+  set('sb-tickets-open',ticketsOpen,false);
+  set('sb-orders-active',ordersActive,false);
+  set('sb-club-due',clubDue,false);
+  set('sb-inv-due',invDueCount,true);
+
+  // Recent activity feed — last 5 comms
+  const allComms=[
+    ...(S.clubComms||[]).map(c=>{
+      const m=S.clubMembers.find(x=>x.customerId===c.customerId);
+      const name=m?[(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', '):c.customerId;
+      return{...c,_type:'Club',_subject:name};
+    }),
+    ...(S.orderMsgs||[]).filter(m=>m.method).map(m=>{
+      const o=S.orderCustomers.find(x=>x.id===m.orderCustomerId);
+      return{...m,_type:'Order',_subject:o?o.customerName:''};
+    }),
+    ...(S.ticketMsgs||[]).filter(m=>m.message&&m.method).map(m=>{
+      const tk=S.tickets.find(x=>x.id===m.ticketId);
+      return{...m,_type:'Ticket',_subject:tk?tk.subject:''};
+    }),
+    ...(S.outreachMsgs||[]).filter(m=>m.message).map(m=>{
+      const o=S.outreach.find(x=>x.id===m.outreachId);
+      return{...m,_type:'Outreach',_subject:o?o.name||'':''};
+    }),
+  ].filter(c=>c.createdAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,5);
+
+  const typeColors={Club:'#2E7D32',Order:'#E65100',Ticket:'#4527A0',Outreach:'#0D47A1'};
+  const actEl=document.getElementById('sb-activity');
+  if(actEl){
+    actEl.innerHTML=allComms.length?allComms.map(c=>{
+      const rep=TEAM[c.author!=null?c.author:0]||TEAM[0];
+      const tc=typeColors[c._type]||'var(--ink-f)';
+      return`<div style="padding:7px 0;border-bottom:1px solid var(--bdr);">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
+          <span style="font-size:9px;font-weight:700;color:${tc};text-transform:uppercase;">${c._type}</span>
+          <div class="av ${rep.cls}" style="width:14px;height:14px;font-size:6px;margin-left:auto;">${rep.init}</div>
+        </div>
+        ${c._subject?`<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c._subject}</div>`:''}
+        <div style="font-size:11px;color:var(--ink-m);">${c.createdAt}</div>
+      </div>`;
+    }).join(''):'<div style="font-size:12px;color:var(--ink-m);padding:8px 0;">No recent activity</div>';
+  }
+}
+
 function renderHome(){
   const el=document.getElementById('home-content');if(!el)return;
   const t=today();
@@ -5807,7 +5912,7 @@ function renderHome(){
   const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
   document.getElementById('home-greeting').textContent=(hour<12?'Good morning':hour<17?'Good afternoon':'Good evening')+', McGregor Vineyard';
 
-  // 1. Reminders — due/overdue first, fall back to next upcoming if none
+  // 1. Reminders — due/overdue first, fall back to next upcoming if none — ALL users
   const dueReminders=S.reminders.filter(r=>!r.done&&r.dueDate&&r.dueDate<=t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
   const upcomingReminders=S.reminders.filter(r=>!r.done&&r.dueDate&&r.dueDate>t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
   const showReminders=dueReminders.length?dueReminders:upcomingReminders.slice(0,8);
@@ -5823,7 +5928,7 @@ function renderHome(){
           <div class="av ${rep.cls}" style="width:22px;height:22px;font-size:8px;flex-shrink:0;">${rep.init}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.note}</div>
-            <div style="font-size:11px;color:${dateColor};">${dateLabel}${r.refName?' · '+r.refName:''}</div>
+            <div style="font-size:11px;color:${dateColor};">${dateLabel}${r.refName?' · '+r.refName:''} · <span style="font-weight:600;">${rep.name}</span></div>
           </div>
         </div>`;
       }).join('')+
@@ -5970,16 +6075,46 @@ function renderHome(){
     :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No recent activity</div>`;
 
 
-  // Fix layout — wrap each section properly
+  // 3. Tickets summary
+  const openTickets=S.tickets.filter(t=>t.status==='Open');
+  const inProgressTickets=S.tickets.filter(t=>t.status==='In Progress');
+  const overdueTickets=S.tickets.filter(t=>t.status!=='Resolved'&&t.dueDate&&t.dueDate<t);
+  const ticketsHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:${openTickets.length?'12':'0'}px;">
+    <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;cursor:pointer;" onclick="sv('tickets')">
+      <div style="font-size:22px;font-weight:700;color:var(--w-tx);">${openTickets.length}</div>
+      <div style="font-size:11px;color:var(--ink-m);">Open</div>
+    </div>
+    <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;cursor:pointer;" onclick="sv('tickets')">
+      <div style="font-size:22px;font-weight:700;color:var(--s-tx);">${inProgressTickets.length}</div>
+      <div style="font-size:11px;color:var(--ink-m);">In progress</div>
+    </div>
+    <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;cursor:pointer;" onclick="sv('tickets')">
+      <div style="font-size:22px;font-weight:700;color:${overdueTickets.length?'var(--d-tx)':'var(--ink-m)'};">${overdueTickets.length}</div>
+      <div style="font-size:11px;color:var(--ink-m);">Overdue</div>
+    </div>
+  </div>
+  ${openTickets.slice(0,4).map(tk=>{
+    const rep=TEAM[tk.assignee]||null;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;">
+      ${rep?`<div class="av ${rep.cls}" style="width:18px;height:18px;font-size:7px;flex-shrink:0;">${rep.init}</div>`:''}
+      <span style="flex:1;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tk.subject}</span>
+      ${tk.customerName?`<span style="font-size:11px;color:var(--ink-m);flex-shrink:0;">${tk.customerName}</span>`:''}
+    </div>`;
+  }).join('')}
+  ${openTickets.length>4?`<div style="font-size:12px;color:var(--ink-m);padding-top:8px;">${openTickets.length-4} more — <span style="color:var(--burg);cursor:pointer;" onclick="sv('tickets')">view all</span></div>`:''}`;
+
+  // Fix layout — 2x2 grid for summary cards, then recent activity in same grid
   el.innerHTML='';
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:16px;';
   const sections=[
-    {title:dueReminders.length?"Reminders Due":"Upcoming Reminders",tab:'reminders',badge:dueReminders.length?`<span style="background:var(--d-bg);color:var(--d-tx);font-size:11px;padding:1px 7px;border-radius:10px;margin-left:8px;">${dueReminders.length}</span>`:'',html:remHtml},
+    {title:remTitle,tab:'reminders',badge:dueReminders.length?`<span style="background:var(--d-bg);color:var(--d-tx);font-size:11px;padding:1px 7px;border-radius:10px;margin-left:8px;">${dueReminders.length}</span>`:'',html:remHtml},
     {title:'Upcoming Club Processing',tab:'club',badge:'',html:clubHtml},
     {title:'Outstanding Orders',tab:'orders',badge:'',html:ordersHtml},
     {title:'Inventory Due',tab:'projects',badge:'',html:invHtml},
+    {title:'Tickets',tab:'tickets',badge:'',html:ticketsHtml},
+    {title:'Recent Activity',tab:'',badge:'',html:activityHtml},
   ];
-  const grid=document.createElement('div');
-  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:16px;';
   sections.forEach(s=>{
     const card=document.createElement('div');
     card.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;padding:16px;';
@@ -5990,11 +6125,6 @@ function renderHome(){
     grid.appendChild(card);
   });
   el.appendChild(grid);
-  // Recent activity full width
-  const actCard=document.createElement('div');
-  actCard.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;padding:16px;margin-top:16px;';
-  actCard.innerHTML=`<div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;margin-bottom:12px;">Recent Activity</div>${activityHtml}`;
-  el.appendChild(actCard);
 }
 
 
@@ -6612,8 +6742,13 @@ function renderClubView(){
   const syncEl=document.getElementById('club-last-sync');
   if(syncEl){
     if(S.clubMembersLastSync){
+      const syncDate=S.clubMembersLastSync.slice(0,10);
+      const isToday=syncDate===today();
       syncEl.style.display='block';
-      syncEl.innerHTML='🕐 Last refreshed: <strong>'+S.clubMembersLastSync+'</strong> · '+S.clubMembers.length+' members · <span style="color:var(--burg);cursor:pointer;text-decoration:underline;" onclick="syncClubMembers()">Refresh now</span>';
+      syncEl.style.background=isToday?'var(--s-bg)':'var(--d-bg)';
+      syncEl.style.color=isToday?'var(--s-tx)':'var(--d-tx)';
+      syncEl.style.border='none';
+      syncEl.innerHTML='🕐 Last refreshed: <strong>'+S.clubMembersLastSync+'</strong> · '+S.clubMembers.length+' members · <span style="cursor:pointer;text-decoration:underline;" onclick="syncClubMembers()">Refresh now</span>';
     } else if(S.clubMembers.length===0){
       syncEl.style.display='block';
       syncEl.innerHTML='No data loaded yet. Click <strong>⬇ Load from C7</strong> to fetch club members.';
