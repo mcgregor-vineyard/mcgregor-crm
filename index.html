@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.223</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.226</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -592,6 +592,7 @@ select.fi{cursor:pointer;}
               <th>Status</th>
               <th>Next process</th>
               <th>Days away</th>
+              <th>Last contact</th>
               <th>Ship to</th>
             </tr></thead>
             <tbody id="club-tbody"></tbody>
@@ -5696,41 +5697,46 @@ function updatePrintPreview(){
 }
 
 function generateClubPrintPage(){
-  const members=getClubPrintMembers();
+  let members=getClubPrintMembers();
   if(!members.length){showToast('No contacts match these filters','err');return;}
+  // Sort: overdue/today first, then by next process date ascending
+  const t=today();
+  members=[...members].sort((a,b)=>{
+    const da=a.subscription?.nextProcessDate?.slice(0,10)||a.nextProcessDate||'9999';
+    const db=b.subscription?.nextProcessDate?.slice(0,10)||b.nextProcessDate||'9999';
+    const aPast=da<=t,bPast=db<=t;
+    if(aPast&&!bPast)return -1;
+    if(!aPast&&bPast)return 1;
+    return da.localeCompare(db);
+  });
   const perPage=parseInt(document.getElementById('cp-per-page').value)||10;
   const instructions=S.clubInstructions||'';
-  const t=today();
   const deliveryFilter=document.getElementById('cp-delivery-filter').value;
   const contactFilter=document.getElementById('cp-contact-filter').value;
   const deliveryLabel=deliveryFilter==='ship'?'Ship only':deliveryFilter==='pickup'?'Pickup only':'All';
   const contactLabel=contactFilter==='unreached'?'Not yet contacted':'All contacts';
 
-  // Build pages
   const pages=[];
   for(let i=0;i<members.length;i+=perPage)pages.push(members.slice(i,i+perPage));
 
   const pageHtml=pages.map((page,pi)=>`
     <div class="page">
       <div class="page-header">
-        <div>
-          <div class="page-title">McGregor Vineyard Wine Club — Call List</div>
-          <div class="page-sub">Printed: ${t} · Delivery: ${deliveryLabel} · ${contactLabel} · Page ${pi+1} of ${pages.length}</div>
-          ${instructions?`<div class="instructions">${instructions}</div>`:''}
-        </div>
+        <div class="page-title">McGregor Vineyard Wine Club — Call List</div>
+        <div class="page-sub">Printed: ${t} · Delivery: ${deliveryLabel} · ${contactLabel} · Page ${pi+1} of ${pages.length}</div>
+        ${instructions?`<div class="instructions">${instructions}</div>`:''}
       </div>
       <table>
-        <thead>
-          <tr>
-            <th style="width:18%;">Member</th>
-            <th style="width:20%;">Email</th>
-            <th style="width:13%;">Phone</th>
-            <th style="width:11%;">Club</th>
-            <th style="width:10%;">Next Process</th>
-            <th style="width:8%;">Delivery</th>
-            <th style="width:20%;">Notes / Outcome</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th style="width:16%;">Member</th>
+          <th style="width:18%;">Email</th>
+          <th style="width:11%;">Phone</th>
+          <th style="width:9%;">Club</th>
+          <th style="width:10%;">Next Process</th>
+          <th style="width:7%;">Delivery</th>
+          <th style="width:14%;">Last Contact</th>
+          <th style="width:15%;">Notes / Outcome</th>
+        </tr></thead>
         <tbody>
           ${page.map(m=>{
             const name=[(m.customer?.lastName||m.customerLastName||''),(m.customer?.firstName||m.customerFirstName||'')].filter(Boolean).join(', ')||'—';
@@ -5739,20 +5745,31 @@ function generateClubPrintPage(){
             const club=(m.club?.title||m.clubTitle||'').replace('McGregor Vineyard ','');
             const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'—';
             const days=daysUntil(nextDate==='—'?null:nextDate);
-            const daysStr=days===null?'':days===0?' (Today)':days===1?' (Tomorrow)':' ('+days+'d)';
+            const pastDue=nextDate!=='—'&&nextDate<=t;
+            const daysStr=days===null?'':days<0?' — Overdue':days===0?' — Today':days===1?' — Tomorrow':' — '+days+'d';
             const delivery=m.orderDeliveryMethod==='Pickup'?'Pickup':'Ship';
-            const pastDue=nextDate!=='—'&&nextDate<t;
-            // Last comm logged
-            const lastComm=(S.clubComms||[]).filter(c=>c.customerId===m.customerId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
-            const lastCommHtml=lastComm?`<div class="last-comm">${lastComm.createdAt}: ${lastComm.method} — ${lastComm.outcome}${lastComm.notes?' — '+lastComm.notes:''}</div>`:'';
+            // Last comm
+            const comms=(S.clubComms||[]).filter(c=>c.customerId===m.customerId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+            const lastComm=comms[0]||null;
+            const lastContactHtml=lastComm
+              ?`<div style="font-size:8.5px;font-weight:600;">${lastComm.createdAt}</div><div style="font-size:8px;color:#555;">${lastComm.method} — ${lastComm.outcome}</div>${lastComm.notes?`<div style="font-size:8px;color:#777;font-style:italic;">${lastComm.notes}</div>`:''}`
+              :`<span style="color:#aaa;">—</span>`;
+            // Outstanding order
+            const hasOrder=(S.orderCustomers||[]).some(o=>
+              o.status!=='Resolved'&&(
+                (m.customerId&&o.customerId===m.customerId)||
+                (email&&o.customerEmail&&o.customerEmail.toLowerCase()===email.toLowerCase())
+              )
+            );
             return`<tr${pastDue?' class="past-due"':''}>
-              <td class="name">${name}</td>
+              <td class="name">${name}${hasOrder?'<div class="order-badge">📦 Outstanding order</div>':''}</td>
               <td class="email">${email}</td>
               <td>${phone}</td>
               <td>${club}</td>
               <td>${nextDate}${daysStr}</td>
               <td>${delivery}</td>
-              <td>${lastCommHtml}<div class="note-line"></div></td>
+              <td>${lastContactHtml}</td>
+              <td><div class="note-line"></div><div class="note-line" style="margin-top:12px;"></div></td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -5766,25 +5783,24 @@ function generateClubPrintPage(){
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#1a1a1a;background:white;}
-  .page{padding:14mm 12mm;min-height:100vh;}
-  .page-header{margin-bottom:10px;border-bottom:2px solid #6B1A2A;padding-bottom:8px;}
+  .page{padding:12mm 10mm;}
+  .page-header{margin-bottom:8px;border-bottom:2px solid #6B1A2A;padding-bottom:7px;}
   .page-title{font-size:14px;font-weight:700;color:#6B1A2A;letter-spacing:.02em;}
   .page-sub{font-size:9px;color:#666;margin-top:3px;}
-  .instructions{margin-top:6px;padding:6px 8px;background:#FFF5F5;border-left:3px solid #6B1A2A;font-size:9px;color:#333;line-height:1.4;}
+  .instructions{margin-top:6px;padding:5px 8px;background:#FFF5F5;border-left:3px solid #6B1A2A;font-size:9px;color:#333;line-height:1.4;}
   table{width:100%;border-collapse:collapse;margin-top:6px;}
-  th{background:#6B1A2A;color:white;padding:4px 5px;text-align:left;font-size:8.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
-  td{padding:5px 5px;border-bottom:1px solid #e5e5e5;vertical-align:top;font-size:9.5px;line-height:1.3;}
+  th{background:#6B1A2A;color:white;padding:4px 5px;text-align:left;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  td{padding:5px 5px;border-bottom:1px solid #e5e5e5;vertical-align:top;font-size:9px;line-height:1.3;}
   tr:nth-child(even) td{background:#FAFAFA;}
   tr.past-due td{background:#FFF0F0;}
   .name{font-weight:600;}
-  .email{color:#6B1A2A;}
-  .last-comm{font-size:8.5px;color:#666;margin-bottom:2px;font-style:italic;}
-  .note-line{border-bottom:1px solid #ccc;margin-top:8px;height:1px;}
+  .email{color:#6B1A2A;font-size:8.5px;}
+  .order-badge{font-size:7.5px;font-weight:700;color:#B33A00;margin-top:2px;}
+  .note-line{border-bottom:1px solid #ccc;height:1px;}
   .page-break{page-break-after:always;}
   @media print{
-    .page{padding:10mm 10mm;}
+    .page{padding:8mm 8mm;}
     .page-break{page-break-after:always;height:0;display:block;}
-    body{font-size:9px;}
   }
 </style>
 </head>
@@ -6459,11 +6475,16 @@ function renderClubView(){
   document.getElementById('club-stat-active').textContent=allActive.length;
   document.getElementById('club-stat-processing-soon').textContent=soon.length;
 
-  // Sort — default nearest first; members without a next process date go to end
+  // Sort — upcoming first (nearest process date), past-due to bottom
   members.sort((a,b)=>{
+    const t=today();
+    const da=a.subscription?.nextProcessDate?.slice(0,10)||'9999-99-99';
+    const db=b.subscription?.nextProcessDate?.slice(0,10)||'9999-99-99';
     if(sortBy==='nextProcess'||sortBy==='daysAway'){
-      const da=a.subscription?.nextProcessDate?.slice(0,10)||'9999-99-99';
-      const db=b.subscription?.nextProcessDate?.slice(0,10)||'9999-99-99';
+      const aPast=da<=t;const bPast=db<=t;
+      // Past/today = urgent (card declined) → top
+      if(aPast&&!bPast)return -1;
+      if(!aPast&&bPast)return 1;
       return da.localeCompare(db);
     }
     if(sortBy==='name'){
@@ -6476,7 +6497,7 @@ function renderClubView(){
 
   tbody.innerHTML='';
   if(!members.length){
-    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--ink-m);">'+(S.clubMembers.length?'No members match this filter.':'Click ⬇ Load from C7 to fetch club members.')+'</td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--ink-m);">'+(S.clubMembers.length?'No members match this filter.':'Click ⬇ Load from C7 to fetch club members.')+'</td></tr>';
     return;
   }
 
@@ -6491,6 +6512,22 @@ function renderClubView(){
     const c7Link=m.customerId&&CONFIG.C7_TENANT
       ?`<a href="https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/crm/customer/${m.customerId}" target="_blank" style="font-size:11px;color:var(--burg);white-space:nowrap;">C7 ↗</a>`:'';
     const email=(m.customer?.emails?.[0]?.email)||'';
+    // Last contact attempt from ClubComms
+    const memberComms=(S.clubComms||[]).filter(c=>c.customerId===m.customerId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    const lastComm=memberComms[0]||null;
+    const lastContactHtml=lastComm
+      ?`<div style="font-size:12px;font-weight:500;">${lastComm.createdAt}</div><div style="font-size:11px;color:var(--ink-m);">${lastComm.method} — ${lastComm.outcome}</div>`
+      :`<span style="font-size:12px;color:var(--ink-m);">—</span>`;
+    // Outstanding order badge
+    const hasOrder=(S.orderCustomers||[]).some(o=>
+      o.status!=='Resolved'&&(
+        (m.customerId&&o.customerId===m.customerId)||
+        (email&&o.customerEmail&&o.customerEmail.toLowerCase()===email.toLowerCase())
+      )
+    );
+    const orderBadge=hasOrder
+      ?`<div style="margin-top:3px;"><span style="font-size:10px;font-weight:700;background:#FDE8D8;color:#B33A00;border-radius:4px;padding:1px 6px;border:1px solid #F4A86A;">📦 Outstanding order</span></div>`
+      :'';
     // Combined Shipping reminder — match by customerId
     const shipReminders=S.reminders.filter(r=>
       r.refType==='club-combined-shipping'&&
@@ -6520,13 +6557,14 @@ function renderClubView(){
     tr.style.cursor='pointer';
     tr.onclick=(e)=>{if(e.target.tagName!=='A'&&e.target.tagName!=='BUTTON')openClubMemberPanel(m);};
     tr.innerHTML=`
-      <td style="font-weight:500;">${name}${shipReminderHtml}</td>
+      <td style="font-weight:500;">${name}${shipReminderHtml}${orderBadge}</td>
       <td>${c7Link}</td>
       <td style="font-size:12px;">${email?`<a href="mailto:${email}" style="color:var(--burg);">${email}</a>`:''}</td>
       <td style="font-size:12px;">${m.club?.title||'—'}</td>
       <td>${clubStatusBadge(m.status)}</td>
       <td style="font-size:13px;${isPast?'color:var(--d-tx);font-weight:600;':''}">${nextDate||'—'}</td>
       <td style="font-weight:600;color:${daysColor};">${daysLabel}</td>
+      <td>${lastContactHtml}</td>
       <td style="font-size:12px;color:var(--ink-m);">${m.orderDeliveryMethod==='Pickup'?'Pickup':(m.shipTo?.city||m.shipTo?.stateCode||'—')}</td>`;
     tbody.appendChild(tr);
   });
