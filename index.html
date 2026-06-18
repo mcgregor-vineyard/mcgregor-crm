@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.229</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.230</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -5807,22 +5807,28 @@ function renderHome(){
   const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
   document.getElementById('home-greeting').textContent=(hour<12?'Good morning':hour<17?'Good afternoon':'Good evening')+', McGregor Vineyard';
 
-  // 1. Today's reminders (due today or overdue, not done)
-  const overdueReminders=S.reminders.filter(r=>!r.done&&r.dueDate&&r.dueDate<=t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  const remHtml=overdueReminders.length
-    ?overdueReminders.slice(0,8).map(r=>{
+  // 1. Reminders — due/overdue first, fall back to next upcoming if none
+  const dueReminders=S.reminders.filter(r=>!r.done&&r.dueDate&&r.dueDate<=t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const upcomingReminders=S.reminders.filter(r=>!r.done&&r.dueDate&&r.dueDate>t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const showReminders=dueReminders.length?dueReminders:upcomingReminders.slice(0,8);
+  const remTitle=dueReminders.length?'Reminders Due':'Upcoming Reminders';
+  const remHtml=showReminders.length
+    ?showReminders.map(r=>{
         const rep=TEAM[r.assignee]||TEAM[0];
         const isOverdue=r.dueDate<t;
+        const isToday=r.dueDate===t;
+        const dateLabel=isOverdue?'Overdue — '+r.dueDate:isToday?'Due today':'Due '+r.dueDate;
+        const dateColor=isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)';
         return`<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);">
           <div class="av ${rep.cls}" style="width:22px;height:22px;font-size:8px;flex-shrink:0;">${rep.init}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.note}</div>
-            <div style="font-size:11px;color:${isOverdue?'var(--d-tx)':'var(--w-tx)'};">${isOverdue?'Overdue — '+r.dueDate:'Due today'}${r.refName?' · '+r.refName:''}</div>
+            <div style="font-size:11px;color:${dateColor};">${dateLabel}${r.refName?' · '+r.refName:''}</div>
           </div>
         </div>`;
       }).join('')+
-      (overdueReminders.length>8?`<div style="font-size:12px;color:var(--ink-m);padding-top:8px;">${overdueReminders.length-8} more — <span style="color:var(--burg);cursor:pointer;" onclick="sv('reminders')">view all</span></div>`:'')
-    :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No reminders due today ✓</div>`;
+      (!dueReminders.length&&upcomingReminders.length>8?`<div style="font-size:12px;color:var(--ink-m);padding-top:8px;">${upcomingReminders.length-8} more — <span style="color:var(--burg);cursor:pointer;" onclick="sv('reminders')">view all</span></div>`:'')
+    :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No reminders ✓</div>`;
 
   // 2. Club processing (next 14 days)
   const clubMembers=S.clubMembers.filter(m=>m.status==='Active');
@@ -5915,13 +5921,13 @@ function renderHome(){
       `
     :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No inventory data yet</div>`;
 
-  // 5. Recent activity
+  // 5. Recent activity — all team members, all sources
   const allComms=[
     ...(S.clubComms||[]).map(c=>({...c,_type:'Club',_name:c.customerId})),
     ...(S.orderMsgs||[]).filter(m=>m.method).map(m=>({...m,_type:'Order',_name:m.orderCustomerId})),
-    ...(S.reminderNotes||[]).map(n=>({...n,_type:'Reminder',_name:n.reminderId})),
+    ...(S.ticketMsgs||[]).filter(m=>m.message&&m.method).map(m=>({...m,_type:'Ticket',_name:m.ticketId})),
     ...(S.outreachMsgs||[]).filter(m=>m.message).map(m=>({...m,_type:'Outreach',_name:m.outreachId})),
-  ].filter(c=>c.createdAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,8);
+  ].filter(c=>c.createdAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,15);
   const activityHtml=allComms.length
     ?allComms.map(c=>{
         const rep=TEAM[c.author!=null?c.author:(c.assignee!=null?c.assignee:0)]||TEAM[0];
@@ -5943,7 +5949,7 @@ function renderHome(){
   // Fix layout — wrap each section properly
   el.innerHTML='';
   const sections=[
-    {title:"Today's Reminders",tab:'reminders',badge:overdueReminders.length?`<span style="background:var(--d-bg);color:var(--d-tx);font-size:11px;padding:1px 7px;border-radius:10px;margin-left:8px;">${overdueReminders.length}</span>`:'',html:remHtml},
+    {title:dueReminders.length?"Reminders Due":"Upcoming Reminders",tab:'reminders',badge:dueReminders.length?`<span style="background:var(--d-bg);color:var(--d-tx);font-size:11px;padding:1px 7px;border-radius:10px;margin-left:8px;">${dueReminders.length}</span>`:'',html:remHtml},
     {title:'Upcoming Club Processing',tab:'club',badge:'',html:clubHtml},
     {title:'Outstanding Orders',tab:'orders',badge:'',html:ordersHtml},
     {title:'Inventory Due',tab:'projects',badge:'',html:invHtml},
