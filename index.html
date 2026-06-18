@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.226</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.228</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
@@ -1311,21 +1311,6 @@ select.fi{cursor:pointer;}
 </div>
 
 <!-- Power BI URL settings modal -->
-<div id="powerbi-modal" class="modal-backdrop">
-  <div class="modal" style="width:500px;" onclick="event.stopPropagation();">
-    <div class="mhdr"><div class="mtitle">Power BI Report URL</div><button class="mcls" onclick="closeModal('powerbi-modal')">✕</button></div>
-    <div class="mbdy">
-      <div style="font-size:12px;color:var(--ink-m);margin-bottom:10px;">Paste your Power BI embed URL. This is saved in your browser and shared across all Inventory projects.</div>
-      <div class="fr"><label class="fl">Embed URL</label><input type="text" class="fi" id="powerbi-url-input" placeholder="https://app.powerbi.com/reportEmbed?..." /></div>
-    </div>
-    <div class="mftr">
-      <button class="btn" onclick="closeModal('powerbi-modal')">Cancel</button>
-      <button class="btn" style="color:var(--d-tx);border-color:var(--d-tx);" onclick="clearPowerBIUrl()">Clear</button>
-      <button class="btn btnp" onclick="savePowerBIUrl()">Save</button>
-    </div>
-  </div>
-</div>
-
 <!-- Club instructions modal -->
 <div id="club-instructions-modal" class="modal-backdrop">
   <div class="modal" style="width:560px;" onclick="event.stopPropagation();">
@@ -3757,11 +3742,6 @@ async function openOrderThread(id){
   // Club process date (from cached club members, ship only)
   const clubCardEl=document.getElementById('ot-club-card');
   if(clubCardEl){
-    console.log('Club match debug — order email:',o.customerEmail,'order customerId:',o.customerId,'total club members:',S.clubMembers.length);
-    if(S.clubMembers.length){
-      const sample=S.clubMembers[0];
-      console.log('Sample club member fields:',{customerId:sample.customerId,email:sample.customer?.emails?.[0]?.email,delivery:sample.orderDeliveryMethod,nextProcess:sample.subscription?.nextProcessDate});
-    }
   const matches=S.clubMembers.filter(m=>{
       const memberEmail=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
       const orderEmail=(o.customerEmail||'').toLowerCase();
@@ -3792,8 +3772,6 @@ async function openOrderThread(id){
   document.getElementById('ot-assignee').value=o.assignee;
   document.getElementById('ot-new-msg').value='';
   document.getElementById('ot-method').value='';
-  const clubCardReset=document.getElementById('ot-club-card');
-  if(clubCardReset)clubCardReset.style.display='none';
   // Populate pickup date
   const pd=document.getElementById('ot-pickup-date');
   const ps=document.getElementById('ot-pickup-status');
@@ -6106,31 +6084,6 @@ function renderWineReleaseList(projectId){
 }
 
 // ---- Power BI Embed ----
-function renderPowerBIFrame(){
-  // URL is hardcoded in the iframe — nothing to render dynamically
-}
-
-function openPowerBISettings(){
-  const url=localStorage.getItem('mcg-powerbi-url')||'';
-  document.getElementById('powerbi-url-input').value=url;
-  openModal('powerbi-modal');
-}
-
-function savePowerBIUrl(){
-  const url=document.getElementById('powerbi-url-input').value.trim();
-  if(url)localStorage.setItem('mcg-powerbi-url',url);
-  closeModal('powerbi-modal');
-  renderPowerBIFrame();
-  showToast('Power BI URL saved');
-}
-
-function clearPowerBIUrl(){
-  localStorage.removeItem('mcg-powerbi-url');
-  closeModal('powerbi-modal');
-  renderPowerBIFrame();
-  showToast('Power BI URL cleared');
-}
-
 // ---- Reminder modal C7 search (Club Combined Shipping) ----
 function onRmTypeChange(){
   const type=document.getElementById('rm-type').value;
@@ -6824,7 +6777,7 @@ function showInventoryOrStandard(p){
   document.getElementById('pj-preorder-section').style.display=isPO?'':'none';
   document.getElementById('pj-winerelease-section').style.display=isWR?'':'none';
   const pbiPanel=document.getElementById('pj-powerbi-panel');
-  if(pbiPanel){pbiPanel.style.display=isInv?'':'none';if(isInv)renderPowerBIFrame();}
+  if(pbiPanel)pbiPanel.style.display=isInv?'':'none';
   if(isInv)renderInventoryList(p.id);
   else if(isPO)renderPreOrderList(p.id);
   else if(isWR)renderWineReleaseList(p.id);
