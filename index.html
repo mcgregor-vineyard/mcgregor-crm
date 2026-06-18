@@ -140,7 +140,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.230</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.231</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -5921,25 +5921,49 @@ function renderHome(){
       `
     :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No inventory data yet</div>`;
 
-  // 5. Recent activity — all team members, all sources
-  const allComms=[
-    ...(S.clubComms||[]).map(c=>({...c,_type:'Club',_name:c.customerId})),
-    ...(S.orderMsgs||[]).filter(m=>m.method).map(m=>({...m,_type:'Order',_name:m.orderCustomerId})),
-    ...(S.ticketMsgs||[]).filter(m=>m.message&&m.method).map(m=>({...m,_type:'Ticket',_name:m.ticketId})),
-    ...(S.outreachMsgs||[]).filter(m=>m.message).map(m=>({...m,_type:'Outreach',_name:m.outreachId})),
-  ].filter(c=>c.createdAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,15);
+  // 5. Recent activity — all team members, all sources, with subject names
+  const clubCommsFull=(S.clubComms||[]).map(c=>{
+    const member=S.clubMembers.find(m=>m.customerId===c.customerId);
+    const name=member?[(member.customer?.lastName||''),(member.customer?.firstName||'')].filter(Boolean).join(', '):c.customerId||'';
+    return{...c,_type:'Club',_subject:name};
+  });
+  const orderMsgsFull=(S.orderMsgs||[]).filter(m=>m.method).map(m=>{
+    const order=S.orderCustomers.find(o=>o.id===m.orderCustomerId);
+    return{...m,_type:'Order',_subject:order?order.customerName:''};
+  });
+  const ticketMsgsFull=(S.ticketMsgs||[]).filter(m=>m.message&&m.method).map(m=>{
+    const ticket=S.tickets.find(t=>t.id===m.ticketId);
+    return{...m,_type:'Ticket',_subject:ticket?ticket.subject:''};
+  });
+  const outreachMsgsFull=(S.outreachMsgs||[]).filter(m=>m.message).map(m=>{
+    const item=S.outreach.find(o=>o.id===m.outreachId);
+    return{...m,_type:'Outreach',_subject:item?item.name||item.title||'':''};
+  });
+  const allComms=[...clubCommsFull,...orderMsgsFull,...ticketMsgsFull,...outreachMsgsFull]
+    .filter(c=>c.createdAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,15);
+
+  const typeColors={Club:'#EAF4EA',Order:'#FFF3E0',Ticket:'#EDE7F6',Outreach:'#E3F2FD'};
+  const typeTextColors={Club:'#2E7D32',Order:'#E65100',Ticket:'#4527A0',Outreach:'#0D47A1'};
+
   const activityHtml=allComms.length
     ?allComms.map(c=>{
         const rep=TEAM[c.author!=null?c.author:(c.assignee!=null?c.assignee:0)]||TEAM[0];
         const note=c.notes||c.message||c.note||'';
-        return`<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--bdr);">
-          <div class="av ${rep.cls}" style="width:20px;height:20px;font-size:8px;flex-shrink:0;">${rep.init}</div>
+        const method=c.method||'';
+        const outcome=c.outcome||'';
+        const bg=typeColors[c._type]||'var(--cream)';
+        const tc=typeTextColors[c._type]||'var(--ink-f)';
+        return`<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);">
+          <div class="av ${rep.cls}" style="width:24px;height:24px;font-size:9px;flex-shrink:0;margin-top:1px;">${rep.init}</div>
           <div style="flex:1;min-width:0;">
-            <div style="display:flex;gap:6px;align-items:center;">
-              <span style="font-size:10px;background:var(--cream);border-radius:4px;padding:1px 5px;color:var(--ink-f);">${c._type}</span>
-              <span style="font-size:12px;color:var(--ink-m);">${c.createdAt}</span>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
+              <span style="font-size:10px;font-weight:600;background:${bg};color:${tc};border-radius:4px;padding:1px 6px;">${c._type}</span>
+              ${c._subject?`<span style="font-size:13px;font-weight:600;">${c._subject}</span>`:''}
+              ${method?`<span style="font-size:11px;color:var(--ink-m);">· ${method}</span>`:''}
+              ${outcome?`<span style="font-size:11px;color:var(--ink-m);">${method?'—':'·'} ${outcome}</span>`:''}
             </div>
-            ${note?`<div style="font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${note}</div>`:''}
+            ${note?`<div style="font-size:12px;color:var(--ink);line-height:1.4;">${note}</div>`:''}
+            <div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${rep.name} · ${c.createdAt}</div>
           </div>
         </div>`;
       }).join('')
