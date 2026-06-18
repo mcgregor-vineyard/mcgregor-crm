@@ -140,8 +140,9 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.228</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.229</div></div>
     <div class="nav">
+      <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
       <button class="ntab" onclick="sv('contacts')">Contacts</button>
       <button class="ntab" onclick="sv('tickets')">Tickets</button>
@@ -220,7 +221,13 @@ select.fi{cursor:pointer;}
     </div>
     <div class="content">
 
-      <div id="view-campaigns" class="view on">
+      <!-- Home dashboard -->
+      <div id="view-home" class="view on">
+        <div class="vhdr"><div class="vtitle" id="home-greeting">McGregor Connect</div></div>
+        <div id="home-content" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"></div>
+      </div>
+
+      <div id="view-campaigns" class="view">
         <div class="vhdr"><div class="vtitle">Campaigns</div><button class="btn btnp" onclick="openNewCamp()">+ New campaign</button></div>
         <div class="dstats">
           <div class="dsc"><div class="dsn" id="ds-camps">0</div><div class="dsl">Total campaigns</div></div>
@@ -2066,7 +2073,7 @@ async function loadFromSheets(){
     S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||'',website:r[12]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
-    try{renderAll();if(S.clubMembers.length)renderClubView();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
+    try{renderAll();if(S.clubMembers.length)renderClubView();renderHome();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
   }catch(e){
     console.error('loadFromSheets error:',e);
     setSyncBar('err','Could not connect to Google Sheets: '+e.message);
@@ -2137,8 +2144,8 @@ function sv(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   document.getElementById('view-'+view).classList.add('on');
-  ['campaigns','contacts','tickets','orders','reminders','outreach','projects','club','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
-  closeDP();renderAll();
+  ['home','campaigns','contacts','tickets','orders','reminders','outreach','projects','club','reports'].forEach((v,i)=>{if(v===view)document.querySelectorAll('.ntab')[i].classList.add('on');});
+  closeDP();if(view==='home')renderHome();else renderAll();
 }
 function setCU(i){S.cu=parseInt(i);document.getElementById('cuav').textContent=TEAM[S.cu].init;}
 function setF(f,el){S.filter=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderContacts();}
@@ -5792,7 +5799,201 @@ ${pageHtml}
   closeModal('club-print-modal');
 }
 
-// ---- Wine Release ----
+// ---- Home Dashboard ----
+function renderHome(){
+  const el=document.getElementById('home-content');if(!el)return;
+  const t=today();
+  const hour=new Date().getHours();
+  const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
+  document.getElementById('home-greeting').textContent=(hour<12?'Good morning':hour<17?'Good afternoon':'Good evening')+', McGregor Vineyard';
+
+  // 1. Today's reminders (due today or overdue, not done)
+  const overdueReminders=S.reminders.filter(r=>!r.done&&r.dueDate&&r.dueDate<=t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const remHtml=overdueReminders.length
+    ?overdueReminders.slice(0,8).map(r=>{
+        const rep=TEAM[r.assignee]||TEAM[0];
+        const isOverdue=r.dueDate<t;
+        return`<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);">
+          <div class="av ${rep.cls}" style="width:22px;height:22px;font-size:8px;flex-shrink:0;">${rep.init}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.note}</div>
+            <div style="font-size:11px;color:${isOverdue?'var(--d-tx)':'var(--w-tx)'};">${isOverdue?'Overdue — '+r.dueDate:'Due today'}${r.refName?' · '+r.refName:''}</div>
+          </div>
+        </div>`;
+      }).join('')+
+      (overdueReminders.length>8?`<div style="font-size:12px;color:var(--ink-m);padding-top:8px;">${overdueReminders.length-8} more — <span style="color:var(--burg);cursor:pointer;" onclick="sv('reminders')">view all</span></div>`:'')
+    :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No reminders due today ✓</div>`;
+
+  // 2. Club processing (next 14 days)
+  const clubMembers=S.clubMembers.filter(m=>m.status==='Active');
+  const upcomingClub=clubMembers.filter(m=>{
+    const d=daysUntil(m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate);
+    return d!==null&&d>=0&&d<=14;
+  }).sort((a,b)=>(a.subscription?.nextProcessDate||'').localeCompare(b.subscription?.nextProcessDate||''));
+  const contactedIds=new Set((S.clubComms||[]).map(c=>c.customerId));
+  const clubContacted=upcomingClub.filter(m=>contactedIds.has(m.customerId)).length;
+  const clubUnreached=upcomingClub.length-clubContacted;
+  const overdueClub=clubMembers.filter(m=>{
+    const d=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
+    return d&&d<t;
+  });
+  const clubHtml=upcomingClub.length||overdueClub.length
+    ?`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--burg);">${upcomingClub.length}</div>
+          <div style="font-size:11px;color:var(--ink-m);">Processing in 14d</div>
+        </div>
+        <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--w-tx);">${clubUnreached}</div>
+          <div style="font-size:11px;color:var(--ink-m);">Not yet contacted</div>
+        </div>
+        <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:${overdueClub.length?'var(--d-tx)':'var(--s-tx)'};">${overdueClub.length}</div>
+          <div style="font-size:11px;color:var(--ink-m);">Overdue / declined</div>
+        </div>
+      </div>
+      ${upcomingClub.slice(0,5).map(m=>{
+        const name=[(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', ')||'—';
+        const d=daysUntil(m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate);
+        const contacted=contactedIds.has(m.customerId);
+        return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;">
+          <span style="flex:1;font-weight:500;">${name}</span>
+          <span style="color:var(--ink-m);">${d===0?'Today':d===1?'Tomorrow':d+'d'}</span>
+          <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:${contacted?'var(--s-bg)':'var(--cream)'};color:${contacted?'var(--s-tx)':'var(--ink-m)'};">${contacted?'Contacted':'Not reached'}</span>
+        </div>`;
+      }).join('')}
+      ${upcomingClub.length>5?`<div style="font-size:12px;color:var(--ink-m);padding-top:8px;">${upcomingClub.length-5} more — <span style="color:var(--burg);cursor:pointer;" onclick="sv('club')">view all</span></div>`:''}
+      `
+    :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">${S.clubMembers.length?'No members processing in the next 14 days':'Load club members first'}</div>`;
+
+  // 3. Outstanding orders
+  const activeOrders=S.orderCustomers.filter(o=>o.status!=='Resolved');
+  const inProgress=activeOrders.filter(o=>o.status==='In Progress').length;
+  const openOrders=activeOrders.filter(o=>o.status==='Open').length;
+  const ordersHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+    <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;cursor:pointer;" onclick="sv('orders')">
+      <div style="font-size:22px;font-weight:700;color:var(--burg);">${activeOrders.length}</div>
+      <div style="font-size:11px;color:var(--ink-m);">Total active</div>
+    </div>
+    <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;cursor:pointer;" onclick="sv('orders')">
+      <div style="font-size:22px;font-weight:700;color:var(--w-tx);">${openOrders}</div>
+      <div style="font-size:11px;color:var(--ink-m);">Open</div>
+    </div>
+    <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;cursor:pointer;" onclick="sv('orders')">
+      <div style="font-size:22px;font-weight:700;color:var(--s-tx);">${inProgress}</div>
+      <div style="font-size:11px;color:var(--ink-m);">In progress</div>
+    </div>
+  </div>`;
+
+  // 4. Inventory due
+  const allInvEntries=S.inventoryEntries.filter(e=>e.active!==false);
+  const invDue=allInvEntries.filter(e=>invDueStatus(e).isDue);
+  const invOverdue=invDue.filter(e=>invDueStatus(e).isOverdue);
+  const invHtml=allInvEntries.length
+    ?`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--ink);">${allInvEntries.length}</div>
+          <div style="font-size:11px;color:var(--ink-m);">Total wines</div>
+        </div>
+        <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--w-tx);">${invDue.length}</div>
+          <div style="font-size:11px;color:var(--ink-m);">Due to count</div>
+        </div>
+        <div style="background:var(--cream);border-radius:7px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:${invOverdue.length?'var(--d-tx)':'var(--s-tx)'};">${invOverdue.length}</div>
+          <div style="font-size:11px;color:var(--ink-m);">Overdue</div>
+        </div>
+      </div>
+      ${invDue.slice(0,5).map(e=>{
+        const {daysUntilDue,isOverdue}=invDueStatus(e);
+        return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:12px;">
+          <span style="flex:1;font-weight:500;">${e.wineName}</span>
+          <span style="font-weight:600;color:${isOverdue?'var(--d-tx)':'var(--w-tx)'};">${isOverdue?'Overdue':'Due now'}</span>
+        </div>`;
+      }).join('')}
+      ${invDue.length>5?`<div style="font-size:12px;color:var(--ink-m);padding-top:8px;">${invDue.length-5} more due — <span style="color:var(--burg);cursor:pointer;" onclick="sv('projects')">view all</span></div>`:''}
+      `
+    :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No inventory data yet</div>`;
+
+  // 5. Recent activity
+  const allComms=[
+    ...(S.clubComms||[]).map(c=>({...c,_type:'Club',_name:c.customerId})),
+    ...(S.orderMsgs||[]).filter(m=>m.method).map(m=>({...m,_type:'Order',_name:m.orderCustomerId})),
+    ...(S.reminderNotes||[]).map(n=>({...n,_type:'Reminder',_name:n.reminderId})),
+    ...(S.outreachMsgs||[]).filter(m=>m.message).map(m=>({...m,_type:'Outreach',_name:m.outreachId})),
+  ].filter(c=>c.createdAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,8);
+  const activityHtml=allComms.length
+    ?allComms.map(c=>{
+        const rep=TEAM[c.author!=null?c.author:(c.assignee!=null?c.assignee:0)]||TEAM[0];
+        const note=c.notes||c.message||c.note||'';
+        return`<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--bdr);">
+          <div class="av ${rep.cls}" style="width:20px;height:20px;font-size:8px;flex-shrink:0;">${rep.init}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <span style="font-size:10px;background:var(--cream);border-radius:4px;padding:1px 5px;color:var(--ink-f);">${c._type}</span>
+              <span style="font-size:12px;color:var(--ink-m);">${c.createdAt}</span>
+            </div>
+            ${note?`<div style="font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${note}</div>`:''}
+          </div>
+        </div>`;
+      }).join('')
+    :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No recent activity</div>`;
+
+  el.innerHTML=`
+    <div>
+      ${homeCard('Today\'s Reminders','reminders',overdueReminders.length?`<span style="background:var(--d-bg);color:var(--d-tx);font-size:11px;padding:1px 7px;border-radius:10px;">${overdueReminders.length}</span>`:'')}
+      ${remHtml}
+      </div>
+    </div>
+    <div>
+      ${homeCard('Upcoming Club Processing','club','')}
+      ${clubHtml}
+      </div>
+    </div>
+    <div>
+      ${homeCard('Outstanding Orders','orders','')}
+      ${ordersHtml}
+      </div>
+    </div>
+    <div>
+      ${homeCard('Inventory Due','projects','')}
+      ${invHtml}
+      </div>
+    </div>
+    <div style="grid-column:1/-1;">
+      ${homeCard('Recent Activity','','')}
+      ${activityHtml}
+      </div>
+    </div>
+  `.replace(/<\/div>\s*<\/div>/g,'</div>');
+
+  // Fix layout — wrap each section properly
+  el.innerHTML='';
+  const sections=[
+    {title:"Today's Reminders",tab:'reminders',badge:overdueReminders.length?`<span style="background:var(--d-bg);color:var(--d-tx);font-size:11px;padding:1px 7px;border-radius:10px;margin-left:8px;">${overdueReminders.length}</span>`:'',html:remHtml},
+    {title:'Upcoming Club Processing',tab:'club',badge:'',html:clubHtml},
+    {title:'Outstanding Orders',tab:'orders',badge:'',html:ordersHtml},
+    {title:'Inventory Due',tab:'projects',badge:'',html:invHtml},
+  ];
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:16px;';
+  sections.forEach(s=>{
+    const card=document.createElement('div');
+    card.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;padding:16px;';
+    card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;">${s.title}${s.badge}</div>
+      ${s.tab?`<span style="font-size:11px;color:var(--burg);cursor:pointer;text-decoration:underline;" onclick="sv('${s.tab}')">View all</span>`:''}
+    </div>${s.html}`;
+    grid.appendChild(card);
+  });
+  el.appendChild(grid);
+  // Recent activity full width
+  const actCard=document.createElement('div');
+  actCard.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;padding:16px;margin-top:16px;';
+  actCard.innerHTML=`<div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;margin-bottom:12px;">Recent Activity</div>${activityHtml}`;
+  el.appendChild(actCard);
+}
+
 
 const WINE_RELEASE_CHECKLIST=[
   // Part 1
