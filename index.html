@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.234</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.235</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -262,7 +262,7 @@ select.fi{cursor:pointer;}
       <!-- Home dashboard -->
       <div id="view-home" class="view on">
         <div class="vhdr"><div class="vtitle" id="home-greeting">McGregor Connect</div></div>
-        <div id="home-content" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"></div>
+        <div id="home-content" style="width:100%;"></div>
       </div>
 
       <div id="view-campaigns" class="view">
@@ -6124,22 +6124,22 @@ function renderHome(){
   };
 
   const outer=document.createElement('div');
-  outer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start;';
+  outer.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:100%;box-sizing:border-box;';
 
   // Left column
   const leftCol=document.createElement('div');
-  leftCol.style.cssText='display:flex;flex-direction:column;gap:16px;';
+  leftCol.style.cssText='display:flex;flex-direction:column;gap:16px;min-width:0;';
   leftCards.forEach(s=>leftCol.appendChild(makeCard(s)));
   outer.appendChild(leftCol);
 
   // Middle column
   const midCol=document.createElement('div');
-  midCol.style.cssText='display:flex;flex-direction:column;gap:16px;';
+  midCol.style.cssText='display:flex;flex-direction:column;gap:16px;min-width:0;';
   midCards.forEach(s=>midCol.appendChild(makeCard(s)));
   outer.appendChild(midCol);
 
   // Right column — Recent Activity, scrollable
-  const actCard=makeCard({title:'Recent Activity',tab:'',badge:'',html:activityHtml},'overflow-y:auto;max-height:80vh;');
+  const actCard=makeCard({title:'Recent Activity',tab:'',badge:'',html:activityHtml},'overflow-y:auto;max-height:80vh;min-width:0;');
   outer.appendChild(actCard);
 
   el.appendChild(outer);
