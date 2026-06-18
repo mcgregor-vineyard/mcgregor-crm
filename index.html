@@ -5939,33 +5939,6 @@ function renderHome(){
       }).join('')
     :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No recent activity</div>`;
 
-  el.innerHTML=`
-    <div>
-      ${homeCard('Today\'s Reminders','reminders',overdueReminders.length?`<span style="background:var(--d-bg);color:var(--d-tx);font-size:11px;padding:1px 7px;border-radius:10px;">${overdueReminders.length}</span>`:'')}
-      ${remHtml}
-      </div>
-    </div>
-    <div>
-      ${homeCard('Upcoming Club Processing','club','')}
-      ${clubHtml}
-      </div>
-    </div>
-    <div>
-      ${homeCard('Outstanding Orders','orders','')}
-      ${ordersHtml}
-      </div>
-    </div>
-    <div>
-      ${homeCard('Inventory Due','projects','')}
-      ${invHtml}
-      </div>
-    </div>
-    <div style="grid-column:1/-1;">
-      ${homeCard('Recent Activity','','')}
-      ${activityHtml}
-      </div>
-    </div>
-  `.replace(/<\/div>\s*<\/div>/g,'</div>');
 
   // Fix layout — wrap each section properly
   el.innerHTML='';
