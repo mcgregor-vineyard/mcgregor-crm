@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.233</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.234</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -5909,30 +5909,28 @@ function renderHome(){
   const el=document.getElementById('home-content');if(!el)return;
   const t=today();
   const hour=new Date().getHours();
-  const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
-  document.getElementById('home-greeting').textContent=(hour<12?'Good morning':hour<17?'Good afternoon':'Good evening')+', McGregor Vineyard';
+  const firstName=(TEAM[S.cu]?.name||'').split(' ')[0]||'there';
+  document.getElementById('home-greeting').textContent=(hour<12?'Good morning':hour<17?'Good afternoon':'Good evening')+', '+firstName+'.';
 
-  // 1. Reminders — due/overdue first, fall back to next upcoming if none — ALL users
-  const dueReminders=S.reminders.filter(r=>!r.done&&r.dueDate&&r.dueDate<=t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  const upcomingReminders=S.reminders.filter(r=>!r.done&&r.dueDate&&r.dueDate>t).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
-  const showReminders=dueReminders.length?dueReminders:upcomingReminders.slice(0,8);
+  // 1. All reminders — undone, all users, sorted by date (overdue first, then upcoming)
+  const allPendingReminders=S.reminders.filter(r=>!r.done&&r.dueDate).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const dueReminders=allPendingReminders.filter(r=>r.dueDate<=t);
   const remTitle=dueReminders.length?'Reminders Due':'Upcoming Reminders';
-  const remHtml=showReminders.length
-    ?showReminders.map(r=>{
+  const remHtml=allPendingReminders.length
+    ?allPendingReminders.map(r=>{
         const rep=TEAM[r.assignee]||TEAM[0];
         const isOverdue=r.dueDate<t;
         const isToday=r.dueDate===t;
         const dateLabel=isOverdue?'Overdue — '+r.dueDate:isToday?'Due today':'Due '+r.dueDate;
         const dateColor=isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)';
-        return`<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);">
-          <div class="av ${rep.cls}" style="width:22px;height:22px;font-size:8px;flex-shrink:0;">${rep.init}</div>
+        return`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr);">
+          <div class="av ${rep.cls}" style="width:20px;height:20px;font-size:8px;flex-shrink:0;">${rep.init}</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.note}</div>
-            <div style="font-size:11px;color:${dateColor};">${dateLabel}${r.refName?' · '+r.refName:''} · <span style="font-weight:600;">${rep.name}</span></div>
+            <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.note}</div>
+            <div style="font-size:11px;color:${dateColor};">${dateLabel}${r.refName?' · '+r.refName:''}</div>
           </div>
         </div>`;
-      }).join('')+
-      (!dueReminders.length&&upcomingReminders.length>8?`<div style="font-size:12px;color:var(--ink-m);padding-top:8px;">${upcomingReminders.length-8} more — <span style="color:var(--burg);cursor:pointer;" onclick="sv('reminders')">view all</span></div>`:'')
+      }).join('')
     :`<div style="color:var(--ink-m);font-size:13px;padding:16px 0;text-align:center;">No reminders ✓</div>`;
 
   // 2. Club processing (next 14 days)
@@ -6103,28 +6101,48 @@ function renderHome(){
   }).join('')}
   ${openTickets.length>4?`<div style="font-size:12px;color:var(--ink-m);padding-top:8px;">${openTickets.length-4} more — <span style="color:var(--burg);cursor:pointer;" onclick="sv('tickets')">view all</span></div>`:''}`;
 
-  // Fix layout — 2x2 grid for summary cards, then recent activity in same grid
+  // Build layout — 3 equal columns, Recent Activity on right spanning all rows
   el.innerHTML='';
-  const grid=document.createElement('div');
-  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:16px;';
-  const sections=[
+  const leftCards=[
     {title:remTitle,tab:'reminders',badge:dueReminders.length?`<span style="background:var(--d-bg);color:var(--d-tx);font-size:11px;padding:1px 7px;border-radius:10px;margin-left:8px;">${dueReminders.length}</span>`:'',html:remHtml},
     {title:'Upcoming Club Processing',tab:'club',badge:'',html:clubHtml},
     {title:'Outstanding Orders',tab:'orders',badge:'',html:ordersHtml},
+  ];
+  const midCards=[
     {title:'Inventory Due',tab:'projects',badge:'',html:invHtml},
     {title:'Tickets',tab:'tickets',badge:'',html:ticketsHtml},
-    {title:'Recent Activity',tab:'',badge:'',html:activityHtml},
   ];
-  sections.forEach(s=>{
+
+  const makeCard=(s,extraStyle='')=>{
     const card=document.createElement('div');
-    card.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;padding:16px;';
+    card.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;padding:16px;'+extraStyle;
     card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;">${s.title}${s.badge}</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;">${s.title}${s.badge||''}</div>
       ${s.tab?`<span style="font-size:11px;color:var(--burg);cursor:pointer;text-decoration:underline;" onclick="sv('${s.tab}')">View all</span>`:''}
     </div>${s.html}`;
-    grid.appendChild(card);
-  });
-  el.appendChild(grid);
+    return card;
+  };
+
+  const outer=document.createElement('div');
+  outer.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start;';
+
+  // Left column
+  const leftCol=document.createElement('div');
+  leftCol.style.cssText='display:flex;flex-direction:column;gap:16px;';
+  leftCards.forEach(s=>leftCol.appendChild(makeCard(s)));
+  outer.appendChild(leftCol);
+
+  // Middle column
+  const midCol=document.createElement('div');
+  midCol.style.cssText='display:flex;flex-direction:column;gap:16px;';
+  midCards.forEach(s=>midCol.appendChild(makeCard(s)));
+  outer.appendChild(midCol);
+
+  // Right column — Recent Activity, scrollable
+  const actCard=makeCard({title:'Recent Activity',tab:'',badge:'',html:activityHtml},'overflow-y:auto;max-height:80vh;');
+  outer.appendChild(actCard);
+
+  el.appendChild(outer);
 }
 
 
