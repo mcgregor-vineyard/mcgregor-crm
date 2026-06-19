@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.238</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.239</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -1914,7 +1914,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
+  C7_WORKER_URL: '',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -2780,9 +2780,39 @@ function previewReEngageFile(input){
     const lines=e.target.result.split('\n').filter(l=>l.trim());
     // Skip header row if first col looks like a header
     const start=lines[0].toLowerCase().includes('name')||lines[0].toLowerCase().includes('email')?1:0;
+
+    // Proper CSV parser — respects quoted fields containing commas
+    function parseCSVLine(line){
+      const cols=[];let cur='';let inQuote=false;
+      for(let i=0;i<line.length;i++){
+        const ch=line[i];
+        if(ch==='"'){inQuote=!inQuote;}
+        else if(ch===','&&!inQuote){cols.push(cur.trim());cur='';}
+        else{cur+=ch;}
+      }
+      cols.push(cur.trim());
+      return cols;
+    }
+
     const rows=lines.slice(start).map(l=>{
-      const cols=l.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
-      return{name:cols[0]||'',email:cols[1]||'',club:cols[2]||'',cancelDate:cols[3]||'',cancelReason:cols[4]||'',membershipLength:cols[5]||'',cancelComments:cols[6]||''};
+      const cols=parseCSVLine(l);
+      let name=cols[0]||'';
+      // Detect "Last, First" format — if name contains a comma it was quoted
+      // Also handle unquoted "Last, First" which would have been split into cols[0] and cols[1]
+      // Check if cols[1] looks like a name fragment rather than an email
+      let email=cols[1]||'';
+      if(name&&!email.includes('@')&&cols.length>1){
+        // Likely "Last, First" was split — rejoin and shift
+        name=cols[0]+', '+cols[1];
+        email=cols[2]||'';
+        return{name:name.trim(),email,club:cols[3]||'',cancelDate:cols[4]||'',cancelReason:cols[5]||'',membershipLength:cols[6]||'',cancelComments:cols[7]||''};
+      }
+      // Normalize "Last, First" -> "First Last" for display/storage
+      if(name.includes(',')){
+        const parts=name.split(',');
+        name=(parts[1].trim()+' '+parts[0].trim()).trim();
+      }
+      return{name,email,club:cols[2]||'',cancelDate:cols[3]||'',cancelReason:cols[4]||'',membershipLength:cols[5]||'',cancelComments:cols[6]||''};
     }).filter(r=>r.name||r.email);
     S._reEngagePending=rows;
     const prev=document.getElementById('re-engage-preview');
@@ -2821,7 +2851,7 @@ async function importReEngageMembers(){
       }catch(e){}
     }
     if(c7id)matched++;
-    // Split name into first/last
+    // Name is already normalized to "First Last" by previewReEngageFile
     const parts=r.name.trim().split(/\s+/);
     const last=parts.length>1?parts.pop():'';
     const first=parts.join(' ');
