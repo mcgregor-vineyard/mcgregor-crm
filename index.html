@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.241</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.242</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -871,6 +871,12 @@ select.fi{cursor:pointer;}
     <div class="mbdy">
       <input type="hidden" id="ecm-id" />
       <div class="fr"><label class="fl">Campaign name *</label><input type="text" class="fi" id="ecm-name" placeholder="e.g. Spring Allocation 2026" /></div>
+      <div class="fr"><label class="fl">Campaign type</label>
+        <select class="fi" id="ecm-type">
+          <option value="">General</option>
+          <option value="re-engagement">Past Member Re-Engagement</option>
+        </select>
+      </div>
       <div class="f2">
         <div class="fr"><label class="fl">Start date</label><input type="date" class="fi" id="ecm-start" /></div>
         <div class="fr"><label class="fl">End date</label><input type="date" class="fi" id="ecm-end" /></div>
@@ -2438,6 +2444,7 @@ function openEditCamp(){
   const c=S.campaigns.find(x=>x.id===S.activeCamp);if(!c)return;
   document.getElementById('ecm-id').value=c.id;
   document.getElementById('ecm-name').value=c.name;
+  document.getElementById('ecm-type').value=c.type||'';
   document.getElementById('ecm-start').value=c.start||'';
   document.getElementById('ecm-end').value=c.end||'';
   document.getElementById('ecm-desc').value=c.desc||'';
@@ -2450,14 +2457,15 @@ async function saveEditCamp(){
   if(!name){showToast('Please enter a campaign name','err');return;}
   const c=S.campaigns.find(x=>x.id===id);if(!c)return;
   c.name=name;
+  c.type=document.getElementById('ecm-type').value||'';
   c.start=document.getElementById('ecm-start').value;
   c.end=document.getElementById('ecm-end').value;
   c.desc=document.getElementById('ecm-desc').value;
   try{
-    const allRows=await sheetsGet('Campaigns!A2:G');
+    const allRows=await sheetsGet('Campaigns!A2:H');
     const rowIdx=allRows.findIndex(r=>r[0]===id);
     if(rowIdx>=0){
-      await sheetsUpdate('Campaigns!A'+(rowIdx+2)+':G'+(rowIdx+2),[[c.id,c.name,c.start,c.end,c.desc,c.createdAt,c.archived?'true':'false']]);
+      await sheetsUpdate('Campaigns!A'+(rowIdx+2)+':H'+(rowIdx+2),[[c.id,c.name,c.start,c.end,c.desc,c.createdAt,c.archived?'true':'false',c.type||'']]);
     }
     closeModal('edit-camp-modal');
     renderAll();
