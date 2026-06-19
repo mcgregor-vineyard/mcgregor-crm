@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.243</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.245</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -568,6 +568,14 @@ select.fi{cursor:pointer;}
                 </div>
                 <div id="pj-winerelease-list"></div>
               </div>
+              <!-- Customer Contact project -->
+              <div id="pj-customercontact-section" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                  <div style="font-weight:600;font-size:14px;">Contacts</div>
+                  <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openAddCcContact()">+ Add contact</button>
+                </div>
+                <div id="pj-customercontact-list"></div>
+              </div>
             </div>
             <!-- Right: notes + Power BI (Inventory only) -->
             <div>
@@ -693,7 +701,7 @@ select.fi{cursor:pointer;}
     </div>
   </div>
 
-  <div class="detail-panel-backdrop" id="detail-backdrop" onclick="closeDP();closePjItemPanel();closeClubMemberPanel();"></div>
+  <div class="detail-panel-backdrop" id="detail-backdrop" onclick="closeDP();closePjItemPanel();closeClubMemberPanel();closeCcPanel();"></div>
   <div class="detail-panel" id="detail-panel">
     <div style="padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;background:var(--burg);color:white;flex-shrink:0;">
       <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;" id="dp-title">Contact</div>
@@ -753,6 +761,52 @@ select.fi{cursor:pointer;}
       <div>
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-f);margin-bottom:8px;">Communication history</div>
         <div id="cmp-history" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer Contact communication panel -->
+  <div class="detail-panel" id="cc-contact-panel">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;background:#2C3E6B;color:white;flex-shrink:0;">
+      <div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;" id="cc-name">Contact</div>
+        <div id="cc-meta" style="font-size:12px;opacity:.75;margin-top:2px;"></div>
+      </div>
+      <button style="background:rgba(255,255,255,.2);border:none;cursor:pointer;color:white;font-size:16px;border-radius:4px;padding:2px 8px;" onclick="closeCcPanel()">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;">
+      <!-- Contact info -->
+      <div id="cc-info" style="background:var(--cream);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;font-size:13px;"></div>
+      <!-- Completion status -->
+      <div style="background:white;border:1px solid var(--bdr);border-radius:8px;padding:14px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-f);margin-bottom:10px;">Completion status</div>
+        <div style="display:flex;flex-direction:column;gap:6px;" id="cc-completion-btns"></div>
+      </div>
+      <!-- Log communication -->
+      <div style="background:white;border:1px solid var(--bdr);border-radius:8px;padding:14px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-f);margin-bottom:10px;">Log communication</div>
+        <select class="fi" id="cc-method" style="margin-bottom:8px;">
+          <option value="Phone">Phone call</option>
+          <option value="Left voicemail">Left voicemail</option>
+          <option value="Email sent">Email sent</option>
+          <option value="Email received">Email received</option>
+          <option value="In person">In person</option>
+          <option value="Internal note">Internal note</option>
+        </select>
+        <select class="fi" id="cc-outcome" style="margin-bottom:8px;">
+          <option value="reached">Reached</option>
+          <option value="vm">Left voicemail</option>
+          <option value="noanswer">No answer</option>
+          <option value="notReached">Not reached</option>
+          <option value="note">Note only</option>
+        </select>
+        <textarea class="fi" id="cc-notes" rows="3" placeholder="Notes..."></textarea>
+        <button class="btn btnp" style="width:100%;margin-top:8px;" onclick="saveCcComm()">Log</button>
+      </div>
+      <!-- History -->
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-f);margin-bottom:8px;">Communication history</div>
+        <div id="cc-history" style="display:flex;flex-direction:column;gap:8px;"></div>
       </div>
     </div>
   </div>
@@ -1143,6 +1197,7 @@ select.fi{cursor:pointer;}
             <option value="Inventory">Inventory</option>
             <option value="PreOrder">PreOrder Fulfillment</option>
             <option value="WineRelease">Wine Release</option>
+            <option value="CustomerContact">Customer Contact</option>
           </select>
         </div>
         <div class="fr"><label class="fl">Status</label>
@@ -1379,6 +1434,36 @@ select.fi{cursor:pointer;}
     <div class="mftr">
       <button class="btn" onclick="closeModal('club-instructions-modal')">Cancel</button>
       <button class="btn btnp" onclick="saveClubInstructions()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Customer Contact — add contact modal -->
+<div id="cc-add-modal" class="modal-backdrop">
+  <div class="modal" style="width:440px;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle">Add contact</div><button class="mcls" onclick="closeModal('cc-add-modal')">✕</button></div>
+    <div class="mbdy">
+      <div class="f2">
+        <div class="fr"><label class="fl">First name</label><input type="text" class="fi" id="cc-add-first" /></div>
+        <div class="fr"><label class="fl">Last name</label><input type="text" class="fi" id="cc-add-last" /></div>
+      </div>
+      <div class="f2">
+        <div class="fr"><label class="fl">Email</label><input type="text" class="fi" id="cc-add-email" /></div>
+        <div class="fr"><label class="fl">Phone</label><input type="text" class="fi" id="cc-add-phone" /></div>
+      </div>
+      <div class="fr"><label class="fl">Notes</label><textarea class="fi" id="cc-add-notes" rows="2" placeholder="Any context for this contact..."></textarea></div>
+      <div style="margin-top:10px;padding:10px 12px;background:var(--cream);border:1px solid var(--bdr);border-radius:7px;">
+        <div style="font-size:11px;color:var(--ink-m);margin-bottom:6px;">Or search Commerce7</div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" class="fi" id="cc-add-search" placeholder="Name or email..." onkeydown="if(event.key==='Enter')searchCcC7()" style="flex:1;font-size:12px;" />
+          <button class="btn" onclick="searchCcC7()">Search</button>
+        </div>
+        <div id="cc-add-results" style="max-height:160px;overflow-y:auto;border:1px solid var(--bdr);border-radius:5px;background:white;display:none;margin-top:6px;"></div>
+      </div>
+    </div>
+    <div class="mftr">
+      <button class="btn" onclick="closeModal('cc-add-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveCcContact()">Add contact</button>
     </div>
   </div>
 </div>
@@ -1970,9 +2055,9 @@ function getCampColor(campId){
   return idx>=0?CAMP_COLORS[idx%CAMP_COLORS.length]:{bg:'var(--cream)',border:'var(--bdr)',text:'var(--ink-m)'};
 }
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
-const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages',projects:'Projects',projectContacts:'ProjectContacts',projectNotes:'ProjectNotes',projectItemNotes:'ProjectItemNotes',inventoryEntries:'InventoryEntries',clubComms:'ClubComms',clubMembers:'ClubMembers',clubSettings:'ClubSettings',wineReleaseWines:'WineReleaseWines',wineReleaseItems:'WineReleaseItems'};
+const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages',projects:'Projects',projectContacts:'ProjectContacts',projectNotes:'ProjectNotes',projectItemNotes:'ProjectItemNotes',inventoryEntries:'InventoryEntries',clubComms:'ClubComms',clubMembers:'ClubMembers',clubSettings:'ClubSettings',wineReleaseWines:'WineReleaseWines',wineReleaseItems:'WineReleaseItems',customerContactLog:'CustomerContactLog'};
 
-let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],projectItemNotes:[],inventoryEntries:[],clubMembers:[],clubComms:[],clubMembersLastSync:'',clubInstructions:'',wineReleaseWines:[],wineReleaseItems:[],activeClubMemberId:null,activeClubMember:null,activeProjectItemId:null,activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
+let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],projectItemNotes:[],inventoryEntries:[],clubMembers:[],clubComms:[],clubMembersLastSync:'',clubInstructions:'',wineReleaseWines:[],wineReleaseItems:[],customerContactLog:[],activeClubMemberId:null,activeClubMember:null,activeProjectItemId:null,activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
 
 function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function gmt4Now(){
@@ -2071,7 +2156,8 @@ async function ensureSheets(){
   if(needed.includes('ClubSettings'))await sheetsUpdate('ClubSettings!A1:B1',[['Key','Value']]);
   if(needed.includes('WineReleaseWines'))await sheetsUpdate('WineReleaseWines!A1:E1',[['ID','ProjectID','WineName','CreatedAt','SortOrder']]);
   if(needed.includes('WineReleaseItems'))await sheetsUpdate('WineReleaseItems!A1:H1',[['ID','WineID','ProjectID','Task','Assignee','Done','CompletedBy','CompletedAt']]);
-  if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:O1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes','Done','CompletedBy','CompletedAt']]);
+  if(needed.includes('CustomerContactLog'))await sheetsUpdate('CustomerContactLog!A1:H1',[['ID','ContactID','ProjectID','Method','Outcome','Notes','Author','CreatedAt']]);
+  if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:P1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes','Done','CompletedBy','CompletedAt','CompletionType']]);
   if(needed.includes('ProjectNotes'))await sheetsUpdate('ProjectNotes!A1:F1',[['ID','ProjectID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('ProjectItemNotes'))await sheetsUpdate('ProjectItemNotes!A1:F1',[['ID','ContactID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('OrderCustomers'))await sheetsUpdate('OrderCustomers!A1:M1',[['ID','CustomerID','CustomerName','CustomerEmail','CustomerPhone','Status','Assignee','CreatedAt','SyncedAt','Notes','PickupDate','OldestOrderDate','UnfulfilledCount','ResolvedAt']]);
@@ -2084,16 +2170,17 @@ async function loadFromSheets(){
   setSyncBar('loading','Loading from Google Sheets...');
   try{
     await ensureSheets();
-    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows,projectRows,projectContactRows,projectNoteRows,projectItemNoteRows,inventoryRows,clubCommsRows,clubMemberRows,clubSettingsRows,wineReleaseWineRows,wineReleaseItemRows]=await Promise.all([
+    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows,projectRows,projectContactRows,projectNoteRows,projectItemNoteRows,inventoryRows,clubCommsRows,clubMemberRows,clubSettingsRows,wineReleaseWineRows,wineReleaseItemRows,customerContactLogRows]=await Promise.all([
       sheetsGet('Campaigns!A2:H'),sheetsGet('Contacts!A2:P'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:I'),
       sheetsGet('OrderCustomers!A2:N'),sheetsGet('OrderMessages!A2:G'),
       sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
       sheetsGet('ReminderNotes!A2:F'),
-      sheetsGet('Projects!A2:I'),sheetsGet('ProjectContacts!A2:O'),sheetsGet('ProjectNotes!A2:F'),sheetsGet('ProjectItemNotes!A2:F'),
+      sheetsGet('Projects!A2:I'),sheetsGet('ProjectContacts!A2:P'),sheetsGet('ProjectNotes!A2:F'),sheetsGet('ProjectItemNotes!A2:F'),
       sheetsGet('InventoryEntries!A2:M'),sheetsGet('ClubComms!A2:H'),
       sheetsGet('ClubMembers!A2:K').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[]),
-      sheetsGet('WineReleaseWines!A2:E').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[])
+      sheetsGet('WineReleaseWines!A2:E').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[]),
+      sheetsGet('CustomerContactLog!A2:H').catch(()=>[])
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true',type:r[7]||''}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',clubName:r[11]||'',cancelDate:r[12]||'',cancelReason:r[13]||'',membershipLength:r[14]||'',cancelComments:r[15]||'',attempts:[]}));
@@ -2104,7 +2191,7 @@ async function loadFromSheets(){
     S.reminders=reminderRows.filter(r=>r[0]).map(r=>({id:r[0],note:r[1]||'',dueDate:r[2]||'',assignee:parseInt(r[3])||0,refType:r[4]||'',refId:r[5]||'',refName:r[6]||'',done:r[7]==='true',customerId:r[8]||''}));
     S.reminderNotes=(reminderNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],reminderId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.projects=(projectRows||[]).filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',desc:r[2]||'',startDate:r[3]||'',endDate:r[4]||'',assignee:parseInt(r[5])||0,status:r[6]||'Active',createdAt:r[7]||'',type:r[8]||'Standard'}));
-    S.projectContacts=(projectContactRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',first:r[2]||'',last:r[3]||'',email:r[4]||'',phone:r[5]||'',orderNo:r[6]||'',c7CustomerId:r[7]||'',c7OrderData:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',notes:r[11]||'',done:r[12]==='true',completedBy:r[13]||'',completedAt:r[14]||''}));
+    S.projectContacts=(projectContactRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',first:r[2]||'',last:r[3]||'',email:r[4]||'',phone:r[5]||'',orderNo:r[6]||'',c7CustomerId:r[7]||'',c7OrderData:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',notes:r[11]||'',done:r[12]==='true',completedBy:r[13]||'',completedAt:r[14]||'',completionType:r[15]||''}));
     S.projectNotes=(projectNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.projectItemNotes=(projectItemNoteRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',createdAt:r[5]||''}));
     S.inventoryEntries=(inventoryRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',countDate:r[3]||'',newBottleCount:r[4]!==''?parseInt(r[4]):null,bottlesOwed:r[5]!==''?parseInt(r[5]):null,reserveNumber:r[6]!==''?parseInt(r[6]):null,availableForSale:r[7]!==''?parseInt(r[7]):null,notes:r[8]||'',createdAt:r[9]||'',countedBy:r[10]||'',frequencyDays:r[11]!==''&&r[11]!==undefined?parseInt(r[11]):30,active:r[12]!=='false'}));
@@ -2126,6 +2213,7 @@ async function loadFromSheets(){
     S.clubInstructions=instrRow?instrRow[1]||'':'';
     S.wineReleaseWines=(wineReleaseWineRows||[]).filter(r=>r[0]).map((r,i)=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',createdAt:r[3]||'',sortOrder:r[4]!==''?parseInt(r[4]):i}));
     S.wineReleaseItems=(wineReleaseItemRows||[]).filter(r=>r[0]).map(r=>({id:r[0],wineId:r[1]||'',projectId:r[2]||'',task:r[3]||'',assignee:parseInt(r[4])||0,done:r[5]==='true',completedBy:r[6]||'',completedAt:r[7]||''}));
+    S.customerContactLog=(customerContactLogRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',projectId:r[2]||'',method:r[3]||'',outcome:r[4]||'',notes:r[5]||'',author:parseInt(r[6])||0,createdAt:r[7]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
     const seen={};
@@ -2842,47 +2930,92 @@ async function importReEngageMembers(){
   const campId=S._reEngageCampId;
   if(!rows.length||!campId){showToast('Nothing to import','err');return;}
   const btn=document.getElementById('re-engage-import-btn');
-  btn.disabled=true;btn.textContent='Matching with C7...';
-  let imported=0,matched=0,skipped=0;
+  btn.disabled=true;btn.textContent='Importing...';
   const prev=document.getElementById('re-engage-preview');
-  // Build set of existing emails in this campaign for dedup
+
+  // Build set of existing emails for dedup
   const existingEmails=new Set(
     S.contacts.filter(c=>c.campId===campId&&c.email).map(c=>c.email.toLowerCase())
   );
-  for(let i=0;i<rows.length;i++){
-    const r=rows[i];
-    prev.innerHTML=`<div style="font-size:13px;color:var(--ink-m);">Processing ${i+1} of ${rows.length}...</div>`;
-    // Skip duplicates
+
+  // Step 1: Import all rows to sheet quickly — no C7 lookup yet
+  let imported=0,skipped=0;
+  const newContacts=[];
+  const sheetRows=[];
+  for(const r of rows){
     if(r.email&&existingEmails.has(r.email.toLowerCase())){skipped++;continue;}
-    let c7id='';
-    // Try to match by email in C7
-    if(r.email&&CONFIG.C7_WORKER_URL){
-      try{
-        const data=await c7Req('GET','/customer?q='+encodeURIComponent(r.email)+'&limit=5',null);
-        const custs=(data&&data.customers)||[];
-        const match=custs.find(cu=>(cu.emails||[]).some(e=>e.email.toLowerCase()===r.email.toLowerCase()));
-        if(match)c7id=match.id;
-      }catch(e){}
-    }
-    if(c7id)matched++;
-    // Name is already normalized to "First Last" by previewReEngageFile
     const parts=r.name.trim().split(/\s+/);
     const last=parts.length>1?parts.pop():'';
     const first=parts.join(' ');
     const id=uid();const createdAt=today();
-    const contact={id,campId,first,last,phone:r.phone||'',email:r.email,city:'',assignee:S.cu,createdAt,c7id,addReason:'Past member re-engagement',clubName:r.club,cancelDate:r.cancelDate,cancelReason:r.cancelReason,membershipLength:r.membershipLength,cancelComments:r.cancelComments||'',attempts:[]};
-    await sheetsAppend('Contacts!A:P',[[id,campId,first,last,r.phone||'',r.email,'',S.cu,createdAt,c7id,'Past member re-engagement',r.club,r.cancelDate,r.cancelReason,r.membershipLength,r.cancelComments||'']]);
-    S.contacts.push(contact);
+    const contact={id,campId,first,last,phone:r.phone||'',email:r.email,city:'',assignee:S.cu,createdAt,c7id:'',addReason:'Past member re-engagement',clubName:r.club,cancelDate:r.cancelDate,cancelReason:r.cancelReason,membershipLength:r.membershipLength,cancelComments:r.cancelComments||'',attempts:[]};
+    newContacts.push(contact);
+    sheetRows.push([id,campId,first,last,r.phone||'',r.email,'',S.cu,createdAt,'','Past member re-engagement',r.club,r.cancelDate,r.cancelReason,r.membershipLength,r.cancelComments||'']);
     if(r.email)existingEmails.add(r.email.toLowerCase());
     imported++;
-    await new Promise(res=>setTimeout(res,200));
   }
+
+  // Write to sheet in batches of 100
+  prev.innerHTML=`<div style="font-size:13px;color:var(--ink-m);">Saving ${imported} contacts to sheet...</div>`;
+  try{
+    for(let i=0;i<sheetRows.length;i+=100){
+      await sheetsAppend('Contacts!A:P',sheetRows.slice(i,i+100));
+      prev.innerHTML=`<div style="font-size:13px;color:var(--ink-m);">Saved ${Math.min(i+100,sheetRows.length)} of ${sheetRows.length}...</div>`;
+    }
+  }catch(e){
+    btn.disabled=false;btn.textContent='Import & match with C7';
+    showToast('Error saving: '+e.message,'err');return;
+  }
+
+  // Add to local state
+  newContacts.forEach(c=>S.contacts.push(c));
   btn.disabled=false;btn.textContent='Import & match with C7';
   closeModal('re-engage-upload-modal');
   renderAll();
-  const msg=[imported+' imported',matched+' matched to C7'];
-  if(skipped)msg.push(skipped+' skipped (already in campaign)');
+
+  const msg=[imported+' contacts imported'];
+  if(skipped)msg.push(skipped+' skipped (duplicates)');
+  msg.push('C7 matching not yet run');
   showToast(msg.join(' · '));
+
+  // Step 2: Offer C7 matching as a separate action
+  setTimeout(()=>{
+    if(confirm(`${imported} contacts imported. Would you like to match them to Commerce7 accounts now? This runs in the background and may take a few minutes for large lists.`)){
+      matchReEngageToC7(campId,newContacts);
+    }
+  },500);
+}
+
+async function matchReEngageToC7(campId,contacts){
+  if(!CONFIG.C7_WORKER_URL){showToast('C7 not configured','err');return;}
+  const toMatch=contacts.filter(c=>!c.c7id&&c.email);
+  if(!toMatch.length){showToast('No contacts to match','err');return;}
+  showToast('Matching '+toMatch.length+' contacts with C7 in background...');
+  let matched=0,failed=0;
+  for(let i=0;i<toMatch.length;i++){
+    const c=toMatch[i];
+    try{
+      const data=await c7Req('GET','/customer?q='+encodeURIComponent(c.email)+'&limit=5',null);
+      const custs=(data&&data.customers)||[];
+      const match=custs.find(cu=>(cu.emails||[]).some(e=>e.email.toLowerCase()===c.email.toLowerCase()));
+      if(match&&match.id){
+        c.c7id=match.id;
+        // Update sheet
+        const allRows=await sheetsGet('Contacts!A2:J');
+        const rowIdx=allRows.findIndex(r=>r[0]===c.id);
+        if(rowIdx>=0)await sheetsUpdate('Contacts!J'+(rowIdx+2),[[match.id]]);
+        matched++;
+      }
+    }catch(e){failed++;}
+    // Rate limit: pause every 10 requests
+    if((i+1)%10===0){
+      showToast(`C7 matching: ${i+1}/${toMatch.length} processed, ${matched} matched...`);
+      await new Promise(r=>setTimeout(r,1000));
+    } else {
+      await new Promise(r=>setTimeout(r,150));
+    }
+  }
+  showToast(`C7 matching complete: ${matched} matched, ${failed} not found`);
 }
 function closeImport(){closeModal('import-modal');}
 
@@ -5843,6 +5976,255 @@ function ticketDueBadge(t){
   return`<span style="background:var(--cream);color:var(--ink-m);border-radius:4px;padding:1px 6px;font-size:10px;">Due ${t.dueDate}</span>`;
 }
 
+// ---- Customer Contact Project Type ----
+const CC_COMPLETION={
+  'account-updated':{label:'Account Updated',color:'var(--s-tx)',bg:'var(--s-bg)',icon:'✓'},
+  'no-update-needed':{label:'No Update Needed',color:'#1565C0',bg:'#E3F2FD',icon:'—'},
+  'no-contact':{label:'No Contact Made',color:'var(--ink-m)',bg:'var(--cream)',icon:'✗'},
+};
+
+function openAddCcContact(){
+  document.getElementById('cc-add-first').value='';
+  document.getElementById('cc-add-last').value='';
+  document.getElementById('cc-add-email').value='';
+  document.getElementById('cc-add-phone').value='';
+  document.getElementById('cc-add-notes').value='';
+  document.getElementById('cc-add-search').value='';
+  document.getElementById('cc-add-results').innerHTML='';
+  document.getElementById('cc-add-results').style.display='none';
+  openModal('cc-add-modal');
+}
+
+async function searchCcC7(){
+  const q=document.getElementById('cc-add-search').value.trim();if(!q)return;
+  const el=document.getElementById('cc-add-results');
+  el.style.display='block';el.innerHTML='<div style="padding:8px;color:var(--ink-m);font-size:12px;">Searching...</div>';
+  try{
+    const data=await c7Req('GET','/customer?q='+encodeURIComponent(q)+'&limit=10',null);
+    const custs=(data&&data.customers)||[];
+    if(!custs.length){el.innerHTML='<div style="padding:8px;color:var(--ink-m);font-size:12px;">No results.</div>';return;}
+    el.innerHTML='';
+    custs.forEach(cu=>{
+      const name=((cu.firstName||'')+' '+(cu.lastName||'')).trim()||'Unknown';
+      const email=(cu.emails&&cu.emails[0])?cu.emails[0].email:'';
+      const phone=(cu.phones&&cu.phones[0])?cu.phones[0].phone:'';
+      const div=document.createElement('div');
+      div.style.cssText='padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--bdr);font-size:12px;';
+      div.onmouseover=()=>div.style.background='var(--cream)';
+      div.onmouseout=()=>div.style.background='';
+      div.innerHTML=`<div style="font-weight:600;">${name}</div><div style="color:var(--ink-m);font-size:11px;">${email}${phone?' · '+phone:''}</div>`;
+      div.onclick=()=>{
+        const parts=name.split(' ');
+        document.getElementById('cc-add-last').value=parts.length>1?parts.pop():'';
+        document.getElementById('cc-add-first').value=parts.join(' ');
+        document.getElementById('cc-add-email').value=email;
+        document.getElementById('cc-add-phone').value=phone;
+        el.style.display='none';
+        document.getElementById('cc-add-search').value='';
+      };
+      el.appendChild(div);
+    });
+  }catch(e){el.innerHTML='<div style="padding:8px;color:var(--d-tx);font-size:12px;">Error: '+e.message+'</div>';}
+}
+
+async function saveCcContact(){
+  const projectId=S.activeProject;
+  const first=document.getElementById('cc-add-first').value.trim();
+  const last=document.getElementById('cc-add-last').value.trim();
+  const email=document.getElementById('cc-add-email').value.trim();
+  const phone=document.getElementById('cc-add-phone').value.trim();
+  const notes=document.getElementById('cc-add-notes').value.trim();
+  if(!first&&!last&&!email){showToast('Please enter a name or email','err');return;}
+  const id=uid();const createdAt=today();
+  const contact={id,projectId,first,last,email,phone,orderNo:'',c7CustomerId:'',c7OrderData:'',assignee:S.cu,createdAt,notes,done:false,completedBy:'',completedAt:'',completionType:''};
+  try{
+    await sheetsAppend('ProjectContacts!A:P',[[id,projectId,first,last,email,phone,'','','',S.cu,createdAt,notes,'false','','','']]);
+    S.projectContacts.push(contact);
+    closeModal('cc-add-modal');
+    renderCustomerContactList(projectId);
+    renderProjects();
+    showToast('Contact added');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+function renderCustomerContactList(projectId){
+  const el=document.getElementById('pj-customercontact-list');if(!el)return;
+  const contacts=S.projectContacts.filter(c=>c.projectId===projectId);
+  if(!contacts.length){el.innerHTML='<div class="empty">No contacts yet. Click + Add contact to get started.</div>';return;}
+  el.innerHTML='';
+
+  // Progress summary
+  const resolved=contacts.filter(c=>c.completionType&&c.completionType!=='').length;
+  const pct=contacts.length?Math.round(resolved/contacts.length*100):0;
+  if(contacts.length){
+    const bar=document.createElement('div');
+    bar.style.cssText='margin-bottom:12px;';
+    const counts=Object.keys(CC_COMPLETION).map(k=>{
+      const n=contacts.filter(c=>c.completionType===k).length;
+      return n?`<span style="color:${CC_COMPLETION[k].color};font-size:12px;">${CC_COMPLETION[k].icon} ${CC_COMPLETION[k].label}: ${n}</span>`:'';
+    }).filter(Boolean).join(' · ');
+    bar.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <div style="flex:1;background:var(--bdr);border-radius:4px;height:6px;overflow:hidden;">
+        <div style="width:${pct}%;background:var(--s-tx);height:100%;border-radius:4px;transition:width .3s;"></div>
+      </div>
+      <span style="font-size:12px;color:var(--ink-m);">${resolved}/${contacts.length} resolved</span>
+    </div>${counts?`<div style="display:flex;gap:12px;flex-wrap:wrap;">${counts}</div>`:''}`;
+    el.appendChild(bar);
+  }
+
+  const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
+  tbl.innerHTML=`<thead><tr>
+    <th>Name</th>
+    <th>Email</th>
+    <th>Phone</th>
+    <th>Status</th>
+    <th>Last contact</th>
+    <th>Comms</th>
+    <th></th>
+  </tr></thead>`;
+  const tbody=document.createElement('tbody');
+  contacts.forEach(c=>{
+    const comms=(S.customerContactLog||[]).filter(x=>x.contactId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    const lastComm=comms[0]||null;
+    const ct=c.completionType?CC_COMPLETION[c.completionType]:null;
+    const statusBadge=ct
+      ?`<span style="font-size:11px;font-weight:600;background:${ct.bg};color:${ct.color};border-radius:5px;padding:2px 8px;">${ct.icon} ${ct.label}</span>`
+      :`<span style="font-size:11px;color:var(--ink-m);">Not resolved</span>`;
+    const tr=document.createElement('tr');
+    tr.style.cursor='pointer';
+    tr.onclick=(e)=>{if(e.target.tagName!=='BUTTON')openCcPanel(c.id);};
+    tr.innerHTML=`
+      <td style="font-weight:500;">${(c.first+' '+c.last).trim()||'—'}</td>
+      <td style="font-size:12px;">${c.email?`<a href="mailto:${c.email}" style="color:var(--burg);" onclick="event.stopPropagation()">${c.email}</a>`:''}</td>
+      <td style="font-size:12px;">${c.phone||''}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:12px;">${lastComm?`<div style="font-weight:500;">${lastComm.createdAt}</div><div style="color:var(--ink-m);font-size:11px;">${lastComm.method} — ${lastComm.outcome}</div>`:''}</td>
+      <td><span style="background:var(--burg-f);color:var(--burg);border-radius:10px;padding:1px 7px;font-size:11px;">${comms.length||''}</span></td>
+      <td onclick="event.stopPropagation()"><button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="removeCcContact('${c.id}')">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+  el.appendChild(tbl);
+}
+
+function openCcPanel(contactId){
+  const c=S.projectContacts.find(x=>x.id===contactId);if(!c)return;
+  S._activeCcContactId=contactId;
+  const name=((c.first||'')+' '+(c.last||'')).trim()||'Contact';
+  document.getElementById('cc-name').textContent=name;
+  document.getElementById('cc-meta').textContent=[c.email,c.phone].filter(Boolean).join(' · ')||'No contact info';
+
+  // Info card
+  const infoEl=document.getElementById('cc-info');
+  infoEl.innerHTML=`
+    <div style="font-weight:600;margin-bottom:6px;">${name}</div>
+    ${c.email?`<div style="font-size:12px;"><a href="mailto:${c.email}" style="color:#2C3E6B;">${c.email}</a></div>`:''}
+    ${c.phone?`<div style="font-size:12px;">${c.phone}</div>`:''}
+    ${c.notes?`<div style="font-size:12px;color:var(--ink-m);margin-top:6px;border-top:1px solid var(--bdr);padding-top:6px;">${c.notes}</div>`:''}`;
+
+  // Completion buttons
+  const btnEl=document.getElementById('cc-completion-btns');
+  btnEl.innerHTML='';
+  Object.entries(CC_COMPLETION).forEach(([key,ct])=>{
+    const isActive=c.completionType===key;
+    const btn=document.createElement('button');
+    btn.style.cssText=`padding:8px 12px;border-radius:7px;border:2px solid ${isActive?ct.color:'var(--bdr)'};background:${isActive?ct.bg:'white'};color:${isActive?ct.color:'var(--ink)'};font-size:13px;font-weight:${isActive?'700':'400'};cursor:pointer;text-align:left;transition:all .15s;`;
+    btn.textContent=(isActive?'✓ ':'')+ct.label;
+    btn.onclick=()=>setCcCompletion(contactId,isActive?'':key);
+    btnEl.appendChild(btn);
+  });
+
+  // Reset form
+  document.getElementById('cc-method').value='Phone';
+  document.getElementById('cc-outcome').value='reached';
+  document.getElementById('cc-notes').value='';
+
+  // History
+  renderCcHistory(contactId);
+
+  document.getElementById('cc-contact-panel').classList.add('open');
+  document.getElementById('detail-backdrop').classList.add('open');
+}
+
+function closeCcPanel(){
+  document.getElementById('cc-contact-panel').classList.remove('open');
+  document.getElementById('detail-backdrop').classList.remove('open');
+  S._activeCcContactId=null;
+}
+
+function renderCcHistory(contactId){
+  const comms=(S.customerContactLog||[]).filter(x=>x.contactId===contactId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const el=document.getElementById('cc-history');if(!el)return;
+  if(!comms.length){el.innerHTML='<div style="color:var(--ink-m);font-size:13px;padding:12px;background:var(--cream);border-radius:8px;text-align:center;">No communications logged yet.</div>';return;}
+  el.innerHTML='';
+  comms.forEach(comm=>{
+    const rep=TEAM[comm.author]||TEAM[0];
+    const div=document.createElement('div');
+    div.style.cssText='padding:10px 12px;background:var(--cream);border-radius:8px;font-size:13px;';
+    div.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-weight:600;">${comm.method}</span>
+        ${outcomeBadge(comm.outcome)}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div class="av ${rep.cls}" style="width:16px;height:16px;font-size:7px;">${rep.init}</div>
+        <span style="font-size:11px;color:var(--ink-f);">${comm.createdAt}</span>
+      </div>
+    </div>
+    ${comm.notes?`<div style="color:var(--ink);">${comm.notes}</div>`:''}`;
+    el.appendChild(div);
+  });
+}
+
+async function saveCcComm(){
+  const contactId=S._activeCcContactId;if(!contactId)return;
+  const c=S.projectContacts.find(x=>x.id===contactId);if(!c)return;
+  const method=document.getElementById('cc-method').value;
+  const outcome=document.getElementById('cc-outcome').value;
+  const notes=document.getElementById('cc-notes').value.trim();
+  const id=uid();const createdAt=today();
+  try{
+    await sheetsAppend('CustomerContactLog!A:H',[[id,contactId,c.projectId,method,outcome,notes,S.cu,createdAt]]);
+    if(!S.customerContactLog)S.customerContactLog=[];
+    S.customerContactLog.push({id,contactId,projectId:c.projectId,method,outcome,notes,author:S.cu,createdAt});
+    document.getElementById('cc-notes').value='';
+    renderCcHistory(contactId);
+    renderCustomerContactList(c.projectId);
+    showToast('Communication logged');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+async function setCcCompletion(contactId,completionType){
+  const c=S.projectContacts.find(x=>x.id===contactId);if(!c)return;
+  c.completionType=completionType;
+  c.completedBy=completionType?(TEAM[S.cu]?.name||''):'';
+  c.completedAt=completionType?today():'';
+  try{
+    const allRows=await sheetsGet('ProjectContacts!A2:P');
+    const rowIdx=allRows.findIndex(r=>r[0]===contactId);
+    if(rowIdx>=0)await sheetsUpdate('ProjectContacts!M'+(rowIdx+2)+':P'+(rowIdx+2),[[completionType?'true':'false',c.completedBy,c.completedAt,completionType]]);
+    openCcPanel(contactId);
+    renderCustomerContactList(c.projectId);
+    renderProjects();
+    showToast(completionType?(CC_COMPLETION[completionType]?.label+' set'):'Status cleared');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+async function removeCcContact(contactId){
+  if(!confirm('Remove this contact?'))return;
+  const c=S.projectContacts.find(x=>x.id===contactId);if(!c)return;
+  const pid=c.projectId;
+  try{
+    const allRows=await sheetsGet('ProjectContacts!A2:P');
+    const rowIdx=allRows.findIndex(r=>r[0]===contactId);
+    if(rowIdx>=0)await sheetsUpdate('ProjectContacts!A'+(rowIdx+2)+':P'+(rowIdx+2),[Array(16).fill('')]);
+    S.projectContacts=S.projectContacts.filter(x=>x.id!==contactId);
+    renderCustomerContactList(pid);
+    renderProjects();
+    showToast('Contact removed');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
 // ---- Club Print ----
 function openClubPrintModal(){
   if(!S.clubMembers.length){showToast('Load club members first','err');return;}
@@ -7243,27 +7625,32 @@ function buildProjectCard(p,colorIdx){
   const isInv=p.type==='Inventory';
   const isPO=p.type==='PreOrder';
   const isWR=p.type==='WineRelease';
+  const isCC=p.type==='CustomerContact';
   const invEntries=isInv?S.inventoryEntries.filter(e=>e.projectId===p.id):[];
   const poContacts=isPO?S.projectContacts.filter(c=>c.projectId===p.id):[];
   const wrWines=isWR?(S.wineReleaseWines||[]).filter(w=>w.projectId===p.id):[];
+  const ccContacts=isCC?(S.projectContacts||[]).filter(c=>c.projectId===p.id):[];
   const m=TEAM[p.assignee]||(p.assignee===-1?null:null);
   let pct=0,doneCount=0,totalCount=0;
   if(isInv){totalCount=invEntries.length;doneCount=invEntries.filter(e=>e.availableForSale!==null).length;}
   else if(isPO){totalCount=poContacts.length;doneCount=poContacts.filter(c=>c.done).length;}
   else if(isWR){const wrItems=(S.wineReleaseItems||[]).filter(i=>i.projectId===p.id);totalCount=wrItems.length;doneCount=wrItems.filter(i=>i.done).length;}
+  else if(isCC){totalCount=ccContacts.length;doneCount=ccContacts.filter(c=>c.completionType&&c.completionType!=='').length;}
   else{totalCount=contacts.length;doneCount=contacts.filter(c=>c.done).length;}
   pct=totalCount>0?Math.round(doneCount/totalCount*100):0;
   const pie=totalCount>0?pieChartSVG(pct,col.accent,44):'';
   const typeTag=isInv
     ?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">📦 Inventory</span>`
     :isPO?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">🛒 PreOrder</span>`
-    :isWR?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">🍷 Wine Release</span>`:'';
+    :isWR?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">🍷 Wine Release</span>`
+    :isCC?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">📞 Customer Contact</span>`:'';
   const statsHtml=isInv
     ?`${invEntries.length} wine${invEntries.length!==1?'s':''}`
     :isPO?`${poContacts.length} customer${poContacts.length!==1?'s':''}`
     :isWR?`${wrWines.length} wine${wrWines.length!==1?'s':''} · ${doneCount}/${totalCount} tasks`
-    :`${contacts.length} item${contacts.length!==1?'s':''}`;  const div=document.createElement('div');
-  div.style.cssText=`background:${col.bg};border:1px solid ${col.border};border-radius:12px;padding:16px 18px;cursor:pointer;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;gap:10px;`;
+    :isCC?`${ccContacts.length} contact${ccContacts.length!==1?'s':''} · ${doneCount} resolved`
+    :`${contacts.length} item${contacts.length!==1?'s':''}`;
+  const div=document.createElement('div');  div.style.cssText=`background:${col.bg};border:1px solid ${col.border};border-radius:12px;padding:16px 18px;cursor:pointer;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;gap:10px;`;
   div.onmouseover=()=>{div.style.boxShadow=`0 4px 16px rgba(0,0,0,.10)`;div.style.transform='translateY(-1px)';};
   div.onmouseout=()=>{div.style.boxShadow='';div.style.transform='';};
   div.onclick=()=>openProjectDetail(p.id);
@@ -7304,15 +7691,18 @@ function showInventoryOrStandard(p){
   const isInv=p.type==='Inventory';
   const isPO=p.type==='PreOrder';
   const isWR=p.type==='WineRelease';
-  document.getElementById('pj-standard-section').style.display=(!isInv&&!isPO&&!isWR)?'':'none';
+  const isCC=p.type==='CustomerContact';
+  document.getElementById('pj-standard-section').style.display=(!isInv&&!isPO&&!isWR&&!isCC)?'':'none';
   document.getElementById('pj-inventory-section').style.display=isInv?'':'none';
   document.getElementById('pj-preorder-section').style.display=isPO?'':'none';
   document.getElementById('pj-winerelease-section').style.display=isWR?'':'none';
+  document.getElementById('pj-customercontact-section').style.display=isCC?'':'none';
   const pbiPanel=document.getElementById('pj-powerbi-panel');
   if(pbiPanel)pbiPanel.style.display=isInv?'':'none';
   if(isInv)renderInventoryList(p.id);
   else if(isPO)renderPreOrderList(p.id);
   else if(isWR)renderWineReleaseList(p.id);
+  else if(isCC)renderCustomerContactList(p.id);
   else renderProjectContacts(p.id);
 }
 
@@ -7661,7 +8051,7 @@ async function enrichProjectContactsFromC7(projectId,forceAll){
         if(match)c.c7CustomerId=match.id;
       }
       if(c.c7CustomerId||c.c7OrderData){
-        const allRows=await sheetsGet('ProjectContacts!A2:O');
+        const allRows=await sheetsGet('ProjectContacts!A2:P');
         const rowIdx=allRows.findIndex(r=>r[0]===c.id);
         if(rowIdx>=0)await sheetsUpdate('ProjectContacts!H'+(rowIdx+2)+':I'+(rowIdx+2),[[c.c7CustomerId,c.c7OrderData]]);
       }
@@ -7678,7 +8068,7 @@ async function toggleProjectContact(contactId){
   if(c.done){c.completedBy=TEAM[S.cu]?TEAM[S.cu].name:'';c.completedAt=today();}
   else{c.completedBy='';c.completedAt='';}
   try{
-    const allRows=await sheetsGet('ProjectContacts!A2:O');
+    const allRows=await sheetsGet('ProjectContacts!A2:P');
     const rowIdx=allRows.findIndex(r=>r[0]===contactId);
     if(rowIdx>=0)await sheetsUpdate('ProjectContacts!M'+(rowIdx+2)+':O'+(rowIdx+2),[[c.done.toString(),c.completedBy,c.completedAt]]);
     const p=S.projects.find(x=>x.id===c.projectId);
@@ -7691,7 +8081,7 @@ async function toggleProjectContact(contactId){
 async function removeProjectContact(contactId){
   if(!confirm('Remove this contact from the project?'))return;
   try{
-    const allRows=await sheetsGet('ProjectContacts!A2:O');
+    const allRows=await sheetsGet('ProjectContacts!A2:P');
     const rowIdx=allRows.findIndex(r=>r[0]===contactId);
     if(rowIdx>=0)await sheetsUpdate('ProjectContacts!A'+(rowIdx+2)+':O'+(rowIdx+2),[['','','','','','','','','','','','','','','']]);
     S.projectContacts=S.projectContacts.filter(c=>c.id!==contactId);
@@ -7761,7 +8151,7 @@ async function saveProjectItemNotes(){
   const notes=document.getElementById('pj-item-notes-field').value.trim();
   c.notes=notes;
   try{
-    const allRows=await sheetsGet('ProjectContacts!A2:O');
+    const allRows=await sheetsGet('ProjectContacts!A2:P');
     const rowIdx=allRows.findIndex(r=>r[0]===contactId);
     if(rowIdx>=0)await sheetsUpdate('ProjectContacts!L'+(rowIdx+2),[[notes]]);
     showToast('Notes saved');
@@ -7900,7 +8290,7 @@ async function enrichPreOrderC7(projectId){
       const match=custs.find(cu=>(cu.emails||[]).some(e=>e.email.toLowerCase()===c.email.toLowerCase()));
       if(match){
         c.c7CustomerId=match.id;
-        const allRows=await sheetsGet('ProjectContacts!A2:O');
+        const allRows=await sheetsGet('ProjectContacts!A2:P');
         const rowIdx=allRows.findIndex(r=>r[0]===c.id);
         if(rowIdx>=0)await sheetsUpdate('ProjectContacts!H'+(rowIdx+2),[[match.id]]);
       }
