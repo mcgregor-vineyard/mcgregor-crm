@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.246</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.247</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -6084,6 +6084,44 @@ async function importCcContacts(){
   const msg=[imported+' contacts imported'];
   if(skipped)msg.push(skipped+' skipped (duplicates)');
   showToast(msg.join(' · '));
+  // Offer C7 matching
+  if(newContacts.filter(c=>c.email).length&&CONFIG.C7_WORKER_URL){
+    setTimeout(()=>{
+      if(confirm(`${imported} contacts imported. Match them to Commerce7 accounts now? This runs in the background.`)){
+        matchCcContactsToC7(newContacts);
+      }
+    },500);
+  }
+}
+
+async function matchCcContactsToC7(contacts){
+  const toMatch=contacts.filter(c=>!c.c7CustomerId&&c.email);
+  if(!toMatch.length)return;
+  showToast('Matching '+toMatch.length+' contacts with C7...');
+  let matched=0;
+  for(let i=0;i<toMatch.length;i++){
+    const c=toMatch[i];
+    try{
+      const data=await c7Req('GET','/customer?q='+encodeURIComponent(c.email)+'&limit=5',null);
+      const custs=(data&&data.customers)||[];
+      const match=custs.find(cu=>(cu.emails||[]).some(e=>e.email.toLowerCase()===c.email.toLowerCase()));
+      if(match&&match.id){
+        c.c7CustomerId=match.id;
+        const allRows=await sheetsGet('ProjectContacts!A2:H');
+        const rowIdx=allRows.findIndex(r=>r[0]===c.id);
+        if(rowIdx>=0)await sheetsUpdate('ProjectContacts!H'+(rowIdx+2),[[match.id]]);
+        matched++;
+      }
+    }catch(e){}
+    if((i+1)%10===0){
+      showToast(`C7 matching: ${i+1}/${toMatch.length} done, ${matched} matched...`);
+      await new Promise(r=>setTimeout(r,1000));
+    } else {
+      await new Promise(r=>setTimeout(r,150));
+    }
+  }
+  renderCustomerContactList(S.activeProject);
+  showToast(`C7 matching complete: ${matched} of ${toMatch.length} matched`);
 }
 
 function openAddCcContact(){
@@ -6223,6 +6261,7 @@ function openCcPanel(contactId){
     <div style="font-weight:600;margin-bottom:6px;">${name}</div>
     ${c.email?`<div style="font-size:12px;"><a href="mailto:${c.email}" style="color:#2C3E6B;">${c.email}</a></div>`:''}
     ${c.phone?`<div style="font-size:12px;">${c.phone}</div>`:''}
+    ${c.c7CustomerId&&CONFIG.C7_TENANT?`<div style="margin-top:8px;"><a href="https://${CONFIG.C7_TENANT}.admin.platform.commerce7.com/crm/customer/${c.c7CustomerId}" target="_blank" style="font-size:11px;color:#2C3E6B;border:1px solid #2C3E6B;border-radius:5px;padding:3px 8px;text-decoration:none;display:inline-block;">View in Commerce7 ↗</a></div>`:''}
     ${c.notes?`<div style="font-size:12px;color:var(--ink-m);margin-top:6px;border-top:1px solid var(--bdr);padding-top:6px;">${c.notes}</div>`:''}`;
 
   // Completion buttons
