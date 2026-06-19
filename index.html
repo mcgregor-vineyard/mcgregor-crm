@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.242</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.243</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -2085,7 +2085,7 @@ async function loadFromSheets(){
   try{
     await ensureSheets();
     const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows,projectRows,projectContactRows,projectNoteRows,projectItemNoteRows,inventoryRows,clubCommsRows,clubMemberRows,clubSettingsRows,wineReleaseWineRows,wineReleaseItemRows]=await Promise.all([
-      sheetsGet('Campaigns!A2:G'),sheetsGet('Contacts!A2:P'),sheetsGet('Attempts!A2:I'),
+      sheetsGet('Campaigns!A2:H'),sheetsGet('Contacts!A2:P'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:I'),
       sheetsGet('OrderCustomers!A2:N'),sheetsGet('OrderMessages!A2:G'),
       sheetsGet('Outreach!A2:M'),sheetsGet('OutreachMessages!A2:G'),
@@ -2322,7 +2322,7 @@ async function archiveCampaign(campId,archive){
   if(archive&&!confirm('Archive "'+c.name+'"? It will be hidden from the campaign list but results will still appear in Reports.'))return;
   c.archived=archive;
   try{
-    const allRows=await sheetsGet('Campaigns!A2:G');
+    const allRows=await sheetsGet('Campaigns!A2:H');
     const rowIdx=allRows.findIndex(r=>r[0]===campId);
     if(rowIdx>=0)await sheetsUpdate('Campaigns!G'+(rowIdx+2),[[archive?'true':'false']]);
     if(S.activeCamp===campId){closeCampDetail();}
