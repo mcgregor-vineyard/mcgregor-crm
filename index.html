@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.249</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.251</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7286,9 +7286,9 @@ async function autoCreateClubReminders(){
       );
       if(!alreadyHas){
         const id=uid();
-        const rem={id,note:'Combined Shipping — '+name,dueDate:nextDate,assignee:S.cu,refType:'club-combined-shipping',refId:custId,refName:name,done:false,customerId:custId};
+        const rem={id,note:'Combined Shipping — '+name,dueDate:nextDate,assignee:-1,refType:'club-combined-shipping',refId:custId,refName:name,done:false,customerId:custId};
         try{
-          await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,S.cu,'club-combined-shipping',custId,name,'false',custId]]);
+          await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,-1,'club-combined-shipping',custId,name,'false',custId]]);
           S.reminders.push(rem);
           created++;
         }catch(e){}
@@ -7311,9 +7311,10 @@ async function autoCreateClubReminders(){
       );
       if(!alreadyHas){
         const id=uid();
-        const rem={id,note:'Outstanding Order — '+name,dueDate:nextDate,assignee:S.cu,refType:'club-outstanding-order',refId:custId,refName:name,done:false,customerId:custId};
+        const delivery=m.orderDeliveryMethod==='Pickup'?'Pickup':'Ship';
+        const rem={id,note:'Outstanding Order — '+name+' ('+delivery+')',dueDate:nextDate,assignee:-1,refType:'club-outstanding-order',refId:custId,refName:name,done:false,customerId:custId};
         try{
-          await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,S.cu,'club-outstanding-order',custId,name,'false',custId]]);
+          await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,-1,'club-outstanding-order',custId,name,'false',custId]]);
           S.reminders.push(rem);
           created++;
         }catch(e){}
