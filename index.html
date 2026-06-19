@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.245</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.246</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -572,7 +572,10 @@ select.fi{cursor:pointer;}
               <div id="pj-customercontact-section" style="display:none;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                   <div style="font-weight:600;font-size:14px;">Contacts</div>
-                  <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openAddCcContact()">+ Add contact</button>
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn" style="font-size:12px;" onclick="openCcUpload()">↑ Upload CSV</button>
+                    <button class="btn btnp" style="font-size:13px;padding:7px 16px;" onclick="openAddCcContact()">+ Add contact</button>
+                  </div>
                 </div>
                 <div id="pj-customercontact-list"></div>
               </div>
@@ -1434,6 +1437,23 @@ select.fi{cursor:pointer;}
     <div class="mftr">
       <button class="btn" onclick="closeModal('club-instructions-modal')">Cancel</button>
       <button class="btn btnp" onclick="saveClubInstructions()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Customer Contact CSV upload modal -->
+<div id="cc-upload-modal" class="modal-backdrop">
+  <div class="modal" style="width:520px;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle">Upload contacts</div><button class="mcls" onclick="closeModal('cc-upload-modal')">✕</button></div>
+    <div class="mbdy">
+      <div style="font-size:12px;color:var(--ink-m);margin-bottom:10px;">Upload a CSV with columns: <strong>First Name, Last Name, Email, Phone</strong>. Additional columns are ignored. Duplicates (matched by email) will be skipped.</div>
+      <div style="background:var(--cream);border:1px solid var(--bdr);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--ink-m);margin-bottom:12px;">Column order: First Name · Last Name · Email · Phone</div>
+      <input type="file" id="cc-upload-file" accept=".csv" class="fi" />
+      <div id="cc-upload-preview" style="margin-top:12px;"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn" onclick="closeModal('cc-upload-modal')">Cancel</button>
+      <button class="btn btnp" id="cc-upload-btn" style="display:none;" onclick="importCcContacts()">Import contacts</button>
     </div>
   </div>
 </div>
@@ -5982,6 +6002,89 @@ const CC_COMPLETION={
   'no-update-needed':{label:'No Update Needed',color:'#1565C0',bg:'#E3F2FD',icon:'—'},
   'no-contact':{label:'No Contact Made',color:'var(--ink-m)',bg:'var(--cream)',icon:'✗'},
 };
+
+function openCcUpload(){
+  document.getElementById('cc-upload-file').value='';
+  document.getElementById('cc-upload-preview').innerHTML='';
+  document.getElementById('cc-upload-btn').style.display='none';
+  S._ccUploadPending=[];
+  const fileEl=document.getElementById('cc-upload-file');
+  fileEl.onchange=()=>previewCcUpload(fileEl);
+  openModal('cc-upload-modal');
+}
+
+function previewCcUpload(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const lines=e.target.result.split('\n').filter(l=>l.trim());
+    const start=lines[0].toLowerCase().match(/first|name|email/)?1:0;
+    function parseCSVLine(line){
+      const cols=[];let cur='';let inQ=false;
+      for(let i=0;i<line.length;i++){
+        const ch=line[i];
+        if(ch==='"'){inQ=!inQ;}
+        else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}
+        else{cur+=ch;}
+      }
+      cols.push(cur.trim());
+      return cols;
+    }
+    const rows=lines.slice(start).map(l=>{
+      const cols=parseCSVLine(l);
+      return{first:cols[0]||'',last:cols[1]||'',email:cols[2]||'',phone:cols[3]||''};
+    }).filter(r=>r.first||r.last||r.email);
+    S._ccUploadPending=rows;
+    const prev=document.getElementById('cc-upload-preview');
+    prev.innerHTML=`<div style="font-size:13px;margin-bottom:8px;"><strong>${rows.length}</strong> contacts found</div>
+      <div style="max-height:180px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;">
+        <table class="tbl" style="font-size:11px;">
+          <thead><tr><th>First</th><th>Last</th><th>Email</th><th>Phone</th></tr></thead>
+          <tbody>${rows.slice(0,8).map(r=>`<tr><td>${r.first}</td><td>${r.last}</td><td>${r.email}</td><td>${r.phone}</td></tr>`).join('')}
+          ${rows.length>8?`<tr><td colspan="4" style="text-align:center;color:var(--ink-m);">...and ${rows.length-8} more</td></tr>`:''}</tbody>
+        </table>
+      </div>`;
+    document.getElementById('cc-upload-btn').style.display='inline-block';
+  };
+  reader.readAsText(file);
+}
+
+async function importCcContacts(){
+  const rows=S._ccUploadPending||[];
+  const projectId=S.activeProject;
+  if(!rows.length||!projectId){showToast('Nothing to import','err');return;}
+  const btn=document.getElementById('cc-upload-btn');
+  btn.disabled=true;btn.textContent='Importing...';
+  const prev=document.getElementById('cc-upload-preview');
+  // Dedup by email
+  const existingEmails=new Set(
+    S.projectContacts.filter(c=>c.projectId===projectId&&c.email).map(c=>c.email.toLowerCase())
+  );
+  let imported=0,skipped=0;
+  const sheetRows=[];const newContacts=[];
+  for(const r of rows){
+    if(r.email&&existingEmails.has(r.email.toLowerCase())){skipped++;continue;}
+    const id=uid();const createdAt=today();
+    const contact={id,projectId,first:r.first,last:r.last,email:r.email,phone:r.phone,orderNo:'',c7CustomerId:'',c7OrderData:'',assignee:S.cu,createdAt,notes:'',done:false,completedBy:'',completedAt:'',completionType:''};
+    newContacts.push(contact);
+    sheetRows.push([id,projectId,r.first,r.last,r.email,r.phone,'','','',S.cu,createdAt,'','false','','','']);
+    if(r.email)existingEmails.add(r.email.toLowerCase());
+    imported++;
+  }
+  // Write in batches of 100
+  for(let i=0;i<sheetRows.length;i+=100){
+    await sheetsAppend('ProjectContacts!A:P',sheetRows.slice(i,i+100));
+    prev.innerHTML=`<div style="font-size:13px;color:var(--ink-m);">Saved ${Math.min(i+100,sheetRows.length)} of ${sheetRows.length}...</div>`;
+  }
+  newContacts.forEach(c=>S.projectContacts.push(c));
+  btn.disabled=false;btn.textContent='Import contacts';
+  closeModal('cc-upload-modal');
+  renderCustomerContactList(projectId);
+  renderProjects();
+  const msg=[imported+' contacts imported'];
+  if(skipped)msg.push(skipped+' skipped (duplicates)');
+  showToast(msg.join(' · '));
+}
 
 function openAddCcContact(){
   document.getElementById('cc-add-first').value='';
