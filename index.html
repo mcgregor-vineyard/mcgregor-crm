@@ -145,7 +145,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.239</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.240</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -1397,9 +1397,9 @@ select.fi{cursor:pointer;}
   <div class="modal" style="width:560px;" onclick="event.stopPropagation();">
     <div class="mhdr"><div class="mtitle">Import past members</div><button class="mcls" onclick="closeModal('re-engage-upload-modal')">✕</button></div>
     <div class="mbdy">
-      <div style="font-size:12px;color:var(--ink-m);margin-bottom:12px;">Upload a CSV with columns: <strong>Name, Email, Club, Cancel Date, Cancel Reason, Membership Length, Cancellation Comments</strong>. Each member will be matched to their Commerce7 account by email.</div>
+      <div style="font-size:12px;color:var(--ink-m);margin-bottom:12px;">Upload a CSV with columns: <strong>Name, Email, Phone, Club, Cancel Date, Cancel Reason, Membership Length, Cancellation Comments</strong>. Each member will be matched to their Commerce7 account by email.</div>
       <div style="background:var(--cream);border:1px solid var(--bdr);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--ink-m);margin-bottom:12px;">
-        Column order: Name · Email · Club · Cancel Date · Cancel Reason · Membership Length · Cancellation Comments
+        Column order: Name · Email · Phone · Club · Cancel Date · Cancel Reason · Membership Length · Cancellation Comments
       </div>
       <input type="file" id="re-engage-file" accept=".csv" class="fi" />
       <div id="re-engage-preview" style="margin-top:12px;"></div>
@@ -1914,7 +1914,7 @@ const CONFIG = {
   C7_TENANT: 'mcgregor-vineyard',
   C7_APP_ID: 'mcgregor-crm-v1',
   C7_APP_SECRET: '7d9e82f1a3c5b6d8e0f2a4c6b8d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2b4d6',
-  C7_WORKER_URL: '',
+  C7_WORKER_URL: 'https://mcgregor-c7-proxy.dan-f74.workers.dev',
   SHEET_ID: '1ALdpsWdxK_hKRXoNrX0srv-LQk6HpFhQ_qzu2XnabYw',
   SERVICE_ACCOUNT_EMAIL: 'mcgregor-crm-v1@mcgregor-crm-v1.iam.gserviceaccount.com',
   PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----
@@ -2805,22 +2805,22 @@ function previewReEngageFile(input){
         // Likely "Last, First" was split — rejoin and shift
         name=cols[0]+', '+cols[1];
         email=cols[2]||'';
-        return{name:name.trim(),email,club:cols[3]||'',cancelDate:cols[4]||'',cancelReason:cols[5]||'',membershipLength:cols[6]||'',cancelComments:cols[7]||''};
+        return{name:name.trim(),email,phone:cols[3]||'',club:cols[4]||'',cancelDate:cols[5]||'',cancelReason:cols[6]||'',membershipLength:cols[7]||'',cancelComments:cols[8]||''};
       }
       // Normalize "Last, First" -> "First Last" for display/storage
       if(name.includes(',')){
         const parts=name.split(',');
         name=(parts[1].trim()+' '+parts[0].trim()).trim();
       }
-      return{name,email,club:cols[2]||'',cancelDate:cols[3]||'',cancelReason:cols[4]||'',membershipLength:cols[5]||'',cancelComments:cols[6]||''};
+      return{name,email,phone:cols[2]||'',club:cols[3]||'',cancelDate:cols[4]||'',cancelReason:cols[5]||'',membershipLength:cols[6]||'',cancelComments:cols[7]||''};
     }).filter(r=>r.name||r.email);
     S._reEngagePending=rows;
     const prev=document.getElementById('re-engage-preview');
     prev.innerHTML=`<div style="font-size:13px;margin-bottom:8px;"><strong>${rows.length}</strong> members found in CSV</div>
       <div style="max-height:180px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px;">
         <table class="tbl" style="font-size:11px;">
-          <thead><tr><th>Name</th><th>Email</th><th>Club</th><th>Cancel Date</th><th>Reason</th><th>Length</th><th>Comments</th></tr></thead>
-          <tbody>${rows.slice(0,8).map(r=>`<tr><td>${r.name}</td><td>${r.email}</td><td>${r.club}</td><td>${r.cancelDate}</td><td>${r.cancelReason}</td><td>${r.membershipLength}</td><td>${r.cancelComments}</td></tr>`).join('')}
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Club</th><th>Cancel Date</th><th>Reason</th><th>Length</th><th>Comments</th></tr></thead>
+          <tbody>${rows.slice(0,8).map(r=>`<tr><td>${r.name}</td><td>${r.email}</td><td>${r.phone||''}</td><td>${r.club}</td><td>${r.cancelDate}</td><td>${r.cancelReason}</td><td>${r.membershipLength}</td><td>${r.cancelComments}</td></tr>`).join('')}
           ${rows.length>8?`<tr><td colspan="6" style="text-align:center;color:var(--ink-m);">...and ${rows.length-8} more</td></tr>`:''}</tbody>
         </table>
       </div>`;
@@ -2856,8 +2856,8 @@ async function importReEngageMembers(){
     const last=parts.length>1?parts.pop():'';
     const first=parts.join(' ');
     const id=uid();const createdAt=today();
-    const contact={id,campId,first,last,phone:'',email:r.email,city:'',assignee:S.cu,createdAt,c7id,addReason:'Past member re-engagement',clubName:r.club,cancelDate:r.cancelDate,cancelReason:r.cancelReason,membershipLength:r.membershipLength,cancelComments:r.cancelComments||'',attempts:[]};
-    await sheetsAppend('Contacts!A:P',[[id,campId,first,last,'',r.email,'',S.cu,createdAt,c7id,'Past member re-engagement',r.club,r.cancelDate,r.cancelReason,r.membershipLength,r.cancelComments||'']]);
+    const contact={id,campId,first,last,phone:r.phone||'',email:r.email,city:'',assignee:S.cu,createdAt,c7id,addReason:'Past member re-engagement',clubName:r.club,cancelDate:r.cancelDate,cancelReason:r.cancelReason,membershipLength:r.membershipLength,cancelComments:r.cancelComments||'',attempts:[]};
+    await sheetsAppend('Contacts!A:P',[[id,campId,first,last,r.phone||'',r.email,'',S.cu,createdAt,c7id,'Past member re-engagement',r.club,r.cancelDate,r.cancelReason,r.membershipLength,r.cancelComments||'']]);
     S.contacts.push(contact);
     imported++;
     await new Promise(res=>setTimeout(res,200));
