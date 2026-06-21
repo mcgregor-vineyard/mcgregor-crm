@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.253</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.254</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7266,10 +7266,17 @@ async function cleanupClubReminderAssignees(){
   if(!confirm(`Update ${toFix.length} auto-created club reminder${toFix.length!==1?'s':''} to be unassigned?`))return;
   try{
     const allRows=await sheetsGet('Reminders!A2:I');
-    for(const rem of toFix){
-      const ri=allRows.findIndex(r=>r[0]===rem.id);
-      if(ri>=0)await sheetsUpdate('Reminders!D'+(ri+2),[['-1']]);
+    // Build a map of id → row index
+    const idToRow={};
+    allRows.forEach((r,i)=>{if(r[0])idToRow[r[0]]=i+2;});
+    // Update in batches of 5 with a delay to avoid rate limits
+    for(let i=0;i<toFix.length;i++){
+      const rem=toFix[i];
+      const rowNum=idToRow[rem.id];
+      if(rowNum)await sheetsUpdate('Reminders!D'+rowNum,[['-1']]);
       rem.assignee=-1;
+      if((i+1)%5===0)await new Promise(r=>setTimeout(r,1000));
+      else await new Promise(r=>setTimeout(r,200));
     }
     renderReminders();
     showToast(toFix.length+' reminder'+(toFix.length!==1?'s':'')+' updated — now unassigned');
