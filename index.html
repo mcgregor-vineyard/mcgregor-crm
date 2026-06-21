@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.251</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.253</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -624,6 +624,7 @@ select.fi{cursor:pointer;}
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn" onclick="openClubPrintModal()">🖨 Print list</button>
+            <button class="btn" style="font-size:12px;color:var(--ink-m);" onclick="cleanupClubReminderAssignees()" title="Remove assignees from auto-created club reminders">Fix reminder assignees</button>
             <button class="btn" id="club-sync-btn" onclick="syncClubMembers()">⬇ Load from C7</button>
           </div>
         </div>
@@ -7258,6 +7259,23 @@ async function acknowledgeClubMember(customerId, type, cycleDate){
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
+async function cleanupClubReminderAssignees(){
+  const AUTO_TYPES=['club-combined-shipping','club-outstanding-order'];
+  const toFix=(S.reminders||[]).filter(r=>AUTO_TYPES.includes(r.refType)&&r.assignee!==-1&&r.assignee!==undefined&&r.assignee!=='');
+  if(!toFix.length){showToast('No auto-created reminders need fixing');return;}
+  if(!confirm(`Update ${toFix.length} auto-created club reminder${toFix.length!==1?'s':''} to be unassigned?`))return;
+  try{
+    const allRows=await sheetsGet('Reminders!A2:I');
+    for(const rem of toFix){
+      const ri=allRows.findIndex(r=>r[0]===rem.id);
+      if(ri>=0)await sheetsUpdate('Reminders!D'+(ri+2),[['-1']]);
+      rem.assignee=-1;
+    }
+    renderReminders();
+    showToast(toFix.length+' reminder'+(toFix.length!==1?'s':'')+' updated — now unassigned');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
 async function autoCreateClubReminders(){
   // Called after club members load — auto-create reminders for members in 14-day window
   const t=today();
@@ -7304,18 +7322,28 @@ async function autoCreateClubReminders(){
       )
     );
     if(hasOrder){
-      const alreadyHas=(S.reminders||[]).some(r=>
+      const delivery=m.orderDeliveryMethod==='Pickup'?'Pickup':'Ship';
+      const expectedNote='Outstanding Order — '+name+' ('+delivery+')';
+      const existing=(S.reminders||[]).find(r=>
         r.refType==='club-outstanding-order'&&
         (r.customerId===custId||(r.refId&&r.refId===custId))&&
         r.dueDate===nextDate
       );
-      if(!alreadyHas){
+      if(!existing){
         const id=uid();
-        const delivery=m.orderDeliveryMethod==='Pickup'?'Pickup':'Ship';
-        const rem={id,note:'Outstanding Order — '+name+' ('+delivery+')',dueDate:nextDate,assignee:-1,refType:'club-outstanding-order',refId:custId,refName:name,done:false,customerId:custId};
+        const rem={id,note:expectedNote,dueDate:nextDate,assignee:-1,refType:'club-outstanding-order',refId:custId,refName:name,done:false,customerId:custId};
         try{
           await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,-1,'club-outstanding-order',custId,name,'false',custId]]);
           S.reminders.push(rem);
+          created++;
+        }catch(e){}
+      } else if(!existing.note.includes('(Ship)')&&!existing.note.includes('(Pickup)')){
+        // Patch existing reminder note to include delivery method
+        existing.note=expectedNote;
+        try{
+          const allRows=await sheetsGet('Reminders!A2:I');
+          const ri=allRows.findIndex(r=>r[0]===existing.id);
+          if(ri>=0)await sheetsUpdate('Reminders!B'+(ri+2),[[expectedNote]]);
           created++;
         }catch(e){}
       }
