@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.259</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.260</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7557,14 +7557,6 @@ async function syncClubMembers(){
   const ALLOWED_CLUBS=['McGregor Vineyard Wine Club','McGregor Vineyard Library Wine Club'];
   const syncedAt=gmt4Now();
   try{
-    // Test: fetch one page of club-shipment to discover available fields
-    const testShipment=await c7Req('GET','/club-shipment?limit=1&page=0',null);
-    if(testShipment&&(testShipment.clubShipments||testShipment.subscriptionShipments)){
-      const arr=testShipment.clubShipments||testShipment.subscriptionShipments||[];
-      if(arr.length)console.log('Club shipment sample fields:',JSON.stringify(arr[0],null,2));
-    } else {
-      console.log('Club shipment response:',JSON.stringify(testShipment,null,2));
-    }
     // Fetch ALL pages, then filter
     let allRaw=[];let page=0;let hasMore=true;
     while(hasMore){
