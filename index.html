@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.254</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.256</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -651,6 +651,7 @@ select.fi{cursor:pointer;}
               <th>Next process</th>
               <th>Days away</th>
               <th>Last contact</th>
+              <th>Build status</th>
               <th>Ship to</th>
             </tr></thead>
             <tbody id="club-tbody"></tbody>
@@ -990,6 +991,8 @@ select.fi{cursor:pointer;}
           <option value="reached">Reached — interested</option>
           <option value="sold">Sold</option>
           <option value="nosale">Reached — no sale</option>
+          <option value="joined">Joined club ✓</option>
+          <option value="declined">Declined to join</option>
           <option value="vm">Left voicemail</option>
           <option value="noanswer">No answer</option>
           <option value="email-sent">Email sent</option>
@@ -2175,7 +2178,7 @@ async function ensureSheets(){
   if(needed.includes('Projects'))await sheetsUpdate('Projects!A1:I1',[['ID','Name','Description','StartDate','EndDate','Assignee','Status','CreatedAt','Type']]);
   if(needed.includes('InventoryEntries'))await sheetsUpdate('InventoryEntries!A1:M1',[['ID','ProjectID','WineName','CountDate','NewBottleCount','BottlesOwed','ReserveNumber','AvailableForSale','Notes','CreatedAt','CountedBy','FrequencyDays','Active']]);
   if(needed.includes('ClubComms'))await sheetsUpdate('ClubComms!A1:H1',[['ID','MembershipID','CustomerID','Method','Outcome','Notes','Author','CreatedAt']]);
-  if(needed.includes('ClubMembers'))await sheetsUpdate('ClubMembers!A1:K1',[['MembershipID','CustomerID','ClubTitle','Status','FirstName','LastName','Email','Phone','NextProcessDate','DeliveryMethod','LastSync']]);
+  if(needed.includes('ClubMembers'))await sheetsUpdate('ClubMembers!A1:L1',[['MembershipID','CustomerID','ClubTitle','Status','FirstName','LastName','Email','Phone','NextProcessDate','DeliveryMethod','LastSync','ShipBuildStatus']]);
   if(needed.includes('ClubSettings'))await sheetsUpdate('ClubSettings!A1:B1',[['Key','Value']]);
   if(needed.includes('WineReleaseWines'))await sheetsUpdate('WineReleaseWines!A1:E1',[['ID','ProjectID','WineName','CreatedAt','SortOrder']]);
   if(needed.includes('WineReleaseItems'))await sheetsUpdate('WineReleaseItems!A1:H1',[['ID','WineID','ProjectID','Task','Assignee','Done','CompletedBy','CompletedAt']]);
@@ -2202,7 +2205,7 @@ async function loadFromSheets(){
       sheetsGet('ReminderNotes!A2:F'),
       sheetsGet('Projects!A2:I'),sheetsGet('ProjectContacts!A2:P'),sheetsGet('ProjectNotes!A2:F'),sheetsGet('ProjectItemNotes!A2:F'),
       sheetsGet('InventoryEntries!A2:M'),sheetsGet('ClubComms!A2:H'),
-      sheetsGet('ClubMembers!A2:K').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[]),
+      sheetsGet('ClubMembers!A2:L').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[]),
       sheetsGet('WineReleaseWines!A2:E').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[]),
       sheetsGet('CustomerContactLog!A2:H').catch(()=>[]),
       sheetsGet('ClubAcknowledged!A2:F').catch(()=>[])
@@ -2229,7 +2232,8 @@ async function loadFromSheets(){
         customer:{firstName:r[4]||'',lastName:r[5]||'',emails:r[6]?[{email:r[6]}]:[],phones:r[7]?[{phone:r[7]}]:[]},
         subscription:{nextProcessDate:r[8]||''},
         orderDeliveryMethod:r[9]||'',
-        lastSync:r[10]||''
+        lastSync:r[10]||'',
+        shipBuildStatus:r[11]||''
       }));
       S.clubMembersLastSync=(clubMemberRows||[]).filter(r=>r[10]).map(r=>r[10]).sort().pop()||'';
     }
@@ -2721,6 +2725,20 @@ function showContactDetail(id){
   html+='</div>';
   if(c.c7id)html+='<div style="margin-top:10px;"><a href="https://'+CONFIG.C7_TENANT+'.admin.platform.commerce7.com/crm/customer/'+c.c7id+'" target="_blank" style="font-size:11px;color:'+col.text+';text-decoration:none;border:1px solid '+col.border+';border-radius:5px;padding:3px 8px;display:inline-block;">View in Commerce7</a></div>';
   html+='</div>';
+
+  // Re-engagement completion buttons
+  if(camp&&camp.type==='re-engagement'){
+    const lastAttempt=c.attempts&&c.attempts.length?c.attempts[c.attempts.length-1]:null;
+    const lastOutcome=lastAttempt?lastAttempt.outcome:'';
+    const isJoined=c.attempts&&c.attempts.some(a=>a.outcome==='joined');
+    const isDeclined=c.attempts&&c.attempts.some(a=>a.outcome==='declined');
+    html+='<div style="background:#F8F0F8;border:1px solid #D4B8D4;border-radius:8px;padding:12px 14px;margin-bottom:14px;">';
+    html+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6B1A6B;font-weight:600;margin-bottom:10px;">Re-Engagement Outcome</div>';
+    html+='<div style="display:flex;gap:8px;">';
+    html+=`<button onclick="logReEngageOutcome('${c.id}','joined')" style="flex:1;padding:10px;border-radius:7px;border:2px solid ${isJoined?'#2E7D32':'var(--bdr)'};background:${isJoined?'var(--s-bg)':'white'};color:${isJoined?'var(--s-tx)':'var(--ink)'};font-size:13px;font-weight:${isJoined?'700':'400'};cursor:pointer;">${isJoined?'✓ ':''} Joined</button>`;
+    html+=`<button onclick="logReEngageOutcome('${c.id}','declined')" style="flex:1;padding:10px;border-radius:7px;border:2px solid ${isDeclined?'var(--d-tx)':'var(--bdr)'};background:${isDeclined?'var(--d-bg)':'white'};color:${isDeclined?'var(--d-tx)':'var(--ink)'};font-size:13px;font-weight:${isDeclined?'700':'400'};cursor:pointer;">${isDeclined?'✓ ':''} Declined to Join</button>`;
+    html+='</div></div>';
+  }
 
   // Re-engagement fields (shown for past member campaigns)
   if(camp&&camp.type==='re-engagement'&&(c.clubName||c.cancelDate||c.cancelReason||c.membershipLength||c.cancelComments)){
@@ -4611,21 +4629,23 @@ function renderReminders(){
   const el=document.getElementById('reminders-list');el.innerHTML='';
   if(!rs.length){el.innerHTML='<div class="empty">No reminders found.</div>';return;}
   rs.forEach(r=>{
-    const m=TEAM[r.assignee]||TEAM[0];
+    const rep=r.assignee>=0&&TEAM[r.assignee]?TEAM[r.assignee]:null;
     const isOverdue=!r.done&&r.dueDate<t;
     const isToday=!r.done&&r.dueDate===t;
     const noteCount=(S.reminderNotes||[]).filter(n=>n.reminderId===r.id).length;
+    const isClubType=r.refType==='club-combined-shipping'||r.refType==='club-outstanding-order';
+    const dateLabel=(isClubType?'Next Club Process Date: ':'')+r.dueDate;
     const div=document.createElement('div');
-    div.style.cssText='background:white;border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;'+(r.done?'opacity:.55;':'');
+    div.style.cssText='background:'+(isOverdue?'#FFF0F0':'white')+';border:1px solid '+(isOverdue?'#C62828':'var(--bdr)')+';border-left:'+(isOverdue?'4px solid #C62828':'1px solid var(--bdr)')+';border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;'+(r.done?'opacity:.55;':'');
     div.onclick=()=>openReminderDetail(r.id);
     div.innerHTML='<div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:'+(r.done?'var(--burg)':'white')+';color:white;font-size:10px;" onclick="event.stopPropagation();toggleReminder(\''+r.id+'\')">'+(r.done?'✓':'')+'</div>'
       +'<div style="flex:1;">'
       +'<div style="font-weight:500;font-size:14px;'+(r.done?'text-decoration:line-through;':'')+'">'+r.note+'</div>'
-      +'<div style="display:flex;gap:10px;margin-top:4px;font-size:12px;color:var(--ink-m);">'
-      +'<span style="color:'+(isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)')+';">'+r.dueDate+'</span>'
+      +'<div style="display:flex;gap:10px;margin-top:4px;font-size:12px;color:var(--ink-m);flex-wrap:wrap;">'
+      +'<span style="color:'+(isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)')+';">'+(isOverdue?'⚠ ':'')+dateLabel+'</span>'
       +(r.refName?'<span>↳ '+r.refName+'</span>':'')
       +(noteCount?'<span>🗒 '+noteCount+'</span>':'')
-      +'<div style="display:flex;align-items:center;gap:4px;"><div class="av '+m.cls+'" style="width:16px;height:16px;font-size:7px;">'+m.init+'</div>'+m.name+'</div>'
+      +(rep?'<div style="display:flex;align-items:center;gap:4px;"><div class="av '+rep.cls+'" style="width:16px;height:16px;font-size:7px;">'+rep.init+'</div>'+rep.name+'</div>':'')
       +'</div></div>'
       +'<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="event.stopPropagation();openEditReminder(\''+r.id+'\')">Edit</button>';
     el.appendChild(div);
@@ -7141,6 +7161,29 @@ function renderWineReleaseList(projectId){
 }
 
 // ---- Power BI Embed ----
+async function logReEngageOutcome(contactId, outcome){
+  const c=S.contacts.find(x=>x.id===contactId);if(!c)return;
+  const id=uid();const createdAt=today();
+  const label=outcome==='joined'?'Joined club':'Declined to join';
+  const attempt={id,contactId,method:'Internal note',date:createdAt,outcome,notes:label,sales:[],assignedBy:S.cu,createdAt};
+  try{
+    await sheetsAppend('Attempts!A:I',[[id,contactId,'Internal note',createdAt,outcome,label,'[]',S.cu,createdAt]]);
+    c.attempts=c.attempts||[];c.attempts.push(attempt);
+    // Mark contact as done
+    if(!c.done){
+      c.done=true;
+      const allRows=await sheetsGet('Contacts!A2:P');
+      const ri=allRows.findIndex(r=>r[0]===contactId);
+      // Contacts sheet doesn't have a done col — store in addReason or use a marker
+      // For re-engagement we track completion via attempts, so just update display
+    }
+    const camp=S.campaigns.find(x=>x.id===c.campId);
+    openDP(c,camp);
+    renderContacts();
+    showToast(label+' logged');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
 // ---- Reminder modal C7 search (Club Combined Shipping) ----
 function onRmTypeChange(){
   const type=document.getElementById('rm-type').value;
@@ -7565,7 +7608,8 @@ async function syncClubMembers(){
       m.customer?.phones?.[0]?.phone||'',
       m.subscription?.nextProcessDate?.slice(0,10)||'',
       m.orderDeliveryMethod||'',
-      syncedAt
+      syncedAt,
+      m.subscription?.shipmentBuildStatus||''
     ]));
     for(let i=0;i<rows.length;i+=200){
       await sheetsAppend('ClubMembers!A:K',rows.slice(i,i+200));
@@ -7628,13 +7672,15 @@ function renderClubView(){
 
   // Sort — pinned (past-due + unacknowledged flag) → past-due → upcoming
   const isMemberPinned=(m)=>{
-    const cycleDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
+    const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
+    if(!nextDate||nextDate>today())return false; // only pin past-due
     const cid=m.customerId||'';
     const email=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
     const hasShip=(S.reminders||[]).some(r=>r.refType==='club-combined-shipping'&&(r.customerId===cid||r.refId===cid)&&!r.done);
     const hasOrder=(S.orderCustomers||[]).some(o=>o.status!=='Resolved'&&((cid&&o.customerId===cid)||(email&&o.customerEmail?.toLowerCase()===email)));
-    const shipAck=isClubAcknowledged(cid,'combined-shipping',cycleDate);
-    const orderAck=isClubAcknowledged(cid,'outstanding-order',cycleDate);
+    if(!hasShip&&!hasOrder)return false;
+    const shipAck=(S.clubAcknowledged||[]).some(a=>a.customerId===cid&&a.type==='combined-shipping');
+    const orderAck=(S.clubAcknowledged||[]).some(a=>a.customerId===cid&&a.type==='outstanding-order');
     return(hasShip&&!shipAck)||(hasOrder&&!orderAck);
   };
   members.sort((a,b)=>{
@@ -7642,10 +7688,11 @@ function renderClubView(){
     const da=a.subscription?.nextProcessDate?.slice(0,10)||'9999-99-99';
     const db=b.subscription?.nextProcessDate?.slice(0,10)||'9999-99-99';
     if(sortBy==='nextProcess'||sortBy==='daysAway'){
-      const aPast=da<=t;const bPast=db<=t;
-      const aPin=aPast&&isMemberPinned(a);
-      const bPin=bPast&&isMemberPinned(b);
-      // Pinned past-due first, then other past-due, then upcoming
+      const t2=today();
+      const aPast=da<=t2;const bPast=db<=t2;
+      const aPin=isMemberPinned(a);
+      const bPin=isMemberPinned(b);
+      // Pinned always first, then past-due, then upcoming
       if(aPin&&!bPin)return -1;
       if(!aPin&&bPin)return 1;
       if(aPast&&!bPast)return -1;
@@ -7728,12 +7775,16 @@ function renderClubView(){
           <button onclick="event.stopPropagation();toggleClubCombinedShipping('${doneShipReminders[0].id}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">Undo</button>
         </div>`
       :'';
-    const isPinned=isPast&&isMemberPinned(m);
+    const isPinned=isMemberPinned(m);
     const tr=document.createElement('tr');
     if(isPinned)tr.style.cssText='background:#FFF8E1;border-left:3px solid #E8A84B;';
     else if(isPast)tr.style.cssText='background:#FFF0F0;';
     tr.style.cursor='pointer';
     tr.onclick=(e)=>{if(e.target.tagName!=='A'&&e.target.tagName!=='BUTTON')openClubMemberPanel(m);};
+    const buildStatus=m.subscription?.shipmentBuildStatus||m.shipBuildStatus||'';
+    const buildBadge=buildStatus
+      ?`<span style="font-size:11px;font-weight:600;padding:1px 7px;border-radius:4px;background:${buildStatus==='Built'?'var(--s-bg)':buildStatus==='Skip'?'var(--d-bg)':buildStatus==='Edited'?'#EDE7F6':'var(--cream)'};color:${buildStatus==='Built'?'var(--s-tx)':buildStatus==='Skip'?'var(--d-tx)':buildStatus==='Edited'?'#4527A0':'var(--ink-m)'};">${buildStatus}</span>`
+      :`<span style="color:var(--ink-m);font-size:12px;">—</span>`;
     tr.innerHTML=`
       <td style="font-weight:500;">${name}${shipReminderHtml}${orderBadge}</td>
       <td>${c7Link}</td>
@@ -7743,6 +7794,7 @@ function renderClubView(){
       <td style="font-size:13px;${isPast?'color:var(--d-tx);font-weight:600;':''}">${nextDate||'—'}</td>
       <td style="font-weight:600;color:${daysColor};">${daysLabel}</td>
       <td>${lastContactHtml}</td>
+      <td>${buildBadge}</td>
       <td style="font-size:12px;color:var(--ink-m);">${m.orderDeliveryMethod==='Pickup'?'Pickup':(m.shipTo?.city||m.shipTo?.stateCode||'—')}</td>`;
     tbody.appendChild(tr);
   });
