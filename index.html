@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.257</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.259</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -651,7 +651,6 @@ select.fi{cursor:pointer;}
               <th>Next process</th>
               <th>Days away</th>
               <th>Last contact</th>
-              <th>Build status</th>
               <th>Ship to</th>
             </tr></thead>
             <tbody id="club-tbody"></tbody>
@@ -7558,6 +7557,14 @@ async function syncClubMembers(){
   const ALLOWED_CLUBS=['McGregor Vineyard Wine Club','McGregor Vineyard Library Wine Club'];
   const syncedAt=gmt4Now();
   try{
+    // Test: fetch one page of club-shipment to discover available fields
+    const testShipment=await c7Req('GET','/club-shipment?limit=1&page=0',null);
+    if(testShipment&&(testShipment.clubShipments||testShipment.subscriptionShipments)){
+      const arr=testShipment.clubShipments||testShipment.subscriptionShipments||[];
+      if(arr.length)console.log('Club shipment sample fields:',JSON.stringify(arr[0],null,2));
+    } else {
+      console.log('Club shipment response:',JSON.stringify(testShipment,null,2));
+    }
     // Fetch ALL pages, then filter
     let allRaw=[];let page=0;let hasMore=true;
     while(hasMore){
@@ -7588,11 +7595,7 @@ async function syncClubMembers(){
     });
     // Sort nearest process date first — sheet will be ordered this way
     deduped.sort((a,b)=>(a.subscription?.nextProcessDate||'9999').localeCompare(b.subscription?.nextProcessDate||'9999'));
-    // Log subscription fields from first member to identify shipmentBuildStatus field name
-    if(deduped.length){
-      const s=deduped[0];
-      console.log('Subscription fields sample:',JSON.stringify(s.subscription,null,2));
-    }
+
     S.clubMembers=deduped;
     S.clubMembersLastSync=syncedAt;
     // Populate club filter
@@ -7786,10 +7789,6 @@ function renderClubView(){
     else if(isPast)tr.style.cssText='background:#FFF0F0;';
     tr.style.cursor='pointer';
     tr.onclick=(e)=>{if(e.target.tagName!=='A'&&e.target.tagName!=='BUTTON')openClubMemberPanel(m);};
-    const buildStatus=m.subscription?.shipmentBuildStatus||m.shipBuildStatus||'';
-    const buildBadge=buildStatus
-      ?`<span style="font-size:11px;font-weight:600;padding:1px 7px;border-radius:4px;background:${buildStatus==='Built'?'var(--s-bg)':buildStatus==='Skip'?'var(--d-bg)':buildStatus==='Edited'?'#EDE7F6':'var(--cream)'};color:${buildStatus==='Built'?'var(--s-tx)':buildStatus==='Skip'?'var(--d-tx)':buildStatus==='Edited'?'#4527A0':'var(--ink-m)'};">${buildStatus}</span>`
-      :`<span style="color:var(--ink-m);font-size:12px;">—</span>`;
     tr.innerHTML=`
       <td style="font-weight:500;">${name}${shipReminderHtml}${orderBadge}</td>
       <td>${c7Link}</td>
@@ -7799,7 +7798,6 @@ function renderClubView(){
       <td style="font-size:13px;${isPast?'color:var(--d-tx);font-weight:600;':''}">${nextDate||'—'}</td>
       <td style="font-weight:600;color:${daysColor};">${daysLabel}</td>
       <td>${lastContactHtml}</td>
-      <td>${buildBadge}</td>
       <td style="font-size:12px;color:var(--ink-m);">${m.orderDeliveryMethod==='Pickup'?'Pickup':(m.shipTo?.city||m.shipTo?.stateCode||'—')}</td>`;
     tbody.appendChild(tr);
   });
