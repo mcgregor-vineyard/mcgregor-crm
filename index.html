@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.256</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.257</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7588,6 +7588,11 @@ async function syncClubMembers(){
     });
     // Sort nearest process date first — sheet will be ordered this way
     deduped.sort((a,b)=>(a.subscription?.nextProcessDate||'9999').localeCompare(b.subscription?.nextProcessDate||'9999'));
+    // Log subscription fields from first member to identify shipmentBuildStatus field name
+    if(deduped.length){
+      const s=deduped[0];
+      console.log('Subscription fields sample:',JSON.stringify(s.subscription,null,2));
+    }
     S.clubMembers=deduped;
     S.clubMembersLastSync=syncedAt;
     // Populate club filter
