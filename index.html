@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.265</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.266</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -624,6 +624,7 @@ select.fi{cursor:pointer;}
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn" onclick="openClubPrintModal()">🖨 Print list</button>
+            <button class="btn" style="font-size:12px;color:var(--ink-m);" onclick="deduplicateClubReminders()" title="Remove duplicate auto-created club reminders">Deduplicate reminders</button>
             <button class="btn" style="font-size:12px;color:var(--ink-m);" onclick="cleanupClubReminderAssignees()" title="Remove assignees from auto-created club reminders">Fix reminder assignees</button>
             <button class="btn" id="club-sync-btn" onclick="syncClubMembers()">⬇ Load from C7</button>
           </div>
@@ -7412,6 +7413,41 @@ async function acknowledgeClubMember(customerId, type, cycleDate){
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
+async function deduplicateClubReminders(){
+  const AUTO_TYPES=['club-combined-shipping','club-outstanding-order'];
+  // For each customer+type, keep only the most recent reminder, blank out the rest
+  const grouped={};
+  (S.reminders||[]).filter(r=>AUTO_TYPES.includes(r.refType)).forEach(r=>{
+    const key=(r.customerId||r.refId||'')+'|'+r.refType;
+    if(!grouped[key])grouped[key]=[];
+    grouped[key].push(r);
+  });
+  const toRemove=[];
+  Object.values(grouped).forEach(group=>{
+    if(group.length<=1)return;
+    // Keep the one with the latest dueDate; remove the rest
+    group.sort((a,b)=>b.dueDate.localeCompare(a.dueDate));
+    toRemove.push(...group.slice(1));
+  });
+  if(!toRemove.length){showToast('No duplicate club reminders found');return;}
+  if(!confirm(`Remove ${toRemove.length} duplicate club reminder${toRemove.length!==1?'s':''} from the sheet?`))return;
+  try{
+    const allRows=await sheetsGet('Reminders!A2:I');
+    const idToRow={};
+    allRows.forEach((r,i)=>{if(r[0])idToRow[r[0]]=i+2;});
+    for(let i=0;i<toRemove.length;i++){
+      const rem=toRemove[i];
+      const rowNum=idToRow[rem.id];
+      if(rowNum)await sheetsUpdate('Reminders!A'+rowNum+':I'+rowNum,[['','','','','','','','','']]);
+      S.reminders=S.reminders.filter(r=>r.id!==rem.id);
+      if((i+1)%5===0)await new Promise(r=>setTimeout(r,1000));
+      else await new Promise(r=>setTimeout(r,200));
+    }
+    renderReminders();
+    showToast(toRemove.length+' duplicate reminder'+(toRemove.length!==1?'s':'')+' removed');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
 async function cleanupClubReminderAssignees(){
   const AUTO_TYPES=['club-combined-shipping','club-outstanding-order'];
   const toFix=(S.reminders||[]).filter(r=>AUTO_TYPES.includes(r.refType)&&r.assignee!==-1&&r.assignee!==undefined&&r.assignee!=='');
@@ -7439,41 +7475,36 @@ async function cleanupClubReminderAssignees(){
 async function autoCreateClubReminders(){
   // Called after club members load — auto-create reminders for members in 14-day window
   const t=today();
-  const ALLOWED_TYPES=['club-combined-shipping','club-outstanding-order'];
   let created=0;
   for(const m of (S.clubMembers||[])){
     const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
     if(!nextDate)continue;
     const days=daysUntil(nextDate);
-    if(days===null||days<0||days>14)continue; // only 0-14 day window
+    if(days===null||days>14)continue; // only within 14-day window (including overdue)
     const custId=m.customerId||'';
     const name=[(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', ')||'Member';
 
-    // Check for combined shipping reminder
+    // Check for combined shipping — one reminder per customer, not per cycle date
     const hasShipFlag=(S.reminders||[]).some(r=>
       r.refType==='club-combined-shipping'&&
       (r.customerId===custId||(r.refId&&(r.refId===custId||r.refId===m.id)))&&
       !r.done
     );
-    if(hasShipFlag){
-      // Auto-create reminder if none exists for this cycle
-      const alreadyHas=(S.reminders||[]).some(r=>
-        r.refType==='club-combined-shipping'&&
-        (r.customerId===custId||(r.refId&&r.refId===custId))&&
-        r.dueDate===nextDate
-      );
-      if(!alreadyHas){
-        const id=uid();
-        const rem={id,note:'Combined Shipping — '+name,dueDate:nextDate,assignee:-1,refType:'club-combined-shipping',refId:custId,refName:name,done:false,customerId:custId};
-        try{
-          await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,-1,'club-combined-shipping',custId,name,'false',custId]]);
-          S.reminders.push(rem);
-          created++;
-        }catch(e){}
-      }
+    const alreadyHasShip=(S.reminders||[]).some(r=>
+      r.refType==='club-combined-shipping'&&
+      (r.customerId===custId||(r.refId&&r.refId===custId))
+    );
+    if(hasShipFlag&&!alreadyHasShip){
+      const id=uid();
+      const rem={id,note:'Combined Shipping — '+name,dueDate:nextDate,assignee:-1,refType:'club-combined-shipping',refId:custId,refName:name,done:false,customerId:custId};
+      try{
+        await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,-1,'club-combined-shipping',custId,name,'false',custId]]);
+        S.reminders.push(rem);
+        created++;
+      }catch(e){}
     }
 
-    // Check for outstanding order
+    // Check for outstanding order — one reminder per customer, not per cycle date
     const email=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
     const hasOrder=(S.orderCustomers||[]).some(o=>
       o.status!=='Resolved'&&(
@@ -7486,8 +7517,7 @@ async function autoCreateClubReminders(){
       const expectedNote='Outstanding Order — '+name+' ('+delivery+')';
       const existing=(S.reminders||[]).find(r=>
         r.refType==='club-outstanding-order'&&
-        (r.customerId===custId||(r.refId&&r.refId===custId))&&
-        r.dueDate===nextDate
+        (r.customerId===custId||(r.refId&&r.refId===custId))
       );
       if(!existing){
         const id=uid();
@@ -7498,13 +7528,12 @@ async function autoCreateClubReminders(){
           created++;
         }catch(e){}
       } else if(!existing.note.includes('(Ship)')&&!existing.note.includes('(Pickup)')){
-        // Patch existing reminder note to include delivery method
+        // Patch note to include delivery method
         existing.note=expectedNote;
         try{
           const allRows=await sheetsGet('Reminders!A2:I');
           const ri=allRows.findIndex(r=>r[0]===existing.id);
           if(ri>=0)await sheetsUpdate('Reminders!B'+(ri+2),[[expectedNote]]);
-          created++;
         }catch(e){}
       }
     }
