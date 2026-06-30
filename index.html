@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.263</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.264</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7673,15 +7673,19 @@ function renderClubView(){
 
   // Sort — pinned (past-due + unacknowledged flag) → past-due → upcoming
   const isMemberPinned=(m)=>{
+    const t=today();
     const cid=m.customerId||'';
     const email=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
-    const cycleDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
-    const hasShip=(S.reminders||[]).some(r=>r.refType==='club-combined-shipping'&&(r.customerId===cid||r.refId===cid)&&!r.done);
-    const hasOrder=(S.orderCustomers||[]).some(o=>o.status!=='Resolved'&&((cid&&o.customerId===cid)||(email&&o.customerEmail?.toLowerCase()===email)));
-    if(!hasShip&&!hasOrder)return false;
+    // Check combined ship — pinned if reminder exists, not done, and its dueDate (original cycle date) has passed
+    const shipReminder=(S.reminders||[]).find(r=>r.refType==='club-combined-shipping'&&(r.customerId===cid||r.refId===cid)&&!r.done);
+    const shipPinned=shipReminder&&shipReminder.dueDate<=t;
     const shipAck=(S.clubAcknowledged||[]).some(a=>a.customerId===cid&&a.type==='combined-shipping');
+    // Check outstanding order — pinned if reminder exists, not done, and its dueDate has passed
+    const orderReminder=(S.reminders||[]).find(r=>r.refType==='club-outstanding-order'&&(r.customerId===cid||r.refId===cid)&&!r.done);
+    const orderPinned=orderReminder&&orderReminder.dueDate<=t;
+    const hasOrder=(S.orderCustomers||[]).some(o=>o.status!=='Resolved'&&((cid&&o.customerId===cid)||(email&&o.customerEmail?.toLowerCase()===email)));
     const orderAck=(S.clubAcknowledged||[]).some(a=>a.customerId===cid&&a.type==='outstanding-order');
-    return(hasShip&&!shipAck)||(hasOrder&&!orderAck);
+    return(shipPinned&&!shipAck)||(orderPinned&&hasOrder&&!orderAck);
   };
   members.sort((a,b)=>{
     const t=today();
