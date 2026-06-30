@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.260</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.262</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -3870,8 +3870,9 @@ function orderAgeDays(dateStr){
 }
 
 function buildOrderRow(o,showStatus){
-  const msgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id&&!(m.message&&m.message.match(/^\d+ unfulfilled order/)&&m.method===''));
-  const humanMsgs=msgs;
+  const AUTO_NOTE_PATTERNS=[/^\d+ unfulfilled order/,/^Auto-resolved:/,/^Pickup date set to/,/^Pickup date cleared/];
+  const isAutoNote=(msg)=>!msg.method&&AUTO_NOTE_PATTERNS.some(p=>p.test(msg.message||''));
+  const msgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id&&!isAutoNote(m));
   const lastMsg=msgs.length?msgs[msgs.length-1]:null;
   const m=TEAM[o.assignee]||null;
   const assigneeHtml=m
@@ -7672,10 +7673,9 @@ function renderClubView(){
 
   // Sort — pinned (past-due + unacknowledged flag) → past-due → upcoming
   const isMemberPinned=(m)=>{
-    const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
-    if(!nextDate||nextDate>today())return false; // only pin past-due
     const cid=m.customerId||'';
     const email=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
+    const cycleDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
     const hasShip=(S.reminders||[]).some(r=>r.refType==='club-combined-shipping'&&(r.customerId===cid||r.refId===cid)&&!r.done);
     const hasOrder=(S.orderCustomers||[]).some(o=>o.status!=='Resolved'&&((cid&&o.customerId===cid)||(email&&o.customerEmail?.toLowerCase()===email)));
     if(!hasShip&&!hasOrder)return false;
@@ -7695,6 +7695,7 @@ function renderClubView(){
       // Pinned always first, then past-due, then upcoming
       if(aPin&&!bPin)return -1;
       if(!aPin&&bPin)return 1;
+      if(aPin&&bPin)return da.localeCompare(db);
       if(aPast&&!bPast)return -1;
       if(!aPast&&bPast)return 1;
       return da.localeCompare(db);
