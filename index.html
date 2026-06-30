@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.266</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.267</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -4646,6 +4646,32 @@ async function checkOrdersResolved(){
 }
 
 // ---- Reminders ----
+function resolveReminderRefName(r){
+  if(!r.refId)return '';
+  const type=r.refType||'';
+  if(type==='ticket'||type===''){
+    const tk=(S.tickets||[]).find(t=>t.id===r.refId);
+    if(tk)return tk.customerName||tk.subject||'';
+  }
+  if(type==='order'||type===''){
+    const o=(S.orderCustomers||[]).find(o=>o.id===r.refId);
+    if(o)return o.customerName||'';
+  }
+  if(type==='outreach'||type===''){
+    const ou=(S.outreach||[]).find(o=>o.id===r.refId);
+    if(ou)return ou.title||ou.name||'';
+  }
+  if(type==='contact'||type===''){
+    const c=(S.contacts||[]).find(c=>c.id===r.refId);
+    if(c)return ((c.first||'')+' '+(c.last||'')).trim()||c.email||'';
+  }
+  if(type==='club-combined-shipping'||type==='club-outstanding-order'){
+    const m=(S.clubMembers||[]).find(m=>m.customerId===r.refId);
+    if(m)return [(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', ')||'';
+  }
+  return '';
+}
+
 function renderReminders(){
   const f=document.getElementById('reminder-filter')?document.getElementById('reminder-filter').value:'all';
   const t=today();
@@ -4684,7 +4710,7 @@ function renderReminders(){
       +'<div style="font-weight:500;font-size:14px;'+(r.done?'text-decoration:line-through;':'')+'">'+r.note+'</div>'
       +'<div style="display:flex;gap:10px;margin-top:4px;font-size:12px;color:var(--ink-m);flex-wrap:wrap;">'
       +'<span style="color:'+(isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)')+';">'+(isOverdue?'⚠ ':'')+dateLabel+'</span>'
-      +(r.refName?'<span>↳ '+r.refName+'</span>':'')
+      +(r.refName?'<span>↳ '+r.refName+'</span>':r.refId?'<span>↳ '+resolveReminderRefName(r)+'</span>':'')
       +(noteCount?'<span>🗒 '+noteCount+'</span>':'')
       +(rep?'<div style="display:flex;align-items:center;gap:4px;"><div class="av '+rep.cls+'" style="width:16px;height:16px;font-size:7px;">'+rep.init+'</div>'+rep.name+'</div>':'')
       +'</div></div>'
