@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.267</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.268</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7499,9 +7499,9 @@ async function cleanupClubReminderAssignees(){
 }
 
 async function autoCreateClubReminders(){
-  // Called after club members load — auto-create reminders for members in 14-day window
+  // Called after club members load — auto-create or reset reminders for members in 14-day window
   const t=today();
-  let created=0;
+  let created=0,reset=0;
   for(const m of (S.clubMembers||[])){
     const nextDate=m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate||'';
     if(!nextDate)continue;
@@ -7510,27 +7510,38 @@ async function autoCreateClubReminders(){
     const custId=m.customerId||'';
     const name=[(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', ')||'Member';
 
-    // Check for combined shipping — one reminder per customer, not per cycle date
+    // ---- Combined shipping ----
     const hasShipFlag=(S.reminders||[]).some(r=>
       r.refType==='club-combined-shipping'&&
       (r.customerId===custId||(r.refId&&(r.refId===custId||r.refId===m.id)))&&
       !r.done
     );
-    const alreadyHasShip=(S.reminders||[]).some(r=>
+    const existingShip=(S.reminders||[]).find(r=>
       r.refType==='club-combined-shipping'&&
       (r.customerId===custId||(r.refId&&r.refId===custId))
     );
-    if(hasShipFlag&&!alreadyHasShip){
-      const id=uid();
-      const rem={id,note:'Combined Shipping — '+name,dueDate:nextDate,assignee:-1,refType:'club-combined-shipping',refId:custId,refName:name,done:false,customerId:custId};
-      try{
-        await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,-1,'club-combined-shipping',custId,name,'false',custId]]);
-        S.reminders.push(rem);
-        created++;
-      }catch(e){}
+    if(hasShipFlag){
+      if(!existingShip){
+        // Create new
+        const id=uid();
+        const rem={id,note:'Combined Shipping — '+name,dueDate:nextDate,assignee:-1,refType:'club-combined-shipping',refId:custId,refName:name,done:false,customerId:custId};
+        try{
+          await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,-1,'club-combined-shipping',custId,name,'false',custId]]);
+          S.reminders.push(rem);created++;
+        }catch(e){}
+      } else if(existingShip.done&&existingShip.dueDate!==nextDate){
+        // Reset — new cycle, condition still active
+        existingShip.done=false;existingShip.dueDate=nextDate;
+        try{
+          const allRows=await sheetsGet('Reminders!A2:I');
+          const ri=allRows.findIndex(r=>r[0]===existingShip.id);
+          if(ri>=0)await sheetsUpdate('Reminders!C'+(ri+2)+':H'+(ri+2),[[nextDate,-1,'club-combined-shipping',custId,name,'false']]);
+          reset++;
+        }catch(e){}
+      }
     }
 
-    // Check for outstanding order — one reminder per customer, not per cycle date
+    // ---- Outstanding order ----
     const email=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
     const hasOrder=(S.orderCustomers||[]).some(o=>
       o.status!=='Resolved'&&(
@@ -7541,30 +7552,42 @@ async function autoCreateClubReminders(){
     if(hasOrder){
       const delivery=m.orderDeliveryMethod==='Pickup'?'Pickup':'Ship';
       const expectedNote='Outstanding Order — '+name+' ('+delivery+')';
-      const existing=(S.reminders||[]).find(r=>
+      const existingOrder=(S.reminders||[]).find(r=>
         r.refType==='club-outstanding-order'&&
         (r.customerId===custId||(r.refId&&r.refId===custId))
       );
-      if(!existing){
+      if(!existingOrder){
+        // Create new
         const id=uid();
         const rem={id,note:expectedNote,dueDate:nextDate,assignee:-1,refType:'club-outstanding-order',refId:custId,refName:name,done:false,customerId:custId};
         try{
           await sheetsAppend('Reminders!A:I',[[id,rem.note,nextDate,-1,'club-outstanding-order',custId,name,'false',custId]]);
-          S.reminders.push(rem);
-          created++;
+          S.reminders.push(rem);created++;
         }catch(e){}
-      } else if(!existing.note.includes('(Ship)')&&!existing.note.includes('(Pickup)')){
-        // Patch note to include delivery method
-        existing.note=expectedNote;
+      } else if(existingOrder.done&&existingOrder.dueDate!==nextDate){
+        // Reset — new cycle, condition still active
+        existingOrder.done=false;existingOrder.note=expectedNote;existingOrder.dueDate=nextDate;
         try{
           const allRows=await sheetsGet('Reminders!A2:I');
-          const ri=allRows.findIndex(r=>r[0]===existing.id);
+          const ri=allRows.findIndex(r=>r[0]===existingOrder.id);
+          if(ri>=0)await sheetsUpdate('Reminders!B'+(ri+2)+':H'+(ri+2),[[expectedNote,nextDate,-1,'club-outstanding-order',custId,name,'false']]);
+          reset++;
+        }catch(e){}
+      } else if(existingOrder&&!existingOrder.note.includes('(Ship)')&&!existingOrder.note.includes('(Pickup)')){
+        // Patch delivery method into note
+        existingOrder.note=expectedNote;
+        try{
+          const allRows=await sheetsGet('Reminders!A2:I');
+          const ri=allRows.findIndex(r=>r[0]===existingOrder.id);
           if(ri>=0)await sheetsUpdate('Reminders!B'+(ri+2),[[expectedNote]]);
         }catch(e){}
       }
     }
   }
-  if(created>0){renderReminders();showToast(created+' club reminder'+(created!==1?'s':'')+' created');}
+  const msgs=[];
+  if(created)msgs.push(created+' reminder'+(created!==1?'s':'')+' created');
+  if(reset)msgs.push(reset+' reset for new cycle');
+  if(msgs.length){renderReminders();showToast(msgs.join(' · '));}
 }
 
 // ---- Club Combined Shipping ----
