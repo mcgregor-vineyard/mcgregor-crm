@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.269</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.272</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -1843,6 +1843,16 @@ select.fi{cursor:pointer;}
   </div>
 </div>
 
+<!-- Global Refresh Modal -->
+<div id="global-refresh-modal" class="modal-backdrop">
+  <div class="modal" style="width:480px;" onclick="event.stopPropagation();">
+    <div class="mhdr"><div class="mtitle">↻ Refreshing McGregor Connect</div></div>
+    <div class="mbdy" id="refresh-modal-body">
+      <div style="font-size:13px;color:var(--ink-m);margin-bottom:16px;">Syncing all data sources...</div>
+    </div>
+  </div>
+</div>
+
 <!-- Activity Log Modal -->
 <div id="activity-modal" class="modal-backdrop">
   <div class="modal" style="width:640px;max-height:90vh;" onclick="event.stopPropagation();">
@@ -2325,10 +2335,61 @@ function copyToClipboard(text){
   });
 }
 async function syncAll(){
-  document.getElementById('sync-btn').disabled=true;
-  await loadFromSheets();
-  document.getElementById('sync-btn').disabled=false;
+  const btn=document.getElementById('sync-btn');
+  btn.disabled=true;
+
+  const steps=[
+    {id:'step-sheets',label:'Google Sheets — all data',fn:()=>loadFromSheets()},
+    {id:'step-orders',label:'Commerce7 — unfulfilled orders',fn:()=>syncOrdersFromC7()},
+    {id:'step-resolved',label:'Commerce7 — check resolved orders',fn:()=>checkOrdersResolved()},
+    {id:'step-club',label:'Commerce7 — club members',fn:()=>syncClubMembersQuiet()},
+  ];
+
+  // Build modal body
+  const body=document.getElementById('refresh-modal-body');
+  body.innerHTML=steps.map(s=>`
+    <div style="margin-bottom:16px;" id="${s.id}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <div style="font-size:13px;font-weight:500;">${s.label}</div>
+        <div style="font-size:12px;color:var(--ink-m);" id="${s.id}-status">Waiting...</div>
+      </div>
+      <div style="background:var(--bdr);border-radius:4px;height:6px;overflow:hidden;">
+        <div id="${s.id}-bar" style="height:100%;width:0%;background:var(--burg);border-radius:4px;transition:width .4s;"></div>
+      </div>
+    </div>`).join('')+
+    `<div id="refresh-done" style="display:none;margin-top:8px;padding:10px 14px;background:var(--s-bg);border-radius:8px;color:var(--s-tx);font-size:13px;font-weight:600;text-align:center;">✓ All done</div>
+     <div style="display:flex;justify-content:flex-end;margin-top:16px;"><button class="btn" id="refresh-close-btn" style="display:none;" onclick="closeModal('global-refresh-modal')">Close</button></div>`;
+
+  openModal('global-refresh-modal');
+
+  const setStatus=(id,msg,pct,color='var(--burg)')=>{
+    const el=document.getElementById(id+'-status');
+    const bar=document.getElementById(id+'-bar');
+    if(el)el.textContent=msg;
+    if(bar){bar.style.width=pct+'%';bar.style.background=color;}
+  };
+
+  for(const step of steps){
+    setStatus(step.id,'Running...',30);
+    try{
+      await step.fn();
+      setStatus(step.id,'✓ Done',100,'var(--s-tx)');
+    }catch(e){
+      setStatus(step.id,'⚠ '+e.message,100,'var(--d-tx)');
+    }
+    await new Promise(r=>setTimeout(r,300));
+  }
+
+  document.getElementById('refresh-done').style.display='block';
+  document.getElementById('refresh-close-btn').style.display='inline-block';
+  btn.disabled=false;
 }
+
+// Quiet club sync (no UI updates beyond data)
+async function syncClubMembersQuiet(){
+  await syncClubMembers();
+}
+
 
 function setSyncBar(state,msg){
   const bar=document.getElementById('sync-bar');const sp=document.getElementById('sync-spinner');
@@ -8153,24 +8214,50 @@ function renderProjects(){
   const archived=S.projects.filter(p=>p.status==='Archived');
   el.innerHTML='';
   if(!active.length&&!archived.length){el.innerHTML='<div class="empty">No projects yet. Click + New project to get started.</div>';return;}
-  const grid=document.createElement('div');
-  grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,360px));gap:14px;';
-  active.forEach((p,i)=>grid.appendChild(buildProjectCard(p,i)));
-  el.appendChild(grid);
+
+  // Group active by type
+  const TYPE_GROUPS=[
+    {key:'',label:'General'},
+    {key:'Inventory',label:'📦 Inventory'},
+    {key:'WineRelease',label:'🍷 Wine Release'},
+    {key:'CustomerContact',label:'📞 Customer Contact'},
+    {key:'PreOrder',label:'🛒 Pre-Order'},
+  ];
+  const grid=(projects,colorOffset=0,isArchived=false)=>{
+    const g=document.createElement('div');
+    g.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,360px));gap:14px;';
+    projects.forEach((p,i)=>{
+      const card=buildProjectCard(p,isArchived?undefined:colorOffset+i,isArchived);
+      g.appendChild(card);
+    });
+    return g;
+  };
+
+  let colorOffset=0;
+  TYPE_GROUPS.forEach(group=>{
+    const projects=active.filter(p=>(p.type||'')===(group.key));
+    if(!projects.length)return;
+    const section=document.createElement('div');
+    section.style.cssText='margin-bottom:24px;';
+    section.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr);">${group.label}</div>`;
+    section.appendChild(grid(projects,colorOffset));
+    colorOffset+=projects.length;
+    el.appendChild(section);
+  });
+
   if(archived.length){
     const archDiv=document.createElement('div');
-    archDiv.style.cssText='margin-top:24px;';
-    archDiv.innerHTML='<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-f);margin-bottom:10px;">Archived ('+archived.length+')</div>';
-    const archGrid=document.createElement('div');
-    archGrid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,360px));gap:14px;';
-    archived.forEach((p,i)=>{const c=buildProjectCard(p,i);c.style.opacity='.6';archGrid.appendChild(c);});
-    archDiv.appendChild(archGrid);
+    archDiv.style.cssText='margin-top:8px;';
+    archDiv.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr);">Archived (${archived.length})</div>`;
+    archDiv.appendChild(grid(archived,0,true));
     el.appendChild(archDiv);
   }
 }
 
-function buildProjectCard(p,colorIdx){
-  const col=projectColor(colorIdx===undefined?S.projects.indexOf(p):colorIdx);
+function buildProjectCard(p,colorIdx,isArchived=false){
+  const col=isArchived
+    ?{bg:'var(--cream)',border:'var(--bdr)',text:'var(--ink-m)',accent:'var(--ink-f)'}
+    :projectColor(colorIdx===undefined?S.projects.indexOf(p):colorIdx);
   const contacts=S.projectContacts.filter(c=>c.projectId===p.id);
   const notes=S.projectNotes.filter(n=>n.projectId===p.id);
   const isInv=p.type==='Inventory';
@@ -8201,9 +8288,12 @@ function buildProjectCard(p,colorIdx){
     :isWR?`${wrWines.length} wine${wrWines.length!==1?'s':''} · ${doneCount}/${totalCount} tasks`
     :isCC?`${ccContacts.length} contact${ccContacts.length!==1?'s':''} · ${doneCount} resolved`
     :`${contacts.length} item${contacts.length!==1?'s':''}`;
-  const div=document.createElement('div');  div.style.cssText=`background:${col.bg};border:1px solid ${col.border};border-radius:12px;padding:16px 18px;cursor:pointer;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;gap:10px;`;
-  div.onmouseover=()=>{div.style.boxShadow=`0 4px 16px rgba(0,0,0,.10)`;div.style.transform='translateY(-1px)';};
-  div.onmouseout=()=>{div.style.boxShadow='';div.style.transform='';};
+  const div=document.createElement('div');
+  div.style.cssText=`background:${col.bg};border:1px solid ${col.border};border-radius:12px;padding:16px 18px;cursor:pointer;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;gap:10px;${isArchived?'opacity:.65;':''}`;
+  if(!isArchived){
+    div.onmouseover=()=>{div.style.boxShadow='0 4px 16px rgba(0,0,0,.10)';div.style.transform='translateY(-1px)';};
+    div.onmouseout=()=>{div.style.boxShadow='';div.style.transform='';};
+  }
   div.onclick=()=>openProjectDetail(p.id);
   div.innerHTML=`
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
@@ -9199,7 +9289,7 @@ function openInventoryWineModal(entryId){
   document.getElementById('iw-id').value=e?e.id:'';
   document.getElementById('iw-title').textContent=e?'Edit Wine':'Add Wine';
   document.getElementById('iw-name').value=e?e.wineName:'';
-  document.getElementById('iw-date').value=e?(e.countDate||today()):today();
+  document.getElementById('iw-date').value=today();
   document.getElementById('iw-new-count').value=e&&e.newBottleCount!==null?e.newBottleCount:'';
   document.getElementById('iw-owed').value=e&&e.bottlesOwed!==null?e.bottlesOwed:'';
   document.getElementById('iw-reserve').value=e&&e.reserveNumber!==null?e.reserveNumber:'';
