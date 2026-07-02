@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.268</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.269</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -8983,13 +8983,10 @@ function renderInventoryList(projectId){
   const tbl=document.createElement('table');tbl.className='tbl';tbl.style.tableLayout='auto';
   tbl.innerHTML=`<thead><tr>
     <th style="${th}" onclick="toggleInvSort('wineName','${projectId}')">Wine ${sa('wineName')}</th>
-    <th style="text-align:center;color:var(--s-tx);">Available</th>
-    <th style="text-align:center;">New count</th>
-    <th style="text-align:center;">Owed</th>
-    <th style="text-align:center;">Reserve</th>
+    <th style="text-align:center;color:var(--ink-m);">Available at Last Count</th>
     <th style="${th}" onclick="toggleInvSort('lastCounted','${projectId}')">Last counted ${sa('lastCounted')}</th>
     <th style="${th};text-align:center;" onclick="toggleInvSort('due','${projectId}')">Due ${sa('due')}</th>
-    <th style="${th};text-align:center;" onclick="toggleInvSort('frequency','${projectId}')">Every (days) ${sa('frequency')}</th>
+    <th style="${th};text-align:center;" onclick="toggleInvSort('frequency','${projectId}')">Frequency ${sa('frequency')}</th>
     <th>Notes</th>
     <th></th>
   </tr></thead>`;
@@ -9009,22 +9006,14 @@ function renderInventoryList(projectId){
     tr.style.cssText='cursor:pointer;'+rowBg;
     tr.onclick=()=>openInventoryWineModal(e.id);
     tr.innerHTML=`<td style="font-weight:500;">${e.wineName}</td>
-      <td style="text-align:center;font-size:18px;font-weight:700;color:${availColor};">${avail!==null?avail:'—'}</td>
-      <td style="text-align:center;font-size:13px;">${e.newBottleCount!==null?e.newBottleCount:'—'}</td>
-      <td style="text-align:center;font-size:13px;">${e.bottlesOwed!==null?e.bottlesOwed:'—'}</td>
-      <td style="text-align:center;font-size:13px;">${e.reserveNumber!==null?e.reserveNumber:'—'}</td>
+      <td style="text-align:center;font-size:14px;font-weight:500;color:${availColor};">${avail!==null?avail:'—'}</td>
       <td>
         <div style="font-weight:600;font-size:13px;color:${dateColor};">${daysLabel}</div>
         ${hasCounted?`<div style="font-size:11px;color:var(--ink-m);">${e.countDate}</div>`:''}
         ${hasCounted&&e.countedBy?`<div style="font-size:11px;font-weight:500;color:var(--ink);">by ${e.countedBy}</div>`:''}
       </td>
       <td style="text-align:center;font-weight:600;font-size:12px;color:${dueColor};">${dueLabel}</td>
-      <td style="text-align:center;" onclick="event.stopPropagation()">
-        <input type="number" min="1" max="365" value="${e.frequencyDays||30}"
-          style="width:54px;border:1px solid var(--bdr);border-radius:5px;padding:3px 5px;font-size:12px;text-align:center;"
-          onchange="saveInventoryFrequency('${e.id}',this.value)"
-          onclick="event.stopPropagation()" />
-      </td>
+      <td style="text-align:center;font-size:13px;color:var(--ink-m);">${e.frequencyDays||30}d</td>
       <td style="font-size:12px;color:var(--ink-m);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.notes||''}</td>
       <td onclick="event.stopPropagation()">
         <button class="btn" style="font-size:11px;padding:2px 7px;color:var(--d-tx);border-color:var(--d-tx);" onclick="deleteInventoryWine('${e.id}')">✕</button>
@@ -9056,7 +9045,7 @@ function renderInventoryList(projectId){
       <table class="tbl" style="table-layout:auto;margin-top:6px;opacity:.75;">
         <thead><tr style="background:var(--cream);">
           <th>Wine</th>
-          <th style="text-align:center;">Available</th>
+          <th style="text-align:center;">Available at Last Count</th>
           <th>Last counted</th>
           <th>Notes</th>
           <th></th>
@@ -9210,7 +9199,7 @@ function openInventoryWineModal(entryId){
   document.getElementById('iw-id').value=e?e.id:'';
   document.getElementById('iw-title').textContent=e?'Edit Wine':'Add Wine';
   document.getElementById('iw-name').value=e?e.wineName:'';
-  document.getElementById('iw-date').value=e?e.countDate:today();
+  document.getElementById('iw-date').value=e?(e.countDate||today()):today();
   document.getElementById('iw-new-count').value=e&&e.newBottleCount!==null?e.newBottleCount:'';
   document.getElementById('iw-owed').value=e&&e.bottlesOwed!==null?e.bottlesOwed:'';
   document.getElementById('iw-reserve').value=e&&e.reserveNumber!==null?e.reserveNumber:'';
