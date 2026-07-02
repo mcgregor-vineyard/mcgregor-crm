@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.272</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.273</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -2340,7 +2340,7 @@ async function syncAll(){
 
   const steps=[
     {id:'step-sheets',label:'Google Sheets — all data',fn:()=>loadFromSheets()},
-    {id:'step-orders',label:'Commerce7 — unfulfilled orders',fn:()=>syncOrdersFromC7()},
+    {id:'step-orders',label:'Commerce7 — unfulfilled orders',fn:()=>syncOutstandingOrders()},
     {id:'step-resolved',label:'Commerce7 — check resolved orders',fn:()=>checkOrdersResolved()},
     {id:'step-club',label:'Commerce7 — club members',fn:()=>syncClubMembersQuiet()},
   ];
