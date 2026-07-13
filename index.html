@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.273</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.274</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -2233,7 +2233,7 @@ async function ensureSheets(){
   if(needed.includes('WineReleaseWines'))await sheetsUpdate('WineReleaseWines!A1:E1',[['ID','ProjectID','WineName','CreatedAt','SortOrder']]);
   if(needed.includes('WineReleaseItems'))await sheetsUpdate('WineReleaseItems!A1:H1',[['ID','WineID','ProjectID','Task','Assignee','Done','CompletedBy','CompletedAt']]);
   if(needed.includes('CustomerContactLog'))await sheetsUpdate('CustomerContactLog!A1:H1',[['ID','ContactID','ProjectID','Method','Outcome','Notes','Author','CreatedAt']]);
-  if(needed.includes('ClubAcknowledged'))await sheetsUpdate('ClubAcknowledged!A1:F1',[['ID','CustomerID','AcknowledgedType','CycleDate','AcknowledgedBy','AcknowledgedAt']]);
+  if(needed.includes('ClubAcknowledged'))await sheetsUpdate('ClubAcknowledged!A1:G1',[['ID','CustomerID','AcknowledgedType','CycleDate','AcknowledgedBy','AckState','AcknowledgedAt']]);
   if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:P1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes','Done','CompletedBy','CompletedAt','CompletionType']]);
   if(needed.includes('ProjectNotes'))await sheetsUpdate('ProjectNotes!A1:F1',[['ID','ProjectID','Message','Author','AuthorName','CreatedAt']]);
   if(needed.includes('ProjectItemNotes'))await sheetsUpdate('ProjectItemNotes!A1:F1',[['ID','ContactID','Message','Author','AuthorName','CreatedAt']]);
@@ -2258,7 +2258,7 @@ async function loadFromSheets(){
       sheetsGet('ClubMembers!A2:L').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[]),
       sheetsGet('WineReleaseWines!A2:E').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[]),
       sheetsGet('CustomerContactLog!A2:H').catch(()=>[]),
-      sheetsGet('ClubAcknowledged!A2:F').catch(()=>[])
+      sheetsGet('ClubAcknowledged!A2:G').catch(()=>[])
     ]);
     S.campaigns=campRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1]||'',start:r[2]||'',end:r[3]||'',desc:r[4]||'',createdAt:r[5]||'',archived:r[6]==='true',type:r[7]||''}));
     S.contacts=contactRows.filter(r=>r[0]).map(r=>({id:r[0],campId:r[1]||'',first:r[2]||'',last:r[3]||'',phone:r[4]||'',email:r[5]||'',city:r[6]||'',assignee:parseInt(r[7])||0,createdAt:r[8]||'',c7id:r[9]||'',addReason:r[10]||'',clubName:r[11]||'',cancelDate:r[12]||'',cancelReason:r[13]||'',membershipLength:r[14]||'',cancelComments:r[15]||'',attempts:[]}));
@@ -2293,7 +2293,7 @@ async function loadFromSheets(){
     S.wineReleaseWines=(wineReleaseWineRows||[]).filter(r=>r[0]).map((r,i)=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',createdAt:r[3]||'',sortOrder:r[4]!==''?parseInt(r[4]):i}));
     S.wineReleaseItems=(wineReleaseItemRows||[]).filter(r=>r[0]).map(r=>({id:r[0],wineId:r[1]||'',projectId:r[2]||'',task:r[3]||'',assignee:parseInt(r[4])||0,done:r[5]==='true',completedBy:r[6]||'',completedAt:r[7]||''}));
     S.customerContactLog=(customerContactLogRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',projectId:r[2]||'',method:r[3]||'',outcome:r[4]||'',notes:r[5]||'',author:parseInt(r[6])||0,createdAt:r[7]||''}));
-    S.clubAcknowledged=(clubAcknowledgedRows||[]).filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',type:r[2]||'',cycleDate:r[3]||'',acknowledgedBy:r[4]||'',acknowledgedAt:r[5]||''}));
+    S.clubAcknowledged=(clubAcknowledgedRows||[]).filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',type:r[2]||'',cycleDate:r[3]||'',acknowledgedBy:r[4]||'',ackState:r[5]||'done',acknowledgedAt:r[6]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
     const seen={};
@@ -7472,31 +7472,54 @@ function isClubAcknowledged(customerId, type, cycleDate){
   );
 }
 
-async function acknowledgeClubMember(customerId, type, cycleDate){
-  // Already acknowledged?
-  if(isClubAcknowledged(customerId,type,cycleDate)){
-    // Un-acknowledge — remove
-    const idx=(S.clubAcknowledged||[]).findIndex(a=>a.customerId===customerId&&a.type===type&&a.cycleDate===cycleDate);
-    if(idx>=0)S.clubAcknowledged.splice(idx,1);
-    // Blank sheet row
-    try{
-      const rows=await sheetsGet('ClubAcknowledged!A2:F');
-      const ri=rows.findIndex(r=>r[1]===customerId&&r[2]===type&&r[3]===cycleDate);
-      if(ri>=0)await sheetsUpdate('ClubAcknowledged!A'+(ri+2)+':F'+(ri+2),[['','','','','','']]);
-    }catch(e){}
-    renderClubView();
-    showToast('Acknowledgement removed');
-    return;
+function getClubAckState(customerId, type, cycleDate){
+  // Returns: 'done', 'remind-next', or null
+  const ack=(S.clubAcknowledged||[]).find(a=>
+    a.customerId===customerId&&a.type===type&&a.cycleDate===cycleDate
+  );
+  if(!ack)return null;
+  return ack.ackState||'done';
+}
+
+async function acknowledgeClubMember(customerId, type, cycleDate, ackState='done'){
+  const existing=(S.clubAcknowledged||[]).find(a=>a.customerId===customerId&&a.type===type&&a.cycleDate===cycleDate);
+  if(existing){
+    if(existing.ackState===ackState){
+      // Same state — toggle off (undo)
+      const idx=S.clubAcknowledged.indexOf(existing);
+      S.clubAcknowledged.splice(idx,1);
+      try{
+        const rows=await sheetsGet('ClubAcknowledged!A2:F');
+        const ri=rows.findIndex(r=>r[1]===customerId&&r[2]===type&&r[3]===cycleDate);
+        if(ri>=0)await sheetsUpdate('ClubAcknowledged!A'+(ri+2)+':G'+(ri+2),[['','','','','','','']]);
+      }catch(e){}
+      renderClubView();
+      showToast('Acknowledgement removed');
+      return;
+    } else {
+      // Different state — update it
+      existing.ackState=ackState;
+      existing.acknowledgedBy=(TEAM[S.cu]||TEAM[0]).name;
+      existing.acknowledgedAt=today();
+      try{
+        const rows=await sheetsGet('ClubAcknowledged!A2:F');
+        const ri=rows.findIndex(r=>r[1]===customerId&&r[2]===type&&r[3]===cycleDate);
+        if(ri>=0)await sheetsUpdate('ClubAcknowledged!A'+(ri+2)+':G'+(ri+2),[[existing.id,customerId,type,cycleDate,existing.acknowledgedBy,ackState,today()]]);
+      }catch(e){}
+      renderClubView();
+      showToast(ackState==='remind-next'?'Will remind next time':'Marked done');
+      return;
+    }
   }
   const id=uid();
   const rep=TEAM[S.cu]||TEAM[0];
-  const ack={id,customerId,type,cycleDate,acknowledgedBy:rep.name,acknowledgedAt:today()};
+  const ack={id,customerId,type,cycleDate,acknowledgedBy:rep.name,acknowledgedAt:today(),ackState};
   try{
-    await sheetsAppend('ClubAcknowledged!A:F',[[id,customerId,type,cycleDate,rep.name,today()]]);
+    await sheetsAppend('ClubAcknowledged!A:G',[[id,customerId,type,cycleDate,rep.name,ackState,today()]]);
     if(!S.clubAcknowledged)S.clubAcknowledged=[];
     S.clubAcknowledged.push(ack);
     renderClubView();
-    showToast('Marked done');
+    showToast(ackState==='remind-next'?'Will remind next time':'Marked done');
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -7591,7 +7614,9 @@ async function autoCreateClubReminders(){
           S.reminders.push(rem);created++;
         }catch(e){}
       } else if(existingShip.done&&existingShip.dueDate!==nextDate){
-        // Reset — new cycle, condition still active
+        // Reset — new cycle, condition still active. Also clear any remind-next ack
+        const ackIdx=(S.clubAcknowledged||[]).findIndex(a=>a.customerId===custId&&a.type==='combined-shipping');
+        if(ackIdx>=0)S.clubAcknowledged.splice(ackIdx,1);
         existingShip.done=false;existingShip.dueDate=nextDate;
         try{
           const allRows=await sheetsGet('Reminders!A2:I');
@@ -7602,16 +7627,17 @@ async function autoCreateClubReminders(){
       }
     }
 
-    // ---- Outstanding order ----
+    // ---- Outstanding order — Pickup members don't get reminders ----
     const email=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
+    const isPickup=m.orderDeliveryMethod==='Pickup';
     const hasOrder=(S.orderCustomers||[]).some(o=>
       o.status!=='Resolved'&&(
         (custId&&o.customerId===custId)||
         (email&&o.customerEmail&&o.customerEmail.toLowerCase()===email)
       )
     );
-    if(hasOrder){
-      const delivery=m.orderDeliveryMethod==='Pickup'?'Pickup':'Ship';
+    if(hasOrder&&!isPickup){
+      const delivery='Ship';
       const expectedNote='Outstanding Order — '+name+' ('+delivery+')';
       const existingOrder=(S.reminders||[]).find(r=>
         r.refType==='club-outstanding-order'&&
@@ -7626,7 +7652,9 @@ async function autoCreateClubReminders(){
           S.reminders.push(rem);created++;
         }catch(e){}
       } else if(existingOrder.done&&existingOrder.dueDate!==nextDate){
-        // Reset — new cycle, condition still active
+        // Reset — new cycle, condition still active. Also clear any remind-next ack
+        const ackIdx=(S.clubAcknowledged||[]).findIndex(a=>a.customerId===custId&&a.type==='outstanding-order');
+        if(ackIdx>=0)S.clubAcknowledged.splice(ackIdx,1);
         existingOrder.done=false;existingOrder.note=expectedNote;existingOrder.dueDate=nextDate;
         try{
           const allRows=await sheetsGet('Reminders!A2:I');
@@ -7635,7 +7663,6 @@ async function autoCreateClubReminders(){
           reset++;
         }catch(e){}
       } else if(existingOrder&&!existingOrder.note.includes('(Ship)')&&!existingOrder.note.includes('(Pickup)')){
-        // Patch delivery method into note
         existingOrder.note=expectedNote;
         try{
           const allRows=await sheetsGet('Reminders!A2:I');
@@ -7667,30 +7694,46 @@ function openClubCombinedShippingReminder(){
   openModal('reminder-modal');
 }
 
-async function toggleClubCombinedShipping(remId){
+async function toggleClubCombinedShipping(remId, action='done'){
   const rem=S.reminders.find(r=>r.id===remId);if(!rem)return;
+  const cid=rem.customerId||rem.refId||'';
+  const cycleDate=rem.dueDate||'';
+
+  if(action==='remind-next'){
+    // Toggle remind-next ack (don't mark reminder done)
+    await acknowledgeClubMember(cid,'combined-shipping',cycleDate,'remind-next');
+    return;
+  }
+
+  // Toggle done on the reminder itself
   rem.done=!rem.done;
+  // Clear any remind-next ack if marking done
+  if(rem.done){
+    const ackIdx=(S.clubAcknowledged||[]).findIndex(a=>a.customerId===cid&&a.type==='combined-shipping');
+    if(ackIdx>=0)S.clubAcknowledged.splice(ackIdx,1);
+  }
   try{
     const allRows=await sheetsGet('Reminders!A2:I');
     const rowIdx=allRows.findIndex(r=>r[0]===remId);
     if(rowIdx>=0)await sheetsUpdate('Reminders!H'+(rowIdx+2),[[rem.done.toString()]]);
-    // Update badge in-place — don't re-render the whole list so the row stays put
     const badge=document.getElementById('club-ship-badge-'+remId);
     if(badge){
       if(rem.done){
+        badge.style.cssText='display:flex;align-items:center;gap:6px;margin-top:3px;';
         badge.innerHTML=`<span style="font-size:11px;font-weight:700;background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:2px 7px;border:1px solid #A5D6A7;">📦 Combined Ship ✓ Done</span>
           <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">Undo</button>`;
       } else {
+        badge.style.cssText='display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;';
         badge.innerHTML=`<span style="font-size:11px;font-weight:700;background:#FFF0D4;color:#8B4500;border-radius:4px;padding:2px 7px;border:1px solid #E8A84B;">📦 Combined Ship</span>
-          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>`;
+          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>
+          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}','remind-next')" style="font-size:10px;background:none;border:1px solid #1565C0;border-radius:4px;padding:1px 6px;cursor:pointer;color:#1565C0;">🔔 Remind next time</button>`;
       }
     }
-    // Also update the open member panel if showing
     if(S.activeClubMember&&(S.activeClubMember.customerId===rem.customerId||S.activeClubMember.id===rem.refId)){
       openClubMemberPanel(S.activeClubMember);
     }
     renderReminders();
-    showToast(rem.done?'Marked complete':'Marked incomplete');
+    showToast(rem.done?'Combined shipping marked done':'Combined shipping reopened');
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
@@ -7925,16 +7968,19 @@ function renderClubView(){
     const t=today();
     const cid=m.customerId||'';
     const email=(m.customer?.emails?.[0]?.email||m.customerEmail||'').toLowerCase();
-    // Check combined ship — pinned if reminder exists, not done, and its dueDate (original cycle date) has passed
+    // Check combined ship
     const shipReminder=(S.reminders||[]).find(r=>r.refType==='club-combined-shipping'&&(r.customerId===cid||r.refId===cid)&&!r.done);
     const shipPinned=shipReminder&&shipReminder.dueDate<=t;
-    const shipAck=(S.clubAcknowledged||[]).some(a=>a.customerId===cid&&a.type==='combined-shipping');
-    // Check outstanding order — pinned if reminder exists, not done, and its dueDate has passed
+    const shipAckState=getClubAckState(cid,'combined-shipping',shipReminder?.dueDate||'');
+    const shipAcked=shipAckState==='done'||shipAckState==='remind-next';
+    // Check outstanding order (ship only)
+    const isPickup=m.orderDeliveryMethod==='Pickup';
     const orderReminder=(S.reminders||[]).find(r=>r.refType==='club-outstanding-order'&&(r.customerId===cid||r.refId===cid)&&!r.done);
-    const orderPinned=orderReminder&&orderReminder.dueDate<=t;
+    const orderPinned=!isPickup&&orderReminder&&orderReminder.dueDate<=t;
     const hasOrder=(S.orderCustomers||[]).some(o=>o.status!=='Resolved'&&((cid&&o.customerId===cid)||(email&&o.customerEmail?.toLowerCase()===email)));
-    const orderAck=(S.clubAcknowledged||[]).some(a=>a.customerId===cid&&a.type==='outstanding-order');
-    return(shipPinned&&!shipAck)||(orderPinned&&hasOrder&&!orderAck);
+    const orderAckState=getClubAckState(cid,'outstanding-order',orderReminder?.dueDate||'');
+    const orderAcked=orderAckState==='done'||orderAckState==='remind-next';
+    return(shipPinned&&!shipAcked)||(orderPinned&&hasOrder&&!orderAcked);
   };
   members.sort((a,b)=>{
     const t=today();
@@ -7984,28 +8030,49 @@ function renderClubView(){
     const lastContactHtml=lastComm
       ?`<div style="font-size:12px;font-weight:500;">${lastComm.createdAt}</div><div style="font-size:11px;color:var(--ink-m);">${lastComm.method} — ${lastComm.outcome}</div>`
       :`<span style="font-size:12px;color:var(--ink-m);">—</span>`;
-    // Outstanding order badge with acknowledge
+    // Outstanding order badge / Pickup note
     const cycleDate=nextDate||'';
     const cid=m.customerId||'';
-    const hasOrder=(S.orderCustomers||[]).some(o=>
+    const isPickup=m.orderDeliveryMethod==='Pickup';
+    const memberOrders=(S.orderCustomers||[]).filter(o=>
       o.status!=='Resolved'&&(
         (cid&&o.customerId===cid)||
         (email&&o.customerEmail&&o.customerEmail.toLowerCase()===email.toLowerCase())
       )
     );
-    const orderAck=hasOrder&&isClubAcknowledged(cid,'outstanding-order',cycleDate);
-    const orderBadge=hasOrder
-      ?orderAck
-        ?`<div style="margin-top:3px;display:flex;align-items:center;gap:6px;">
+    const hasOrder=memberOrders.length>0;
+    const orderAckState=hasOrder?getClubAckState(cid,'outstanding-order',cycleDate):null;
+
+    let orderBadge='';
+    if(hasOrder){
+      if(isPickup){
+        // Pickup — just a small muted info note
+        const oldest=memberOrders.reduce((min,o)=>{const d=o.oldestOrderDate||o.createdAt||'';return(!min||d<min)?d:min;},'');
+        const oldestDays=oldest?Math.floor((new Date()-new Date(oldest))/86400000):null;
+        orderBadge=`<div style="margin-top:2px;font-size:11px;color:var(--ink-m);">📦 ${memberOrders.length} outstanding order${memberOrders.length!==1?'s':''}${oldestDays!==null?' · oldest: '+oldestDays+'d':''}</div>`;
+      } else {
+        // Ship — full badge with three states
+        if(orderAckState==='done'){
+          orderBadge=`<div style="margin-top:3px;display:flex;align-items:center;gap:6px;">
             <span style="font-size:11px;font-weight:700;background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:2px 7px;border:1px solid #A5D6A7;">📦 Order ✓ Done</span>
-            <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">Undo</button>
-          </div>`
-        :`<div style="margin-top:3px;display:flex;align-items:center;gap:6px;">
+            <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}','done')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">Undo</button>
+          </div>`;
+        } else if(orderAckState==='remind-next'){
+          orderBadge=`<div style="margin-top:3px;display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11px;font-weight:700;background:#E3F2FD;color:#1565C0;border-radius:4px;padding:2px 7px;border:1px solid #90CAF9;">📦 Remind next time</span>
+            <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}','remind-next')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">Undo</button>
+          </div>`;
+        } else {
+          orderBadge=`<div style="margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span style="font-size:11px;font-weight:700;background:#FDE8D8;color:#B33A00;border-radius:4px;padding:1px 6px;border:1px solid #F4A86A;">📦 Outstanding order</span>
-            <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>
-          </div>`
-      :'';
-    // Combined Shipping reminder — match by customerId
+            <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}','done')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>
+            <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}','remind-next')" style="font-size:10px;background:none;border:1px solid #1565C0;border-radius:4px;padding:1px 6px;cursor:pointer;color:#1565C0;">🔔 Remind next time</button>
+          </div>`;
+        }
+      }
+    }
+
+    // Combined Shipping reminder — three states + Pickup warning
     const shipReminders=S.reminders.filter(r=>
       r.refType==='club-combined-shipping'&&
       (r.customerId===m.customerId||(r.refId&&(r.refId===m.customerId||r.refId===m.id)))&&
@@ -8018,17 +8085,32 @@ function renderClubView(){
     );
     const hasActiveShipReminder=shipReminders.length>0;
     const hasDoneShipReminder=doneShipReminders.length>0&&!hasActiveShipReminder;
-    const shipReminderHtml=hasActiveShipReminder
-      ?`<div id="club-ship-badge-${shipReminders[0].id}" style="display:flex;align-items:center;gap:6px;margin-top:3px;">
-          <span style="font-size:11px;font-weight:700;background:#FFF0D4;color:#8B4500;border-radius:4px;padding:2px 7px;border:1px solid #E8A84B;">📦 Combined Ship</span>
-          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${shipReminders[0].id}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>
-        </div>`
-      :hasDoneShipReminder
-      ?`<div id="club-ship-badge-${doneShipReminders[0].id}" style="display:flex;align-items:center;gap:6px;margin-top:3px;">
-          <span style="font-size:11px;font-weight:700;background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:2px 7px;border:1px solid #A5D6A7;">📦 Combined Ship ✓ Done</span>
-          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${doneShipReminders[0].id}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">Undo</button>
-        </div>`
-      :'';
+    const pickupWarning=isPickup?` <span style="font-size:10px;background:#FFF3E0;color:#E65100;border-radius:3px;padding:1px 5px;border:1px solid #FFCC80;">⚠ Pickup</span>`:'';
+
+    let shipReminderHtml='';
+    if(hasActiveShipReminder){
+      const remId=shipReminders[0].id;
+      const shipAckState=getClubAckState(cid,'combined-shipping',shipReminders[0].dueDate||'');
+      if(shipAckState==='remind-next'){
+        shipReminderHtml=`<div id="club-ship-badge-${remId}" style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:700;background:#E3F2FD;color:#1565C0;border-radius:4px;padding:2px 7px;border:1px solid #90CAF9;">📦 Combined Ship — Remind next</span>${pickupWarning}
+          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>
+          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}','remind-next')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">Undo</button>
+        </div>`;
+      } else {
+        shipReminderHtml=`<div id="club-ship-badge-${remId}" style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:700;background:#FFF0D4;color:#8B4500;border-radius:4px;padding:2px 7px;border:1px solid #E8A84B;">📦 Combined Ship</span>${pickupWarning}
+          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>
+          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}','remind-next')" style="font-size:10px;background:none;border:1px solid #1565C0;border-radius:4px;padding:1px 6px;cursor:pointer;color:#1565C0;">🔔 Remind next time</button>
+        </div>`;
+      }
+    } else if(hasDoneShipReminder){
+      const remId=doneShipReminders[0].id;
+      shipReminderHtml=`<div id="club-ship-badge-${remId}" style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+        <span style="font-size:11px;font-weight:700;background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:2px 7px;border:1px solid #A5D6A7;">📦 Combined Ship ✓ Done</span>
+        <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">Undo</button>
+      </div>`;
+    }
     const isPinned=isMemberPinned(m);
     const tr=document.createElement('tr');
     if(isPinned)tr.style.cssText='background:#FFF8E1;border-left:3px solid #E8A84B;';
