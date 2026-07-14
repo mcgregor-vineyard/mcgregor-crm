@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.274</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.275</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -6846,7 +6846,7 @@ function renderHome(){
         const isToday=r.dueDate===t;
         const dateLabel=isOverdue?'Overdue — '+r.dueDate:isToday?'Due today':'Due '+r.dueDate;
         const dateColor=isOverdue?'var(--d-tx)':isToday?'var(--w-tx)':'var(--ink-m)';
-        return`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr);">
+        return`<div onclick="sv('reminders')" style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr);cursor:pointer;" onmouseover="this.style.background='var(--burg-f)'" onmouseout="this.style.background=''">
           <div class="av ${rep.cls}" style="width:20px;height:20px;font-size:8px;flex-shrink:0;">${rep.init}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.note}</div>
@@ -6888,7 +6888,7 @@ function renderHome(){
         const name=[(m.customer?.lastName||''),(m.customer?.firstName||'')].filter(Boolean).join(', ')||'—';
         const d=daysUntil(m.subscription?.nextProcessDate?.slice(0,10)||m.nextProcessDate);
         const contacted=contactedIds.has(m.customerId);
-        return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;">
+        return`<div onclick="sv('club')" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;cursor:pointer;" onmouseover="this.style.background='var(--burg-f)'" onmouseout="this.style.background=''">
           <span style="flex:1;font-weight:500;">${name}</span>
           <span style="color:var(--ink-m);">${d===0?'Today':d===1?'Tomorrow':d+'d'}</span>
           <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:${contacted?'var(--s-bg)':'var(--cream)'};color:${contacted?'var(--s-tx)':'var(--ink-m)'};">${contacted?'Contacted':'Not reached'}</span>
@@ -6938,7 +6938,7 @@ function renderHome(){
       </div>
       ${invDue.slice(0,5).map(e=>{
         const {daysUntilDue,isOverdue}=invDueStatus(e);
-        return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:12px;">
+        return`<div onclick="sv('projects')" style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:12px;cursor:pointer;" onmouseover="this.style.background='var(--burg-f)'" onmouseout="this.style.background=''">
           <span style="flex:1;font-weight:500;">${e.wineName}</span>
           <span style="font-weight:600;color:${isOverdue?'var(--d-tx)':'var(--w-tx)'};">${isOverdue?'Overdue':'Due now'}</span>
         </div>`;
@@ -6979,7 +6979,13 @@ function renderHome(){
         const outcome=c.outcome||'';
         const bg=typeColors[c._type]||'var(--cream)';
         const tc=typeTextColors[c._type]||'var(--ink-f)';
-        return`<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);">
+        // Build click handler based on type
+        let clickFn='';
+        if(c._type==='Order'&&c.orderCustomerId)clickFn=`sv('orders');setTimeout(()=>openOrderThread('${c.orderCustomerId}'),300)`;
+        else if(c._type==='Ticket'&&c.ticketId)clickFn=`sv('tickets');openTicketThread('${c.ticketId}')`;
+        else if(c._type==='Outreach'&&c.outreachId)clickFn=`sv('outreach');setTimeout(()=>openOutreachThread('${c.outreachId}'),300)`;
+        else if(c._type==='Club')clickFn=`sv('club')`;
+        return`<div onclick="${clickFn}" style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:${clickFn?'pointer':'default'};" onmouseover="this.style.background='${clickFn?'var(--burg-f)':''}'" onmouseout="this.style.background=''">
           <div class="av ${rep.cls}" style="width:24px;height:24px;font-size:9px;flex-shrink:0;margin-top:1px;">${rep.init}</div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
@@ -6988,7 +6994,7 @@ function renderHome(){
               ${method?`<span style="font-size:11px;color:var(--ink-m);">· ${method}</span>`:''}
               ${outcome?`<span style="font-size:11px;color:var(--ink-m);">${method?'—':'·'} ${outcome}</span>`:''}
             </div>
-            ${note?`<div style="font-size:12px;color:var(--ink);line-height:1.4;">${note}</div>`:''}
+            ${note?`<div style="font-size:12px;color:var(--ink);line-height:1.4;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;">${note}</div>`:''}
             <div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${rep.name} · ${c.createdAt}</div>
           </div>
         </div>`;
@@ -7016,7 +7022,7 @@ function renderHome(){
   </div>
   ${openTickets.slice(0,4).map(tk=>{
     const rep=TEAM[tk.assignee]||null;
-    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;">
+    return`<div onclick="sv('tickets');openTicketThread('${tk.id}')" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;cursor:pointer;" onmouseover="this.style.background='var(--burg-f)'" onmouseout="this.style.background=''">
       ${rep?`<div class="av ${rep.cls}" style="width:18px;height:18px;font-size:7px;flex-shrink:0;">${rep.init}</div>`:''}
       <span style="flex:1;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tk.subject}</span>
       ${tk.customerName?`<span style="font-size:11px;color:var(--ink-m);flex-shrink:0;">${tk.customerName}</span>`:''}
