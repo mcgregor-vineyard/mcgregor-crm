@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.275</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.276</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -253,10 +253,8 @@ select.fi{cursor:pointer;}
 
   <div class="main">
     <div class="tbar">
-      <div class="sw"><span class="si">⌕</span><input type="text" id="srch" placeholder="Search contacts..." oninput="renderContacts()" /></div>
-      <button class="btn" onclick="openCallQueue()">☎ Call queue</button>
-      <button class="btn" onclick="openAddContact()">+ Add contact</button>
-      <button class="btn btnp" onclick="openImport()">+ Import list</button>
+      <div class="sw"><span class="si">⌕</span><input type="text" id="srch" placeholder="Search this page..." oninput="runPageSearch()" /></div>
+      <div id="tbar-actions"></div>
     </div>
     <div class="content">
 
@@ -1865,7 +1863,7 @@ select.fi{cursor:pointer;}
           <option value="ticket">Ticket messages</option>
           <option value="order">Order notes</option>
           <option value="outreach">Outreach</option>
-          <option value="reminder">Reminders</option>
+          <option value="club">Club comms</option>
         </select>
         <select id="activity-rep-filter" class="fi" style="width:auto;font-size:12px;padding:4px 8px;" onchange="renderActivityLog()">
           <option value="all">All reps</option>
@@ -2310,7 +2308,11 @@ async function loadFromSheets(){
     S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||'',website:r[12]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     setSyncBar('ok','Synced with Google Sheets — '+S.contacts.length+' contacts');
-    try{renderAll();if(S.clubMembers.length){renderClubView();autoCreateClubReminders();}renderHome();renderSidebar();}catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
+    try{renderAll();if(S.clubMembers.length){renderClubView();autoCreateClubReminders();}renderHome();renderSidebar();
+      // Init search bar — hidden on home tab
+      const srchEl=document.getElementById('srch');
+      if(srchEl){srchEl.style.display='none';if(srchEl.previousElementSibling)srchEl.previousElementSibling.style.display='none';}
+    }catch(re){console.error('renderAll error:',re);setSyncBar('err','Render error: '+re.message);}
   }catch(e){
     console.error('loadFromSheets error:',e);
     setSyncBar('err','Could not connect to Google Sheets: '+e.message);
@@ -2338,25 +2340,23 @@ async function syncAll(){
   const btn=document.getElementById('sync-btn');
   btn.disabled=true;
 
-  const steps=[
-    {id:'step-sheets',label:'Google Sheets — all data',fn:()=>loadFromSheets()},
-    {id:'step-orders',label:'Commerce7 — unfulfilled orders',fn:()=>syncOutstandingOrders()},
-    {id:'step-resolved',label:'Commerce7 — check resolved orders',fn:()=>checkOrdersResolved()},
-    {id:'step-club',label:'Commerce7 — club members',fn:()=>syncClubMembersQuiet()},
-  ];
-
-  // Build modal body
   const body=document.getElementById('refresh-modal-body');
-  body.innerHTML=steps.map(s=>`
-    <div style="margin-bottom:16px;" id="${s.id}">
+  const makeStep=(id,label)=>`
+    <div style="margin-bottom:16px;" id="${id}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-        <div style="font-size:13px;font-weight:500;">${s.label}</div>
-        <div style="font-size:12px;color:var(--ink-m);" id="${s.id}-status">Waiting...</div>
+        <div style="font-size:13px;font-weight:500;">${label}</div>
+        <div style="font-size:12px;color:var(--ink-m);" id="${id}-status">Waiting...</div>
       </div>
       <div style="background:var(--bdr);border-radius:4px;height:6px;overflow:hidden;">
-        <div id="${s.id}-bar" style="height:100%;width:0%;background:var(--burg);border-radius:4px;transition:width .4s;"></div>
+        <div id="${id}-bar" style="height:100%;width:0%;background:var(--burg);border-radius:4px;transition:width .4s;"></div>
       </div>
-    </div>`).join('')+
+    </div>`;
+
+  body.innerHTML=
+    makeStep('step-sheets','Google Sheets — all data')+
+    makeStep('step-orders','Commerce7 — unfulfilled orders')+
+    makeStep('step-resolved','Commerce7 — check resolved orders')+
+    makeStep('step-club','Commerce7 — club members')+
     `<div id="refresh-done" style="display:none;margin-top:8px;padding:10px 14px;background:var(--s-bg);border-radius:8px;color:var(--s-tx);font-size:13px;font-weight:600;text-align:center;">✓ All done</div>
      <div style="display:flex;justify-content:flex-end;margin-top:16px;"><button class="btn" id="refresh-close-btn" style="display:none;" onclick="closeModal('global-refresh-modal')">Close</button></div>`;
 
@@ -2369,16 +2369,27 @@ async function syncAll(){
     if(bar){bar.style.width=pct+'%';bar.style.background=color;}
   };
 
-  for(const step of steps){
-    setStatus(step.id,'Running...',30);
-    try{
-      await step.fn();
-      setStatus(step.id,'✓ Done',100,'var(--s-tx)');
-    }catch(e){
-      setStatus(step.id,'⚠ '+e.message,100,'var(--d-tx)');
-    }
-    await new Promise(r=>setTimeout(r,300));
-  }
+  // Phase 1 — Sheets + Orders in parallel
+  setStatus('step-sheets','Running...',30);
+  setStatus('step-orders','Running...',30);
+  await Promise.all([
+    loadFromSheets()
+      .then(()=>setStatus('step-sheets','✓ Done',100,'var(--s-tx)'))
+      .catch(e=>setStatus('step-sheets','⚠ '+e.message,100,'var(--d-tx)')),
+    syncOutstandingOrders()
+      .then(()=>setStatus('step-orders','✓ Done',100,'var(--s-tx)'))
+      .catch(e=>setStatus('step-orders','⚠ '+e.message,100,'var(--d-tx)')),
+  ]);
+
+  // Phase 2 — Check resolved (needs data from phase 1)
+  setStatus('step-resolved','Running...',30);
+  try{await checkOrdersResolved();setStatus('step-resolved','✓ Done',100,'var(--s-tx)');}
+  catch(e){setStatus('step-resolved','⚠ '+e.message,100,'var(--d-tx)');}
+
+  // Phase 3 — Club members (heaviest, last)
+  setStatus('step-club','Running...',30);
+  try{await syncClubMembersQuiet();setStatus('step-club','✓ Done',100,'var(--s-tx)');}
+  catch(e){setStatus('step-club','⚠ '+e.message,100,'var(--d-tx)');}
 
   document.getElementById('refresh-done').style.display='block';
   document.getElementById('refresh-close-btn').style.display='inline-block';
@@ -2440,8 +2451,40 @@ function sv(view){
   if(campSection)campSection.style.display=isCampView?'block':'none';
   if(sbToday)sbToday.parentElement.style.display=isCampView?'none':'block';
   if(sbActivityWrap)sbActivityWrap.style.display=isCampView?'none':'block';
+
+  // Update search bar and action buttons per tab
+  const srch=document.getElementById('srch');
+  const tbarActions=document.getElementById('tbar-actions');
+  const SEARCH_TABS=['contacts','orders','reminders','club'];
+  if(srch){
+    srch.value='';
+    srch.style.display=SEARCH_TABS.includes(view)?'':'none';
+    srch.previousElementSibling.style.display=SEARCH_TABS.includes(view)?'':'none'; // hide ⌕ icon too
+    const placeholders={contacts:'Search contacts...',orders:'Search orders...',reminders:'Search reminders...',club:'Search members...'};
+    srch.placeholder=placeholders[view]||'Search this page...';
+  }
+  if(tbarActions){
+    const actions={
+      contacts:`<button class="btn" onclick="openCallQueue()">☎ Call queue</button><button class="btn" onclick="openAddContact()">+ Add contact</button><button class="btn btnp" onclick="openImport()">+ Import list</button>`,
+      campaigns:`<button class="btn btnp" onclick="openNewCamp()">+ New campaign</button>`,
+      tickets:`<button class="btn btnp" onclick="openNewTicket()">+ New ticket</button>`,
+      outreach:`<button class="btn btnp" onclick="openNewOutreach()">+ New outreach</button>`,
+      projects:`<button class="btn btnp" onclick="openNewProject()">+ New project</button>`,
+      reminders:`<button class="btn btnp" onclick="openNewReminder()">+ New reminder</button>`,
+    };
+    tbarActions.innerHTML=actions[view]||'';
+  }
+
   closeDP();if(view==='home')renderHome();else renderAll();
   renderSidebar();
+}
+
+function runPageSearch(){
+  const view=['home','campaigns','contacts','tickets','orders','reminders','outreach','projects','club','reports'].find((_,i)=>document.querySelectorAll('.ntab')[i]?.classList.contains('on'));
+  if(view==='contacts')renderContacts();
+  else if(view==='orders')renderOrders();
+  else if(view==='reminders')renderReminders();
+  else if(view==='club')renderClubView();
 }
 function setCU(i){S.cu=parseInt(i);document.getElementById('cuav').textContent=TEAM[S.cu].init;}
 function setF(f,el){S.filter=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderContacts();}
@@ -3918,6 +3961,8 @@ function renderOrders(){
   let active=S.orderCustomers.filter(o=>o.status!=='Resolved');
   let resolvedList=S.orderCustomers.filter(o=>o.status==='Resolved');
   if(f!=='all'){active=active.filter(o=>o.status===f);resolvedList=resolvedList.filter(o=>o.status===f);}
+  const oq=(document.getElementById('srch')?.value||'').toLowerCase();
+  if(oq){active=active.filter(o=>(o.customerName||'').toLowerCase().includes(oq)||(o.customerEmail||'').toLowerCase().includes(oq));}
 
   // Apply current sort
   const {col,dir}=S.orderSort;
@@ -4754,6 +4799,8 @@ function renderReminders(){
   document.getElementById('rm-today').textContent=dueToday;
   document.getElementById('rm-upcoming').textContent=upcoming;
   document.getElementById('rm-done').textContent=done;
+  const rq=(document.getElementById('srch')?.value||'').toLowerCase();
+  if(rq)rs=rs.filter(r=>(r.note||'').toLowerCase().includes(rq)||(r.refName||'').toLowerCase().includes(rq));
   const el=document.getElementById('reminders-list');el.innerHTML='';
   if(!rs.length){el.innerHTML='<div class="empty">No reminders found.</div>';return;}
   rs.forEach(r=>{
@@ -4764,7 +4811,8 @@ function renderReminders(){
     const isClubType=r.refType==='club-combined-shipping'||r.refType==='club-outstanding-order';
     const dateLabel=(isClubType?'Next Club Process Date: ':'')+r.dueDate;
     const div=document.createElement('div');
-    div.style.cssText='background:'+(isOverdue?'#FFF0F0':'white')+';border:1px solid '+(isOverdue?'#C62828':'var(--bdr)')+';border-left:'+(isOverdue?'4px solid #C62828':'1px solid var(--bdr)')+';border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;'+(r.done?'opacity:.55;':'');
+    const isUrgent=isOverdue||isToday;
+    div.style.cssText='background:'+(isUrgent?'#FFF0F0':'white')+';border:1px solid '+(isUrgent?'#C62828':'var(--bdr)')+';border-left:'+(isUrgent?'4px solid #C62828':'1px solid var(--bdr)')+';border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;'+(r.done?'opacity:.55;':'');
     div.onclick=()=>openReminderDetail(r.id);
     div.innerHTML='<div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:'+(r.done?'var(--burg)':'white')+';color:white;font-size:10px;" onclick="event.stopPropagation();toggleReminder(\''+r.id+'\')">'+(r.done?'✓':'')+'</div>'
       +'<div style="flex:1;">'
@@ -5273,28 +5321,30 @@ function renderActivityLog(){
     });
   }
 
-  // Reminders
-  if(typeFilter==='all'||typeFilter==='reminder'){
-    S.reminders.forEach(r=>{
-      if(repFilter!=='all'&&String(r.assignee)!==repFilter)return;
+  // Club comms
+  if(typeFilter==='all'||typeFilter==='club'){
+    (S.clubComms||[]).forEach(c=>{
+      if(repFilter!=='all'&&String(c.author)!==repFilter)return;
+      const member=S.clubMembers.find(m=>m.customerId===c.customerId);
+      const name=member?[(member.customer?.lastName||''),(member.customer?.firstName||'')].filter(Boolean).join(', '):(c.customerId||'');
       events.push({
-        ts:r.dueDate||'',
-        type:'reminder',
-        icon:'🔔',
+        ts:c.createdAt||'',
+        type:'club',
+        icon:'🍷',
         color:'var(--s-bg)',
         colorTx:'var(--s-tx)',
-        label:'Reminder',
-        title:r.note,
-        detail:'Due: '+r.dueDate+(r.done?' · ✓ Completed':''),
-        sub:r.refName||'',
-        author:r.assignee,
-        ref:r.id,
-        refType:'reminder'
+        label:'Club comm',
+        title:name,
+        detail:(c.method?c.method+' · ':'')+c.outcome+(c.notes?' · "'+c.notes+'"':''),
+        sub:'',
+        author:c.author,
+        ref:c.customerId,
+        refType:'club'
       });
     });
   }
 
-  // Sort newest first
+  // Sort newest first — no reminders
   events.sort((a,b)=>b.ts.localeCompare(a.ts));
 
   const el=document.getElementById('activity-list');
@@ -7961,6 +8011,12 @@ function renderClubView(){
 
   let members=[...S.clubMembers];
   if(clubFilter)members=members.filter(m=>(m.club?.title||'')===clubFilter);
+  const cq=(document.getElementById('srch')?.value||'').toLowerCase();
+  if(cq)members=members.filter(m=>{
+    const name=[(m.customer?.lastName||''),(m.customer?.firstName||'')].join(' ').toLowerCase();
+    const email=(m.customer?.emails?.[0]?.email||'').toLowerCase();
+    return name.includes(cq)||email.includes(cq);
+  });
   if(statusFilter)members=members.filter(m=>m.status===statusFilter);
 
   // Stats (from full unfiltered set — already excludes cancelled)
@@ -8071,7 +8127,7 @@ function renderClubView(){
         } else {
           orderBadge=`<div style="margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span style="font-size:11px;font-weight:700;background:#FDE8D8;color:#B33A00;border-radius:4px;padding:1px 6px;border:1px solid #F4A86A;">📦 Outstanding order</span>
-            <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}','done')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>
+            <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}','done')" style="font-size:10px;background:none;border:1px solid #2E7D32;border-radius:4px;padding:1px 6px;cursor:pointer;color:#2E7D32;">✓ Mark done</button>
             <button onclick="event.stopPropagation();acknowledgeClubMember('${cid}','outstanding-order','${cycleDate}','remind-next')" style="font-size:10px;background:none;border:1px solid #1565C0;border-radius:4px;padding:1px 6px;cursor:pointer;color:#1565C0;">🔔 Remind next time</button>
           </div>`;
         }
@@ -8106,7 +8162,7 @@ function renderClubView(){
       } else {
         shipReminderHtml=`<div id="club-ship-badge-${remId}" style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;">
           <span style="font-size:11px;font-weight:700;background:#FFF0D4;color:#8B4500;border-radius:4px;padding:2px 7px;border:1px solid #E8A84B;">📦 Combined Ship</span>${pickupWarning}
-          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}')" style="font-size:10px;background:none;border:1px solid #ccc;border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--ink-m);">✓ Mark done</button>
+          <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}')" style="font-size:10px;background:none;border:1px solid #2E7D32;border-radius:4px;padding:1px 6px;cursor:pointer;color:#2E7D32;">✓ Mark done</button>
           <button onclick="event.stopPropagation();toggleClubCombinedShipping('${remId}','remind-next')" style="font-size:10px;background:none;border:1px solid #1565C0;border-radius:4px;padding:1px 6px;cursor:pointer;color:#1565C0;">🔔 Remind next time</button>
         </div>`;
       }
@@ -8120,7 +8176,7 @@ function renderClubView(){
     const isPinned=isMemberPinned(m);
     const tr=document.createElement('tr');
     if(isPinned)tr.style.cssText='background:#FFF8E1;border-left:3px solid #E8A84B;';
-    else if(isPast)tr.style.cssText='background:#FFF0F0;';
+    else if(isPast||nextDate===t)tr.style.cssText='background:#FFF0F0;';
     tr.style.cursor='pointer';
     tr.onclick=(e)=>{if(e.target.tagName!=='A'&&e.target.tagName!=='BUTTON')openClubMemberPanel(m);};
     tr.innerHTML=`
@@ -8303,7 +8359,6 @@ function renderProjects(){
   el.innerHTML='';
   if(!active.length&&!archived.length){el.innerHTML='<div class="empty">No projects yet. Click + New project to get started.</div>';return;}
 
-  // Group active by type
   const TYPE_GROUPS=[
     {key:'',label:'General'},
     {key:'Inventory',label:'📦 Inventory'},
@@ -8311,33 +8366,36 @@ function renderProjects(){
     {key:'CustomerContact',label:'📞 Customer Contact'},
     {key:'PreOrder',label:'🛒 Pre-Order'},
   ];
-  const grid=(projects,colorOffset=0,isArchived=false)=>{
-    const g=document.createElement('div');
-    g.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,360px));gap:14px;';
-    projects.forEach((p,i)=>{
-      const card=buildProjectCard(p,isArchived?undefined:colorOffset+i,isArchived);
-      g.appendChild(card);
-    });
-    return g;
-  };
+
+  // Single grid for all active projects
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;';
 
   let colorOffset=0;
   TYPE_GROUPS.forEach(group=>{
     const projects=active.filter(p=>(p.type||'')===(group.key));
     if(!projects.length)return;
-    const section=document.createElement('div');
-    section.style.cssText='margin-bottom:24px;';
-    section.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr);">${group.label}</div>`;
-    section.appendChild(grid(projects,colorOffset));
+    // Section label as a full-width grid item
+    const label=document.createElement('div');
+    label.style.cssText='grid-column:1/-1;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);padding-top:8px;padding-bottom:4px;border-bottom:1px solid var(--bdr);margin-bottom:2px;';
+    label.textContent=group.label;
+    grid.appendChild(label);
+    projects.forEach((p,i)=>{
+      grid.appendChild(buildProjectCard(p,colorOffset+i,false));
+    });
     colorOffset+=projects.length;
-    el.appendChild(section);
   });
+
+  el.appendChild(grid);
 
   if(archived.length){
     const archDiv=document.createElement('div');
-    archDiv.style.cssText='margin-top:8px;';
+    archDiv.style.cssText='margin-top:24px;';
     archDiv.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-f);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr);">Archived (${archived.length})</div>`;
-    archDiv.appendChild(grid(archived,0,true));
+    const archGrid=document.createElement('div');
+    archGrid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;';
+    archived.forEach((p,i)=>archGrid.appendChild(buildProjectCard(p,i,true)));
+    archDiv.appendChild(archGrid);
     el.appendChild(archDiv);
   }
 }
