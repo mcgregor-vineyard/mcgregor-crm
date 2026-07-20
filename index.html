@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.282</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.283</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7663,7 +7663,7 @@ function renderWineReleaseList(projectId){
     const wineDiv=document.createElement('div');
     wineDiv.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;overflow:hidden;';
     const header=document.createElement('div');
-    header.style.cssText=`padding:14px 16px;background:${headerBg};color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;transition:background .4s;`;
+    header.style.cssText=`padding:14px 16px;background:${headerBg};color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;transition:background .4s;position:sticky;top:0;z-index:10;`;
     header.onclick=()=>{
       if(openWines.has(wine.id))openWines.delete(wine.id);else openWines.add(wine.id);
       el._openWines=openWines;
