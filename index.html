@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.281</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.282</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7618,6 +7618,8 @@ async function assignWineReleaseItem(itemId,assignee){
 }
 
 function renderWineReleaseList(projectId){
+  const PART_COLORS=['#6B1E2E','#8B4A1A','#8B3A1A','#1A5C45','#1A3D6B','#1D6B2E'];
+
   const el=document.getElementById('pj-winerelease-list');if(!el)return;
   const wines=(S.wineReleaseWines||[]).filter(w=>w.projectId===projectId).sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
   if(!wines.length){el.innerHTML='<div class="empty">No wines yet. Click + Add wine to get started.</div>';return;}
@@ -7626,21 +7628,42 @@ function renderWineReleaseList(projectId){
   el._openWines=openWines;
   wines.forEach(wine=>{
     const items=(S.wineReleaseItems||[]).filter(i=>i.wineId===wine.id);
-    const checkableItems=items.filter(i=>!WINE_RELEASE_CHECKLIST.find(c=>c.task===i.task&&c.isHeader));
+    const coreList=getCoreChecklist();
+    const checkableItems=items.filter(i=>!coreList.find(c=>c.task===i.task&&c.isHeader));
     const doneCount=checkableItems.filter(i=>i.done).length;
     const pct=checkableItems.length?Math.round(doneCount/checkableItems.length*100):0;
     const isOpen=openWines.has(wine.id);
     const nextItem=checkableItems.find(i=>!i.done);
     const nextTaskText=nextItem?nextItem.task:'All tasks complete ✓';
+
+    // Count completed parts — a part is done when ALL checkable tasks after its header are done
+    const headers=coreList.filter(c=>c.isHeader);
+    let completedParts=0;
+    headers.forEach((hdr,hi)=>{
+      const nextHdr=headers[hi+1];
+      // Find tasks belonging to this part (between this header and the next)
+      const hdrIdx=coreList.findIndex(c=>c.id===hdr.id||c.task===hdr.task);
+      const nextHdrIdx=nextHdr?coreList.findIndex(c=>c.id===nextHdr.id||c.task===nextHdr.task):coreList.length;
+      const partTaskNames=coreList.slice(hdrIdx+1,nextHdrIdx).filter(c=>!c.isHeader).map(c=>c.task);
+      if(!partTaskNames.length)return;
+      const allDone=partTaskNames.every(taskName=>{
+        const wi=items.find(i=>i.task===taskName);
+        return wi&&wi.done;
+      });
+      if(allDone)completedParts++;
+    });
+    const allComplete=pct===100&&checkableItems.length>0;
+    const colorIdx=allComplete?PART_COLORS.length-1:Math.min(completedParts,PART_COLORS.length-2);
+    const headerBg=PART_COLORS[colorIdx];
+
     // Check if wine checklist is out of date vs Core Checklist
-    const coreList=getCoreChecklist();
     const wineTaskNames=items.map(i=>i.task);
     const coreTaskNames=coreList.map(c=>c.task);
     const isOutOfDate=items.length!==coreList.length||coreTaskNames.some((t,i)=>wineTaskNames[i]!==t);
     const wineDiv=document.createElement('div');
     wineDiv.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;overflow:hidden;';
     const header=document.createElement('div');
-    header.style.cssText='padding:14px 16px;background:var(--burg);color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;';
+    header.style.cssText=`padding:14px 16px;background:${headerBg};color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;transition:background .4s;`;
     header.onclick=()=>{
       if(openWines.has(wine.id))openWines.delete(wine.id);else openWines.add(wine.id);
       el._openWines=openWines;
@@ -7655,6 +7678,17 @@ function renderWineReleaseList(projectId){
           </div>
           <span style="font-size:11px;opacity:.85;">${doneCount}/${checkableItems.length}</span>
           ${isOutOfDate?`<span style="font-size:10px;background:#FFF3CD;color:#856404;border-radius:4px;padding:2px 7px;font-weight:600;">⚠ Checklist updated</span>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:3px;margin-top:5px;flex-wrap:wrap;">
+          ${headers.map((hdr,hi)=>{
+            const nextHdr=headers[hi+1];
+            const hdrIdx=coreList.findIndex(c=>c.task===hdr.task);
+            const nextHdrIdx=nextHdr?coreList.findIndex(c=>c.task===nextHdr.task):coreList.length;
+            const partTaskNames=coreList.slice(hdrIdx+1,nextHdrIdx).filter(c=>!c.isHeader).map(c=>c.task);
+            const partDone=partTaskNames.length&&partTaskNames.every(tn=>{const wi=items.find(i=>i.task===tn);return wi&&wi.done;});
+            const shortLabel=hdr.task.replace(/^Part \d+ — /,'').replace(/^Part \d+: /,'').split(/\s+/).slice(0,2).join(' ');
+            return `<span title="${hdr.task}" style="font-size:9px;padding:1px 6px;border-radius:3px;background:${partDone?'rgba(255,255,255,0.3)':'rgba(255,255,255,0.1)'};color:${partDone?'white':'rgba(255,255,255,0.5)'};">${partDone?'✓ ':''}${shortLabel}</span>`;
+          }).join('')}
         </div>
         ${!isOpen?`<div style="font-size:12px;opacity:.75;margin-top:3px;">Next: <span style="font-style:italic;">${nextTaskText}</span></div>`:''}
       </div>
