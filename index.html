@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.283</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.285</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7661,9 +7661,9 @@ function renderWineReleaseList(projectId){
     const coreTaskNames=coreList.map(c=>c.task);
     const isOutOfDate=items.length!==coreList.length||coreTaskNames.some((t,i)=>wineTaskNames[i]!==t);
     const wineDiv=document.createElement('div');
-    wineDiv.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;overflow:hidden;';
+    wineDiv.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;';
     const header=document.createElement('div');
-    header.style.cssText=`padding:14px 16px;background:${headerBg};color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;transition:background .4s;position:sticky;top:0;z-index:10;`;
+    header.style.cssText=`padding:14px 16px;background:${headerBg};color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;transition:background .4s;position:sticky;top:0;z-index:10;border-radius:10px 10px 0 0;`;
     header.onclick=()=>{
       if(openWines.has(wine.id))openWines.delete(wine.id);else openWines.add(wine.id);
       el._openWines=openWines;
@@ -7709,16 +7709,73 @@ function renderWineReleaseList(projectId){
     wineDiv.appendChild(header);
     if(isOpen){
       const list=document.createElement('div');
-      list.style.cssText='padding:8px 0;';
+      list.style.cssText='padding:0;';
+
+      // Group items into parts using header items as dividers
+      const parts=[];
+      let currentPart=null;
       items.forEach(item=>{
         const tmpl=coreList.find(c=>c.task===item.task)||{};
-        const isHeaderItem=tmpl&&tmpl.isHeader;
-        const instrId='instr-'+item.id;
-        const row=document.createElement('div');
-        if(isHeaderItem){
-          row.style.cssText='padding:8px 16px;background:var(--cream);border-bottom:1px solid var(--bdr);';
-          row.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--burg);">${item.task}</div>${tmpl.instructions?`<div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${tmpl.instructions}</div>`:''}`;
+        if(tmpl.isHeader){
+          currentPart={header:item,tmpl,tasks:[]};
+          parts.push(currentPart);
         } else {
+          if(!currentPart){currentPart={header:null,tmpl:null,tasks:[]};parts.push(currentPart);}
+          currentPart.tasks.push({item,tmpl});
+        }
+      });
+
+      // Track which parts are manually expanded (overrides auto-collapse)
+      const expandedParts=el._expandedParts||(el._expandedParts=new Set());
+
+      parts.forEach((part,pi)=>{
+        // Determine if part is complete
+        const partDone=part.tasks.length>0&&part.tasks.every(({item})=>item.done);
+        // Auto-collapse if done, unless manually expanded
+        const partId=`${wine.id}-part-${pi}`;
+        const isPartOpen=!partDone||expandedParts.has(partId);
+
+        const section=document.createElement('div');
+
+        // Part header (if exists)
+        if(part.header){
+          const hdrRow=document.createElement('div');
+          hdrRow.style.cssText=`padding:8px 16px;background:var(--cream);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;`;
+          const doneCount=part.tasks.filter(({item})=>item.done).length;
+          hdrRow.innerHTML=`
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${partDone?'var(--s-tx)':'var(--burg)'};">${partDone?'✓ ':''}${part.header.task}</div>
+              ${part.tmpl&&part.tmpl.instructions?`<div style="font-size:11px;color:var(--ink-m);margin-top:1px;">${part.tmpl.instructions}</div>`:''}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <span style="font-size:11px;color:${partDone?'var(--s-tx)':'var(--ink-m)'};">${doneCount}/${part.tasks.length}</span>
+              <span style="font-size:12px;color:var(--ink-m);">${isPartOpen?'▲':'▼'}</span>
+            </div>`;
+          hdrRow.onclick=()=>{
+            if(expandedParts.has(partId))expandedParts.delete(partId);
+            else expandedParts.add(partId);
+            // Toggle without full re-render
+            const taskContainer=document.getElementById('part-tasks-'+partId);
+            if(taskContainer){
+              const nowOpen=expandedParts.has(partId)||!partDone;
+              taskContainer.style.display=nowOpen?'block':'none';
+              const chevron=hdrRow.querySelector('span:last-child');
+              if(chevron)chevron.textContent=nowOpen?'▲':'▼';
+              const badge=hdrRow.querySelector('div:first-child div:first-child');
+              if(badge)badge.textContent=(nowOpen?'▲':'▼');
+            }
+          };
+          section.appendChild(hdrRow);
+        }
+
+        // Task container
+        const taskContainer=document.createElement('div');
+        taskContainer.id='part-tasks-'+partId;
+        taskContainer.style.display=isPartOpen?'block':'none';
+
+        part.tasks.forEach(({item,tmpl})=>{
+          const instrId='instr-'+item.id;
+          const row=document.createElement('div');
           const assigneeVal=parseInt(item.assignee);
           const hasAssignee=assigneeVal>=0&&TEAM[assigneeVal];
           const remAssigneeVal=item.reminderAssignee!==undefined?parseInt(item.reminderAssignee):-1;
@@ -7752,9 +7809,13 @@ function renderWineReleaseList(projectId){
                 ${TEAM.map((t,i)=>`<option value="${i}"${assigneeVal===i?' selected':''}>${t.name.split(' ')[0]}</option>`).join('')}
               </select>
             </div>`;
-        }
-        list.appendChild(row);
+          taskContainer.appendChild(row);
+        });
+
+        section.appendChild(taskContainer);
+        list.appendChild(section);
       });
+
       wineDiv.appendChild(list);
     }
     el.appendChild(wineDiv);
