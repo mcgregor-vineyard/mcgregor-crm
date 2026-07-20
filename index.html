@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.280</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.281</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -2271,7 +2271,7 @@ async function ensureSheets(){
   if(needed.includes('ClubMembers'))await sheetsUpdate('ClubMembers!A1:L1',[['MembershipID','CustomerID','ClubTitle','Status','FirstName','LastName','Email','Phone','NextProcessDate','DeliveryMethod','LastSync','ShipBuildStatus']]);
   if(needed.includes('ClubSettings'))await sheetsUpdate('ClubSettings!A1:B1',[['Key','Value']]);
   if(needed.includes('WineReleaseWines'))await sheetsUpdate('WineReleaseWines!A1:E1',[['ID','ProjectID','WineName','CreatedAt','SortOrder']]);
-  if(needed.includes('WineReleaseItems'))await sheetsUpdate('WineReleaseItems!A1:H1',[['ID','WineID','ProjectID','Task','Assignee','Done','CompletedBy','CompletedAt']]);
+  if(needed.includes('WineReleaseItems'))await sheetsUpdate('WineReleaseItems!A1:J1',[['ID','WineID','ProjectID','Task','Assignee','Done','CompletedBy','CompletedAt','DueDate','ReminderAssignee']]);
   if(needed.includes('WineReleaseChecklist'))await sheetsUpdate('WineReleaseChecklist!A1:F1',[['ID','SortOrder','Task','Instructions','IsHeader','UpdatedAt']]);
   if(needed.includes('CustomerContactLog'))await sheetsUpdate('CustomerContactLog!A1:H1',[['ID','ContactID','ProjectID','Method','Outcome','Notes','Author','CreatedAt']]);
   if(needed.includes('ClubAcknowledged'))await sheetsUpdate('ClubAcknowledged!A1:G1',[['ID','CustomerID','AcknowledgedType','CycleDate','AcknowledgedBy','AckState','AcknowledgedAt']]);
@@ -2333,7 +2333,7 @@ async function loadFromSheets(){
     const instrRow=(clubSettingsRows||[]).find(r=>r[0]==='instructions');
     S.clubInstructions=instrRow?instrRow[1]||'':'';
     S.wineReleaseWines=(wineReleaseWineRows||[]).filter(r=>r[0]).map((r,i)=>({id:r[0],projectId:r[1]||'',wineName:r[2]||'',createdAt:r[3]||'',sortOrder:r[4]!==''?parseInt(r[4]):i}));
-    S.wineReleaseItems=(wineReleaseItemRows||[]).filter(r=>r[0]).map(r=>({id:r[0],wineId:r[1]||'',projectId:r[2]||'',task:r[3]||'',assignee:parseInt(r[4])||0,done:r[5]==='true',completedBy:r[6]||'',completedAt:r[7]||''}));
+    S.wineReleaseItems=(wineReleaseItemRows||[]).filter(r=>r[0]).map(r=>({id:r[0],wineId:r[1]||'',projectId:r[2]||'',task:r[3]||'',assignee:parseInt(r[4])||0,done:r[5]==='true',completedBy:r[6]||'',completedAt:r[7]||'',dueDate:r[8]||'',reminderAssignee:r[9]!==undefined&&r[9]!==''?parseInt(r[9]):-1}));
     S.wineReleaseChecklist=(wineReleaseChecklistRows||[]).filter(r=>r[0]).map((r,i)=>({id:r[0],sortOrder:r[1]!==''?parseInt(r[1]):i,task:r[2]||'',instructions:r[3]||'',isHeader:r[4]==='true',updatedAt:r[5]||''}));
     // Auto-seed Core Checklist from hardcoded if sheet is empty
     if(!S.wineReleaseChecklist.length){
@@ -4863,6 +4863,13 @@ function resolveReminderRefName(r){
   if(type==='contact'||type===''){
     const c=(S.contacts||[]).find(c=>c.id===r.refId);
     if(c)return ((c.first||'')+' '+(c.last||'')).trim()||c.email||'';
+  }
+  if(type==='wine-release-item'){
+    const wi=(S.wineReleaseItems||[]).find(x=>x.id===r.refId);
+    if(wi){
+      const wn=(S.wineReleaseWines||[]).find(w=>w.id===wi.wineId);
+      return (wn?wn.wineName+' — ':'')+wi.task;
+    }
   }
   if(type==='club-combined-shipping'||type==='club-outstanding-order'){
     const m=(S.clubMembers||[]).find(m=>m.customerId===r.refId);
@@ -7521,15 +7528,80 @@ async function deleteWineReleaseWine(wineId){
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
+function toggleWineItemDueRow(itemId){
+  const row=document.getElementById('due-row-'+itemId);
+  if(!row)return;
+  const visible=row.style.display!=='none'&&row.style.display!=='';
+  row.style.display=visible?'none':'flex';
+}
+
+async function saveWineItemDueDate(itemId,dueDate,reminderAssignee){
+  const item=(S.wineReleaseItems||[]).find(x=>x.id===itemId);if(!item)return;
+  const oldDue=item.dueDate||'';
+  item.dueDate=dueDate||'';
+  item.reminderAssignee=reminderAssignee!==undefined?parseInt(reminderAssignee):-1;
+  try{
+    const allRows=await sheetsGet('WineReleaseItems!A2:J');
+    const ri=allRows.findIndex(r=>r[0]===itemId);
+    if(ri>=0)await sheetsUpdate('WineReleaseItems!I'+(ri+2)+':J'+(ri+2),[[item.dueDate,item.reminderAssignee]]);
+    // Find the wine name for the reminder note
+    const wine=(S.wineReleaseWines||[]).find(w=>w.id===item.wineId);
+    const wineName=wine?wine.wineName:'Wine Release';
+    const reminderNote=item.task+' — '+wineName;
+    if(dueDate){
+      // Find existing reminder for this item
+      const existingRem=(S.reminders||[]).find(r=>r.refType==='wine-release-item'&&r.refId===itemId);
+      if(existingRem){
+        // Update it
+        existingRem.dueDate=dueDate;
+        existingRem.assignee=item.reminderAssignee;
+        existingRem.note=reminderNote;
+        const remRows=await sheetsGet('Reminders!A2:I');
+        const remRi=remRows.findIndex(r=>r[0]===existingRem.id);
+        if(remRi>=0)await sheetsUpdate('Reminders!A'+(remRi+2)+':I'+(remRi+2),[[existingRem.id,reminderNote,dueDate,item.reminderAssignee,'wine-release-item',itemId,wineName,existingRem.done?'true':'false','']]);
+      } else {
+        // Create new reminder
+        const remId=uid();
+        const rem={id:remId,note:reminderNote,dueDate,assignee:item.reminderAssignee,refType:'wine-release-item',refId:itemId,refName:wineName,done:false};
+        await sheetsAppend('Reminders!A:I',[[remId,reminderNote,dueDate,item.reminderAssignee,'wine-release-item',itemId,wineName,'false','']]);
+        S.reminders.push(rem);
+      }
+      showToast('Due date set · Reminder created');
+    } else if(oldDue){
+      // Due date cleared — mark existing reminder done
+      const existingRem=(S.reminders||[]).find(r=>r.refType==='wine-release-item'&&r.refId===itemId&&!r.done);
+      if(existingRem){
+        existingRem.done=true;
+        const remRows=await sheetsGet('Reminders!A2:I');
+        const remRi=remRows.findIndex(r=>r[0]===existingRem.id);
+        if(remRi>=0)await sheetsUpdate('Reminders!H'+(remRi+2),[['true']]);
+      }
+      showToast('Due date removed');
+    }
+    renderReminders();
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
 async function toggleWineReleaseItem(itemId){
   const item=(S.wineReleaseItems||[]).find(x=>x.id===itemId);if(!item)return;
   item.done=!item.done;
   if(item.done){item.completedBy=TEAM[S.cu]?.name||'';item.completedAt=today();}
   else{item.completedBy='';item.completedAt='';}
   try{
-    const allRows=await sheetsGet('WineReleaseItems!A2:H');
+    const allRows=await sheetsGet('WineReleaseItems!A2:J');
     const rowIdx=allRows.findIndex(r=>r[0]===itemId);
     if(rowIdx>=0)await sheetsUpdate('WineReleaseItems!F'+(rowIdx+2)+':H'+(rowIdx+2),[[item.done.toString(),item.completedBy,item.completedAt]]);
+    // Resolve linked reminder when marking done
+    if(item.done&&item.dueDate){
+      const rem=(S.reminders||[]).find(r=>r.refType==='wine-release-item'&&r.refId===itemId&&!r.done);
+      if(rem){
+        rem.done=true;
+        const remRows=await sheetsGet('Reminders!A2:I');
+        const remRi=remRows.findIndex(r=>r[0]===rem.id);
+        if(remRi>=0)await sheetsUpdate('Reminders!H'+(remRi+2),[['true']]);
+        renderReminders();
+      }
+    }
     renderWineReleaseList(item.projectId);
     renderProjects();
   }catch(e){showToast('Error: '+e.message,'err');}
@@ -7539,7 +7611,7 @@ async function assignWineReleaseItem(itemId,assignee){
   const item=(S.wineReleaseItems||[]).find(x=>x.id===itemId);if(!item)return;
   item.assignee=parseInt(assignee);
   try{
-    const allRows=await sheetsGet('WineReleaseItems!A2:H');
+    const allRows=await sheetsGet('WineReleaseItems!A2:J');
     const rowIdx=allRows.findIndex(r=>r[0]===itemId);
     if(rowIdx>=0)await sheetsUpdate('WineReleaseItems!E'+(rowIdx+2),[[item.assignee]]);
   }catch(e){showToast('Error: '+e.message,'err');}
@@ -7615,6 +7687,10 @@ function renderWineReleaseList(projectId){
         } else {
           const assigneeVal=parseInt(item.assignee);
           const hasAssignee=assigneeVal>=0&&TEAM[assigneeVal];
+          const remAssigneeVal=item.reminderAssignee!==undefined?parseInt(item.reminderAssignee):-1;
+          const hasDue=!!item.dueDate;
+          const dueIsOverdue=hasDue&&item.dueDate<today()&&!item.done;
+          const dueIsToday=hasDue&&item.dueDate===today()&&!item.done;
           row.style.cssText=`padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:flex-start;gap:12px;${item.done?'opacity:.55;':''}`;
           row.innerHTML=`
             <div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;background:${item.done?'var(--s-tx)':'white'};color:white;font-size:10px;flex-shrink:0;margin-top:2px;" onclick="toggleWineReleaseItem('${item.id}')">${item.done?'✓':''}</div>
@@ -7622,13 +7698,26 @@ function renderWineReleaseList(projectId){
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span style="font-size:13px;font-weight:500;${item.done?'text-decoration:line-through;color:var(--ink-m);':''}">${item.task}</span>
                 ${item.done&&item.completedBy?`<span style="font-size:11px;color:var(--s-tx);">✓ ${item.completedBy} · ${item.completedAt}</span>`:''}
+                ${hasDue&&!item.done?`<span style="font-size:11px;font-weight:600;color:${dueIsOverdue?'var(--d-tx)':dueIsToday?'var(--w-tx)':'var(--ink-m)'};">📅 ${dueIsOverdue?'Overdue: ':dueIsToday?'Today: ':''}${item.dueDate}</span>`:''}
               </div>
               ${tmpl&&tmpl.instructions?`<button onclick="document.getElementById('${instrId}').style.display=document.getElementById('${instrId}').style.display==='none'?'block':'none'" style="background:none;border:none;cursor:pointer;color:var(--burg);font-size:11px;padding:2px 0;margin-top:2px;">📋 Instructions</button><div id="${instrId}" style="display:none;margin-top:6px;padding:8px 10px;background:var(--cream);border-radius:6px;font-size:12px;color:var(--ink);line-height:1.5;border-left:3px solid var(--burg);">${tmpl.instructions}</div>`:''}
+              <div id="due-row-${item.id}" style="display:${hasDue?'flex':'none'};align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;">
+                <span style="font-size:11px;color:var(--ink-m);">📅 Due:</span>
+                <input type="date" value="${item.dueDate||''}" style="font-size:11px;border:1px solid var(--bdr);border-radius:4px;padding:2px 6px;background:white;" onchange="saveWineItemDueDate('${item.id}',this.value,${remAssigneeVal})" />
+                <select style="font-size:11px;border:1px solid var(--bdr);border-radius:4px;padding:2px 5px;background:white;" onchange="saveWineItemDueDate('${item.id}',document.querySelector('#due-row-${item.id} input[type=date]').value,parseInt(this.value))">
+                  <option value="-1"${remAssigneeVal===-1?' selected':''}>Unassigned</option>
+                  ${TEAM.map((t,i)=>`<option value="${i}"${remAssigneeVal===i?' selected':''}>${t.name.split(' ')[0]}</option>`).join('')}
+                </select>
+                <button onclick="saveWineItemDueDate('${item.id}','',-1);document.getElementById('due-row-${item.id}').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--d-tx);">✕ Remove</button>
+              </div>
             </div>
-            <select style="font-size:11px;border:1px solid var(--bdr);border-radius:5px;padding:2px 5px;background:white;cursor:pointer;flex-shrink:0;" onchange="assignWineReleaseItem('${item.id}',this.value)">
-              <option value="-1"${!hasAssignee?' selected':''}>Unassigned</option>
-              ${TEAM.map((t,i)=>`<option value="${i}"${assigneeVal===i?' selected':''}>${t.name.split(' ')[0]}</option>`).join('')}
-            </select>`;
+            <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+              <button onclick="toggleWineItemDueRow('${item.id}')" title="Set due date" style="background:none;border:1px solid var(--bdr);border-radius:4px;cursor:pointer;font-size:11px;padding:2px 6px;color:${hasDue?'var(--burg)':'var(--ink-m)'};">📅</button>
+              <select style="font-size:11px;border:1px solid var(--bdr);border-radius:5px;padding:2px 5px;background:white;cursor:pointer;" onchange="assignWineReleaseItem('${item.id}',this.value)">
+                <option value="-1"${!hasAssignee?' selected':''}>Unassigned</option>
+                ${TEAM.map((t,i)=>`<option value="${i}"${assigneeVal===i?' selected':''}>${t.name.split(' ')[0]}</option>`).join('')}
+              </select>
+            </div>`;
         }
         list.appendChild(row);
       });
