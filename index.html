@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.276</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.277</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -2293,13 +2293,17 @@ async function loadFromSheets(){
     S.customerContactLog=(customerContactLogRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',projectId:r[2]||'',method:r[3]||'',outcome:r[4]||'',notes:r[5]||'',author:parseInt(r[6])||0,createdAt:r[7]||''}));
     S.clubAcknowledged=(clubAcknowledgedRows||[]).filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',type:r[2]||'',cycleDate:r[3]||'',acknowledgedBy:r[4]||'',ackState:r[5]||'done',acknowledgedAt:r[6]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
-    // Deduplicate — if multiple active entries exist for same customer, keep only the one with oldest order date
+    // Deduplicate — if multiple active entries exist for same customer, keep the one
+    // with the most notes/messages (most worked), falling back to newest created date
     const seen={};
     S.orderCustomers=S.orderCustomers.filter(o=>{
       if(o.status==='Resolved')return true;
       if(!seen[o.customerId]){seen[o.customerId]=o;return true;}
-      // Keep whichever has the older order date
-      if((o.oldestOrderDate||'9999')<(seen[o.customerId].oldestOrderDate||'9999')){
+      const existing=seen[o.customerId];
+      const existingMsgs=S.orderMsgs.filter(m=>m.orderCustomerId===existing.id).length;
+      const newMsgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id).length;
+      // Keep the one with more messages; tie-break on newer createdAt
+      if(newMsgs>existingMsgs||(newMsgs===existingMsgs&&o.createdAt>existing.createdAt)){
         seen[o.customerId]=o;return true;
       }
       return false;
@@ -4593,12 +4597,17 @@ async function syncOutstandingOrders(){
       sheetsGet('OrderMessages!A2:G')
     ]);
     S.orderCustomers=custRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
-    // Apply same dedup as initial load
+    // Apply same dedup as initial load — keep entry with most messages
     const seenSync={};
     S.orderCustomers=S.orderCustomers.filter(o=>{
       if(o.status==='Resolved')return true;
       if(!seenSync[o.customerId]){seenSync[o.customerId]=o;return true;}
-      if((o.oldestOrderDate||'9999')<(seenSync[o.customerId].oldestOrderDate||'9999')){seenSync[o.customerId]=o;return true;}
+      const existing=seenSync[o.customerId];
+      const existingMsgs=S.orderMsgs.filter(m=>m.orderCustomerId===existing.id).length;
+      const newMsgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id).length;
+      if(newMsgs>existingMsgs||(newMsgs===existingMsgs&&o.createdAt>existing.createdAt)){
+        seenSync[o.customerId]=o;return true;
+      }
       return false;
     });
     S.orderMsgs=msgRows.filter(r=>r[0]).map(r=>({id:r[0],orderCustomerId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
@@ -4652,9 +4661,21 @@ async function syncOutstandingOrders(){
         }
         skippedDupe++;continue;
       }
-      // Also skip if a resolved entry exists with the same oldestOrderDate (same batch of orders)
-      const resolvedDupe=S.orderCustomers.find(o=>o.customerId===cid&&o.status==='Resolved'&&o.oldestOrderDate===oldestDate);
-      if(resolvedDupe){skippedDupe++;continue;}
+      // Also skip if a resolved entry exists for this customer — they may have had a new oldest
+      // date after partial fulfillment, but we don't want a second active entry
+      const resolvedDupe=S.orderCustomers.find(o=>o.customerId===cid&&o.status==='Resolved');
+      if(resolvedDupe){
+        // Reopen the resolved entry and update its oldest date instead of creating a new one
+        resolvedDupe.status='Open';
+        resolvedDupe.resolvedAt='';
+        resolvedDupe.oldestOrderDate=oldestDate;
+        await updateOrderInSheet(resolvedDupe);
+        const msgId=uid();const createdAt=today();
+        const note='Reopened: '+cust.orders.length+' unfulfilled order'+(cust.orders.length!==1?'s':'')+' still pending (oldest: '+oldestDate+').';
+        await sheetsAppend('OrderMessages!A:G',[[msgId,resolvedDupe.id,note,-1,'System','',createdAt]]);
+        S.orderMsgs.push({id:msgId,orderCustomerId:resolvedDupe.id,message:note,author:-1,authorName:'System',method:'',createdAt});
+        skippedDupe++;continue;
+      }
       const id=uid();const createdAt=today();
       const o={id,customerId:cid,customerName:cust.customerName,customerEmail:cust.customerEmail,customerPhone:cust.customerPhone,status:'Open',assignee:-1,createdAt,syncedAt:createdAt,notes:'',pickupDate:'',oldestOrderDate:oldestDate};
       const msgId=uid();const note=cust.orders.length+' unfulfilled order'+(cust.orders.length!==1?'s':'')+' found in Commerce7 (oldest: '+oldestDate+').';
