@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.278</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.279</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -3993,8 +3993,10 @@ function renderOrders(){
     else if(col==='pickupDate'){av=a.pickupDate||'9999';bv=b.pickupDate||'9999';}
     else if(col==='status'){av=a.status||'';bv=b.status||'';}
     else if(col==='lastFollowup'){
-      av=S.orderMsgs.filter(m=>m.orderCustomerId===a.id).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,a.createdAt);
-      bv=S.orderMsgs.filter(m=>m.orderCustomerId===b.id).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,b.createdAt);
+      const AUTO_NOTE_PATTERNS=[/^\d+ unfulfilled order/,/^Auto-resolved:/,/^Pickup date set to/,/^Pickup date cleared/,/^Reopened:/,/^Oldest order date updated:/];
+      const isAuto=(m)=>!m.method&&AUTO_NOTE_PATTERNS.some(p=>p.test(m.message||''));
+      av=S.orderMsgs.filter(m=>m.orderCustomerId===a.id&&!isAuto(m)).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,'');
+      bv=S.orderMsgs.filter(m=>m.orderCustomerId===b.id&&!isAuto(m)).reduce((mx,m)=>m.createdAt>mx?m.createdAt:mx,'');
     }
     else if(col==='msgs'){
       av=S.orderMsgs.filter(m=>m.orderCustomerId===a.id).length;
@@ -4036,7 +4038,7 @@ function orderAgeDays(dateStr){
 }
 
 function buildOrderRow(o,showStatus){
-  const AUTO_NOTE_PATTERNS=[/^\d+ unfulfilled order/,/^Auto-resolved:/,/^Pickup date set to/,/^Pickup date cleared/];
+  const AUTO_NOTE_PATTERNS=[/^\d+ unfulfilled order/,/^Auto-resolved:/,/^Pickup date set to/,/^Pickup date cleared/,/^Reopened:/,/^Oldest order date updated:/];
   const isAutoNote=(msg)=>!msg.method&&AUTO_NOTE_PATTERNS.some(p=>p.test(msg.message||''));
   const msgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id&&!isAutoNote(m));
   const lastMsg=msgs.length?msgs[msgs.length-1]:null;
