@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.277</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.278</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -2293,21 +2293,36 @@ async function loadFromSheets(){
     S.customerContactLog=(customerContactLogRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',projectId:r[2]||'',method:r[3]||'',outcome:r[4]||'',notes:r[5]||'',author:parseInt(r[6])||0,createdAt:r[7]||''}));
     S.clubAcknowledged=(clubAcknowledgedRows||[]).filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',type:r[2]||'',cycleDate:r[3]||'',acknowledgedBy:r[4]||'',ackState:r[5]||'done',acknowledgedAt:r[6]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
-    // Deduplicate — if multiple active entries exist for same customer, keep the one
-    // with the most notes/messages (most worked), falling back to newest created date
+    // Deduplicate — one active entry per customer, keep the one with most messages
+    // (most worked on), tie-break on oldest createdAt (original entry)
     const seen={};
-    S.orderCustomers=S.orderCustomers.filter(o=>{
-      if(o.status==='Resolved')return true;
-      if(!seen[o.customerId]){seen[o.customerId]=o;return true;}
+    const dupesToBlank=[];
+    S.orderCustomers.forEach(o=>{
+      if(o.status==='Resolved')return;
+      if(!seen[o.customerId]){seen[o.customerId]=o;return;}
       const existing=seen[o.customerId];
       const existingMsgs=S.orderMsgs.filter(m=>m.orderCustomerId===existing.id).length;
       const newMsgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id).length;
-      // Keep the one with more messages; tie-break on newer createdAt
-      if(newMsgs>existingMsgs||(newMsgs===existingMsgs&&o.createdAt>existing.createdAt)){
-        seen[o.customerId]=o;return true;
+      if(newMsgs>existingMsgs||(newMsgs===existingMsgs&&(o.createdAt||'')>(existing.createdAt||''))){
+        // new one wins — discard existing
+        dupesToBlank.push(existing.id);
+        seen[o.customerId]=o;
+      } else {
+        // existing wins — discard new
+        dupesToBlank.push(o.id);
       }
-      return false;
     });
+    S.orderCustomers=S.orderCustomers.filter(o=>o.status==='Resolved'||!dupesToBlank.includes(o.id));
+    // Blank out duplicate rows in sheet quietly in background
+    if(dupesToBlank.length){
+      sheetsGet('OrderCustomers!A2:N').then(allRows=>{
+        const blanks=dupesToBlank.map(id=>{
+          const ri=allRows.findIndex(r=>r[0]===id);
+          return ri>=0?{row:ri+2,id}:null;
+        }).filter(Boolean);
+        blanks.forEach(({row})=>sheetsUpdate('OrderCustomers!A'+row+':N'+row,[['','','','','','','','','','','','','','']]));
+      }).catch(()=>{});
+    }
     S.orderMsgs=orderMsgRows.filter(r=>r[0]).map(r=>({id:r[0],orderCustomerId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
     S.outreach=outreachRows.filter(r=>r[0]).map(r=>({id:r[0],title:r[1]||'',type:r[2]||'',status:r[3]||'Open',eventDate:r[4]||'',contactId:r[5]||'',contactName:r[6]||'',contactEmail:r[7]||'',contactPhone:r[8]||'',assignee:parseInt(r[9])||0,createdAt:r[10]||'',guestCount:r[11]||'',website:r[12]||''}));
     S.outreachMsgs=outreachMsgRows.filter(r=>r[0]).map(r=>({id:r[0],outreachId:r[1]||'',message:r[2]||'',author:parseInt(r[3])||0,authorName:r[4]||'',method:r[5]||'',createdAt:r[6]||''}));
@@ -4597,7 +4612,7 @@ async function syncOutstandingOrders(){
       sheetsGet('OrderMessages!A2:G')
     ]);
     S.orderCustomers=custRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
-    // Apply same dedup as initial load — keep entry with most messages
+    // Apply same dedup as initial load — one active entry per customer
     const seenSync={};
     S.orderCustomers=S.orderCustomers.filter(o=>{
       if(o.status==='Resolved')return true;
@@ -4605,7 +4620,7 @@ async function syncOutstandingOrders(){
       const existing=seenSync[o.customerId];
       const existingMsgs=S.orderMsgs.filter(m=>m.orderCustomerId===existing.id).length;
       const newMsgs=S.orderMsgs.filter(m=>m.orderCustomerId===o.id).length;
-      if(newMsgs>existingMsgs||(newMsgs===existingMsgs&&o.createdAt>existing.createdAt)){
+      if(newMsgs>existingMsgs||(newMsgs===existingMsgs&&(o.createdAt||'')>(existing.createdAt||''))){
         seenSync[o.customerId]=o;return true;
       }
       return false;
