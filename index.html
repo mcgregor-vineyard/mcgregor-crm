@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.287</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.288</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7396,11 +7396,14 @@ async function syncReviewPool(projectId){
 
   // Fetch C7 products and add them
   try{
-    const token=await getC7Token();
-    const prodResp=await fetch(`${C7_PROXY}/v1/product?pageSize=200`,{headers:{Authorization:'Bearer '+token,'tenant-id':C7_TENANT}});
+    const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_SECRET);
+    const c7url='https://api.commerce7.com/v1/product?pageSize=200';
+    const prodResp=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(c7url),{
+      headers:{'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'}
+    });
     if(prodResp.ok){
       const prodData=await prodResp.json();
-      (prodData.product||[]).forEach(p=>{
+      (prodData.products||prodData.product||[]).forEach(p=>{
         if(p.slug&&p.title){
           rows.push([projectId,'https://mcgregorwinery.com/product/'+p.slug,p.title,'product','']);
         }
@@ -7435,39 +7438,55 @@ async function runWebsiteReview(){
       // Pull from C7 API
       progressEl.textContent='Fetching product data from Commerce7...';
       try{
-        const token=await getC7Token();
-        const slug=page.url.split('/product/')[1];
-        const resp=await fetch(`${C7_PROXY}/v1/product/${slug}`,{headers:{Authorization:'Bearer '+token,'tenant-id':C7_TENANT}});
+        const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_SECRET);
+        const slug=page.url.split('/product/')[1]?.replace(/\//g,'');
+        const c7url=`https://api.commerce7.com/v1/product/${slug}`;
+        const resp=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(c7url),{
+          headers:{'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'}
+        });
         if(resp.ok){
           const data=await resp.json();
-          pageContent=`PRODUCT: ${data.title||page.label}\nPrice: ${data.price||'N/A'}\nAvailable: ${data.available||'unknown'}\nDescription: ${data.description||'No description'}\nVintage: ${data.vintage||''}\nVarietal: ${data.varietal||''}\nAppellation: ${data.appellation||''}\nAlcohol: ${data.alcohol||''}\nTasting Notes: ${data.tastingNotes||''}\nFood Pairing: ${data.foodPairing||''}\nWinemaker Notes: ${data.winemakerNotes||''}`;
+          const variants=(data.variants||[]).map(v=>`  - ${v.sku||''}: $${v.price||'?'} ${v.available?'(In stock)':'(Out of stock)'}`).join('\n');
+          pageContent=`PRODUCT: ${data.title||page.label}\nDescription: ${(data.description||'').replace(/<[^>]+>/g,' ')}\nVintage: ${data.vintage||''}\nVarietal: ${data.type||''}\nAppellation: ${data.appellation||''}\nAlcohol: ${data.alcohol||''}\nTasting Notes: ${(data.tastingNotes||'').replace(/<[^>]+>/g,' ')}\nFood Pairing: ${(data.foodPairing||'').replace(/<[^>]+>/g,' ')}\nVariants/Pricing:\n${variants}`;
         } else {
-          pageContent=`Product page: ${page.label}\nURL: ${page.url}\n(Product data unavailable)`;
+          pageContent=`Product page: ${page.label}\nURL: ${page.url}\n(Product data unavailable — HTTP ${resp.status})`;
         }
-      }catch(e){pageContent=`Product page: ${page.label}\nURL: ${page.url}`;}
+      }catch(e){pageContent=`Product page: ${page.label}\nURL: ${page.url}\n(Error: ${e.message})`;}
     } else if(page.type==='collection'){
       // Pull from C7 API
       progressEl.textContent='Fetching collection data from Commerce7...';
       try{
-        const token=await getC7Token();
+        const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_SECRET);
         const collSlug=page.url.split('/collection/')[1]?.replace(/\//g,'');
-        const resp=await fetch(`${C7_PROXY}/v1/collection/${collSlug}`,{headers:{Authorization:'Bearer '+token,'tenant-id':C7_TENANT}});
+        const c7url=`https://api.commerce7.com/v1/collection?slug=${collSlug}`;
+        const resp=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(c7url),{
+          headers:{'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'}
+        });
         if(resp.ok){
           const data=await resp.json();
-          const wines=(data.products||[]).map(p=>`- ${p.title} ($${p.price||'?'}) — ${p.available?'In stock':'Out of stock'}`).join('\n');
-          pageContent=`COLLECTION: ${data.title||page.label}\nDescription: ${data.description||'No description'}\nProducts (${(data.products||[]).length}):\n${wines}`;
+          const coll=(data.collections||[])[0]||data;
+          const wines=(coll.products||[]).map(p=>`- ${p.title} ($${p.price||'?'}) — ${p.available?'In stock':'Out of stock'}`).join('\n');
+          pageContent=`COLLECTION: ${coll.title||page.label}\nDescription: ${(coll.description||'No description').replace(/<[^>]+>/g,' ')}\nProducts (${(coll.products||[]).length}):\n${wines}`;
         } else {
-          pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Collection data unavailable)`;
+          pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Collection data unavailable — HTTP ${resp.status})`;
         }
-      }catch(e){pageContent=`Collection: ${page.label}\nURL: ${page.url}`;}
+      }catch(e){pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Error: ${e.message})`;}
     } else {
-      // Fetch static page via proxy
+      // Fetch static page directly (site is public, no auth needed)
       progressEl.textContent='Fetching page content...';
       try{
-        const resp=await fetch(`https://mcgregor-c7-proxy.dan-f74.workers.dev/fetch-page?url=${encodeURIComponent(page.url)}`);
-        if(resp.ok){pageContent=await resp.text();}
-        else{pageContent=`Page: ${page.label}\nURL: ${page.url}\n(Could not fetch page content)`;}
-      }catch(e){pageContent=`Page: ${page.label}\nURL: ${page.url}`;}
+        const resp=await fetch(page.url,{headers:{'User-Agent':'McGregorConnect/1.0'}});
+        if(resp.ok){
+          const html=await resp.text();
+          // Strip HTML tags and collapse whitespace for readable content
+          const txt=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'')
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'')
+            .replace(/<[^>]+>/g,' ')
+            .replace(/\s{2,}/g,' ')
+            .trim();
+          pageContent=txt.slice(0,8000);
+        }else{pageContent=`Page: ${page.label}\nURL: ${page.url}\n(HTTP ${resp.status})`;}
+      }catch(e){pageContent=`Page: ${page.label}\nURL: ${page.url}\n(Could not fetch: ${e.message})`;}
     }
 
     // Send to Claude API for review
