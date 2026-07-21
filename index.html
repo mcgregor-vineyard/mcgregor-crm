@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.289</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.290</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7475,11 +7475,15 @@ async function runWebsiteReview(){
       // Fetch static page via proxy (CORS requires server-side fetch)
       progressEl.textContent='Fetching page content...';
       try{
-        const proxyUrl=CONFIG.C7_WORKER_URL.replace(/\?url=.*$/,'').replace(/\/$/,'');
-        const resp=await fetch(`${proxyUrl}/fetch-page?url=${encodeURIComponent(page.url)}`);
+        // Extract just the worker base URL (strip any path/query)
+        const workerBase=(()=>{
+          try{const u=new URL(CONFIG.C7_WORKER_URL);return u.origin;}
+          catch(e){return 'https://mcgregor-c7-proxy.dan-f74.workers.dev';}
+        })();
+        console.log('[WebsiteReview] fetch-page URL:', `${workerBase}/fetch-page?url=${encodeURIComponent(page.url)}`);
+        const resp=await fetch(`${workerBase}/fetch-page?url=${encodeURIComponent(page.url)}`);
         if(resp.ok){
           const html=await resp.text();
-          // Strip tags and collapse whitespace for readable content
           const txt=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'')
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'')
             .replace(/<[^>]+>/g,' ')
