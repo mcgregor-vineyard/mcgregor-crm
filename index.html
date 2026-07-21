@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.285</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.287</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -578,6 +578,24 @@ select.fi{cursor:pointer;}
                   </div>
                 </div>
                 <div id="pj-customercontact-list"></div>
+              </div>
+              <!-- Website Review project -->
+              <div id="pj-websitereview-section" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                  <div>
+                    <div style="font-weight:600;font-size:14px;">Website Review</div>
+                    <div id="pj-wr-next-label" style="font-size:12px;color:var(--ink-m);margin-top:2px;"></div>
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn" style="font-size:12px;color:var(--ink-m);" onclick="manageReviewPool()">⚙ Manage pages</button>
+                    <button class="btn btnp" id="pj-wr-run-btn" style="font-size:13px;padding:7px 16px;" onclick="runWebsiteReview()">▶ Run today's review</button>
+                  </div>
+                </div>
+                <div id="pj-wr-running" style="display:none;padding:24px;text-align:center;background:var(--cream);border-radius:10px;margin-bottom:16px;">
+                  <div style="font-size:14px;font-weight:500;margin-bottom:8px;">🔍 Reviewing page...</div>
+                  <div id="pj-wr-progress" style="font-size:12px;color:var(--ink-m);"></div>
+                </div>
+                <div id="pj-wr-reviews-list"></div>
               </div>
             </div>
             <!-- Right: notes + Power BI (Inventory only) -->
@@ -1206,6 +1224,7 @@ select.fi{cursor:pointer;}
             <option value="PreOrder">PreOrder Fulfillment</option>
             <option value="WineRelease">Wine Release</option>
             <option value="CustomerContact">Customer Contact</option>
+            <option value="WebsiteReview">Website Review</option>
           </select>
         </div>
         <div class="fr"><label class="fl">Status</label>
@@ -2171,9 +2190,9 @@ function getCampColor(campId){
   return idx>=0?CAMP_COLORS[idx%CAMP_COLORS.length]:{bg:'var(--cream)',border:'var(--bdr)',text:'var(--ink-m)'};
 }
 const OUT_COLORS={reached:'#1D9E75',sold:'#6B1E2E',nosale:'#888780',vm:'#EF9F27',noanswer:'#B4B2A9','email-sent':'#378ADD','email-replied':'#534AB7',pending:'#D3D1C7'};
-const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages',projects:'Projects',projectContacts:'ProjectContacts',projectNotes:'ProjectNotes',projectItemNotes:'ProjectItemNotes',inventoryEntries:'InventoryEntries',clubComms:'ClubComms',clubMembers:'ClubMembers',clubSettings:'ClubSettings',wineReleaseWines:'WineReleaseWines',wineReleaseItems:'WineReleaseItems',wineReleaseChecklist:'WineReleaseChecklist',customerContactLog:'CustomerContactLog',clubAcknowledged:'ClubAcknowledged'};
+const SHEETS={campaigns:'Campaigns',contacts:'Contacts',attempts:'Attempts',tickets:'Tickets',ticketMsgs:'TicketMessages',reminders:'Reminders',reminderNotes:'ReminderNotes',orderCustomers:'OrderCustomers',orderMsgs:'OrderMessages',outreach:'Outreach',outreachMsgs:'OutreachMessages',projects:'Projects',projectContacts:'ProjectContacts',projectNotes:'ProjectNotes',projectItemNotes:'ProjectItemNotes',inventoryEntries:'InventoryEntries',clubComms:'ClubComms',clubMembers:'ClubMembers',clubSettings:'ClubSettings',wineReleaseWines:'WineReleaseWines',wineReleaseItems:'WineReleaseItems',wineReleaseChecklist:'WineReleaseChecklist',customerContactLog:'CustomerContactLog',clubAcknowledged:'ClubAcknowledged',websiteReviews:'WebsiteReviews',websiteReviewPool:'WebsiteReviewPool'};
 
-let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],projectItemNotes:[],inventoryEntries:[],clubMembers:[],clubComms:[],clubMembersLastSync:'',clubInstructions:'',wineReleaseWines:[],wineReleaseItems:[],wineReleaseChecklist:[],customerContactLog:[],clubAcknowledged:[],activeClubMemberId:null,activeClubMember:null,activeProjectItemId:null,activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
+let S={campaigns:[],contacts:[],attempts:[],tickets:[],ticketMsgs:[],reminders:[],reminderNotes:[],orderCustomers:[],orderMsgs:[],outreach:[],outreachMsgs:[],projects:[],projectContacts:[],projectNotes:[],projectItemNotes:[],inventoryEntries:[],clubMembers:[],clubComms:[],clubMembersLastSync:'',clubInstructions:'',wineReleaseWines:[],wineReleaseItems:[],wineReleaseChecklist:[],customerContactLog:[],clubAcknowledged:[],websiteReviews:[],websiteReviewPool:[],activeClubMemberId:null,activeClubMember:null,activeProjectItemId:null,activeOutreachId:null,activeReminderId:null,activeProject:null,filter:'all',ticketFilter:'all',activeCamp:null,cu:0,importMode:'search',c7Selected:[],pendingUpload:[],outChart:null,campChart:null,token:null,tokenExpiry:0,lookedUpOrder:null,activeTicketId:null,activeOrderId:null,orderSort:{col:'oldestOrderDate',dir:'asc'}};
 
 function uid(){return 'x'+Date.now()+Math.random().toString(36).slice(2,7);}
 function gmt4Now(){
@@ -2273,6 +2292,8 @@ async function ensureSheets(){
   if(needed.includes('WineReleaseWines'))await sheetsUpdate('WineReleaseWines!A1:E1',[['ID','ProjectID','WineName','CreatedAt','SortOrder']]);
   if(needed.includes('WineReleaseItems'))await sheetsUpdate('WineReleaseItems!A1:J1',[['ID','WineID','ProjectID','Task','Assignee','Done','CompletedBy','CompletedAt','DueDate','ReminderAssignee']]);
   if(needed.includes('WineReleaseChecklist'))await sheetsUpdate('WineReleaseChecklist!A1:F1',[['ID','SortOrder','Task','Instructions','IsHeader','UpdatedAt']]);
+  if(needed.includes('WebsiteReviews'))await sheetsUpdate('WebsiteReviews!A1:J1',[['ID','ProjectID','ReviewDate','PageLabel','PageURL','PageType','Summary','Issues','ActionItems','ReviewedBy']]);
+  if(needed.includes('WebsiteReviewPool'))await sheetsUpdate('WebsiteReviewPool!A1:E1',[['ProjectID','URL','Label','Type','LastReviewedDate']]);
   if(needed.includes('CustomerContactLog'))await sheetsUpdate('CustomerContactLog!A1:H1',[['ID','ContactID','ProjectID','Method','Outcome','Notes','Author','CreatedAt']]);
   if(needed.includes('ClubAcknowledged'))await sheetsUpdate('ClubAcknowledged!A1:G1',[['ID','CustomerID','AcknowledgedType','CycleDate','AcknowledgedBy','AckState','AcknowledgedAt']]);
   if(needed.includes('ProjectContacts'))await sheetsUpdate('ProjectContacts!A1:P1',[['ID','ProjectID','First','Last','Email','Phone','OrderNo','C7CustomerID','C7OrderData','Assignee','CreatedAt','Notes','Done','CompletedBy','CompletedAt','CompletionType']]);
@@ -2288,7 +2309,7 @@ async function loadFromSheets(){
   setSyncBar('loading','Loading from Google Sheets...');
   try{
     await ensureSheets();
-    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows,projectRows,projectContactRows,projectNoteRows,projectItemNoteRows,inventoryRows,clubCommsRows,clubMemberRows,clubSettingsRows,wineReleaseWineRows,wineReleaseItemRows,wineReleaseChecklistRows,customerContactLogRows,clubAcknowledgedRows]=await Promise.all([
+    const [campRows,contactRows,attemptRows,ticketRows,ticketMsgRows,reminderRows,orderCustRows,orderMsgRows,outreachRows,outreachMsgRows,reminderNoteRows,projectRows,projectContactRows,projectNoteRows,projectItemNoteRows,inventoryRows,clubCommsRows,clubMemberRows,clubSettingsRows,wineReleaseWineRows,wineReleaseItemRows,wineReleaseChecklistRows,websiteReviewRows,websiteReviewPoolRows,customerContactLogRows,clubAcknowledgedRows]=await Promise.all([
       sheetsGet('Campaigns!A2:H'),sheetsGet('Contacts!A2:P'),sheetsGet('Attempts!A2:I'),
       sheetsGet('Tickets!A2:L'),sheetsGet('TicketMessages!A2:G'),sheetsGet('Reminders!A2:I'),
       sheetsGet('OrderCustomers!A2:N'),sheetsGet('OrderMessages!A2:G'),
@@ -2299,6 +2320,8 @@ async function loadFromSheets(){
       sheetsGet('ClubMembers!A2:L').catch(()=>[]),sheetsGet('ClubSettings!A2:B').catch(()=>[]),
       sheetsGet('WineReleaseWines!A2:E').catch(()=>[]),sheetsGet('WineReleaseItems!A2:H').catch(()=>[]),
       sheetsGet('WineReleaseChecklist!A2:F').catch(()=>[]),
+      sheetsGet('WebsiteReviews!A2:J').catch(()=>[]),
+      sheetsGet('WebsiteReviewPool!A2:E').catch(()=>[]),
       sheetsGet('CustomerContactLog!A2:H').catch(()=>[]),
       sheetsGet('ClubAcknowledged!A2:G').catch(()=>[])
     ]);
@@ -2346,6 +2369,8 @@ async function loadFromSheets(){
       sheetsAppend('WineReleaseChecklist!A:F',seedRows).catch(()=>{});
     }
     S.customerContactLog=(customerContactLogRows||[]).filter(r=>r[0]).map(r=>({id:r[0],contactId:r[1]||'',projectId:r[2]||'',method:r[3]||'',outcome:r[4]||'',notes:r[5]||'',author:parseInt(r[6])||0,createdAt:r[7]||''}));
+    S.websiteReviews=(websiteReviewRows||[]).filter(r=>r[0]).map(r=>({id:r[0],projectId:r[1]||'',reviewDate:r[2]||'',pageLabel:r[3]||'',pageUrl:r[4]||'',pageType:r[5]||'',summary:r[6]||'',issues:r[7]||'',actionItems:r[8]||'',reviewedBy:r[9]||''}));
+    S.websiteReviewPool=(websiteReviewPoolRows||[]).filter(r=>r[0]).map(r=>({projectId:r[0],url:r[1]||'',label:r[2]||'',type:r[3]||'',lastReviewedDate:r[4]||''}));
     S.clubAcknowledged=(clubAcknowledgedRows||[]).filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',type:r[2]||'',cycleDate:r[3]||'',acknowledgedBy:r[4]||'',ackState:r[5]||'done',acknowledgedAt:r[6]||''}));
     S.orderCustomers=orderCustRows.filter(r=>r[0]).map(r=>({id:r[0],customerId:r[1]||'',customerName:r[2]||'',customerEmail:r[3]||'',customerPhone:r[4]||'',status:r[5]||'Open',assignee:parseInt(r[6])||0,createdAt:r[7]||'',syncedAt:r[8]||'',notes:r[9]||'',pickupDate:r[10]||'',oldestOrderDate:r[11]||'',unfulfilledCount:r[12]!==undefined&&r[12]!==''?parseInt(r[12]):-1,resolvedAt:r[13]||''}));
     // Deduplicate — one active entry per customer, keep the one with most messages
@@ -7259,7 +7284,278 @@ const WINE_RELEASE_CHECKLIST=[
   {task:'Website: Remove from Our Wines and wine type page, keep on varietal page',instructions:'On the website: (1) Remove from the "Our Wines" page, (2) Remove from the wine type page (e.g. "Red Wines"), (3) Leave it on the varietal page (e.g. Chardonnay) so it remains searchable as part of the wine\'s history.'},
 ];
 
-// ---- Core Checklist ----
+// ---- Website Review ----
+const STATIC_REVIEW_PAGES=[
+  {label:'Home',url:'https://mcgregorwinery.com/',type:'page'},
+  {label:'Our Wines',url:'https://mcgregorwinery.com/our-wines/',type:'page'},
+  {label:'Visit',url:'https://mcgregorwinery.com/visit/',type:'page'},
+  {label:'Events',url:'https://mcgregorwinery.com/events',type:'page'},
+  {label:'Wine Club',url:'https://mcgregorwinery.com/wine-club/',type:'page'},
+  {label:'Our Story',url:'https://mcgregorwinery.com/our-story/',type:'page'},
+  {label:'What is Saperavi?',url:'https://mcgregorwinery.com/what-is-saperavi/',type:'page'},
+  {label:'Contact',url:'https://mcgregorwinery.com/contact/',type:'page'},
+  {label:'Jobs',url:'https://mcgregorwinery.com/jobs/',type:'page'},
+  {label:'Subscribe',url:'https://mcgregorwinery.com/subscribe/',type:'page'},
+  {label:'Shipping FAQ',url:'https://mcgregorwinery.com/shipping-faq/',type:'page'},
+  {label:'Newsletter Archive',url:'https://mcgregorwinery.com/newsletter-archive/',type:'page'},
+  {label:'Vineyards',url:'https://mcgregorwinery.com/vineyards/',type:'page'},
+  {label:'Our People',url:'https://mcgregorwinery.com/the-people/',type:'page'},
+  {label:'Library Wine Club',url:'https://mcgregorwinery.com/library-wine-club/',type:'page'},
+  {label:'Club FAQ',url:'https://mcgregorwinery.com/club-faq/',type:'page'},
+  {label:'Media',url:'https://mcgregorwinery.com/Media/',type:'page'},
+  {label:'Returns & Cancellations',url:'https://mcgregorwinery.com/returns-cancellations/',type:'page'},
+  {label:'Privacy Policy',url:'https://mcgregorwinery.com/privacy/',type:'page'},
+  {label:'Collection: New Releases',url:'https://mcgregorwinery.com/collection/new-releases/',type:'collection'},
+  {label:'Collection: Red Wines',url:'https://mcgregorwinery.com/collection/red-wines/',type:'collection'},
+  {label:'Collection: White Wines',url:'https://mcgregorwinery.com/collection/white-wines/',type:'collection'},
+  {label:'Collection: Dry Rosé',url:'https://mcgregorwinery.com/collection/rose-wines/',type:'collection'},
+  {label:'Collection: Sparkling Wines',url:'https://mcgregorwinery.com/collection/sparkling-wines/',type:'collection'},
+  {label:'Collection: Large Format',url:'https://mcgregorwinery.com/collection/large-format-bottles/',type:'collection'},
+  {label:'Collection: Unwired',url:'https://mcgregorwinery.com/collection/unwired/',type:'collection'},
+  {label:'Collection: Gift Shop',url:'https://mcgregorwinery.com/collection/gift-shop/',type:'collection'},
+  {label:'Collection: Almost Gone',url:'https://mcgregorwinery.com/collection/almost-gone/',type:'collection'},
+  {label:'Collection: Gift Cards',url:'https://mcgregorwinery.com/collection/gift-cards',type:'collection'},
+  {label:'Collection: Gewürztraminer',url:'https://mcgregorwinery.com/collection/dry-gewurztraminer',type:'collection'},
+  {label:'Collection: Chardonnay',url:'https://mcgregorwinery.com/collection/chardonnay',type:'collection'},
+  {label:'Collection: Riesling',url:'https://mcgregorwinery.com/collection/riesling',type:'collection'},
+  {label:'Collection: Rkatsiteli',url:'https://mcgregorwinery.com/collection/rkatsiteli',type:'collection'},
+  {label:'Collection: Vignoles',url:'https://mcgregorwinery.com/collection/vignoles',type:'collection'},
+  {label:'Collection: Pinot Noir',url:'https://mcgregorwinery.com/collection/pinot-noir',type:'collection'},
+  {label:'Collection: Cabernet Franc',url:'https://mcgregorwinery.com/collection/cabernet-franc',type:'collection'},
+  {label:'Collection: Merlot',url:'https://mcgregorwinery.com/collection/merlot',type:'collection'},
+  {label:'Collection: Cabernet Sauvignon',url:'https://mcgregorwinery.com/collection/cabernet-sauvignon',type:'collection'},
+  {label:'Collection: Rob Roy Red',url:'https://mcgregorwinery.com/collection/rob-roy-red',type:'collection'},
+  {label:'Collection: Saperavi',url:'https://mcgregorwinery.com/collection/saperavi',type:'collection'},
+];
+
+async function renderWebsiteReviewSection(projectId){
+  const nextLbl=document.getElementById('pj-wr-next-label');
+  const reviewsList=document.getElementById('pj-wr-reviews-list');
+  if(!nextLbl||!reviewsList)return;
+
+  // Build/sync the pool for this project
+  await syncReviewPool(projectId);
+
+  // Find next page (round-robin: oldest lastReviewedDate)
+  const pool=(S.websiteReviewPool||[]).filter(p=>p.projectId===projectId);
+  const next=getNextReviewPage(pool);
+  if(next)nextLbl.textContent='Next up: '+next.label;
+  else nextLbl.textContent='Pool is empty — manage pages to add some.';
+
+  // Render past reviews
+  const reviews=(S.websiteReviews||[]).filter(r=>r.projectId===projectId).sort((a,b)=>b.reviewDate.localeCompare(a.reviewDate));
+  reviewsList.innerHTML='';
+  if(!reviews.length){
+    reviewsList.innerHTML='<div class="empty">No reviews yet. Click ▶ Run today\'s review to get started.</div>';
+    return;
+  }
+  reviews.forEach(review=>{
+    const card=document.createElement('div');
+    card.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;overflow:hidden;';
+    const issues=review.issues?review.issues.split('||').filter(Boolean):[];
+    const actions=review.actionItems?review.actionItems.split('||').filter(Boolean):[];
+    const typeIcon=review.pageType==='product'?'🍷':review.pageType==='collection'?'🗂':'📄';
+    card.innerHTML=`
+      <div style="padding:14px 16px;background:var(--cream);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+          <div style="font-size:13px;font-weight:600;">${typeIcon} ${review.pageLabel}</div>
+          <div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${review.reviewDate} · <a href="${review.pageUrl}" target="_blank" style="color:var(--burg);text-decoration:none;">${review.pageUrl}</a></div>
+        </div>
+        <span style="font-size:11px;background:${issues.length?'#FEF3C7':'#DCFCE7'};color:${issues.length?'#92400E':'#166534'};border-radius:20px;padding:3px 10px;flex-shrink:0;">${issues.length?issues.length+' issue'+(issues.length!==1?'s':''):'✓ No issues'}</span>
+      </div>
+      <div style="padding:14px 16px;">
+        <div style="font-size:13px;color:var(--ink);line-height:1.6;margin-bottom:${issues.length||actions.length?'12px':'0'}">${review.summary}</div>
+        ${issues.length?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--w-tx);margin-bottom:6px;">⚠ Issues found</div>${issues.map(i=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--bdr);color:var(--ink);">• ${i}</div>`).join('')}</div>`:''}
+        ${actions.length?`<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--burg);margin-bottom:6px;">✏ Action items</div>${actions.map(a=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--bdr);color:var(--ink);">→ ${a}</div>`).join('')}</div>`:''}
+      </div>`;
+    reviewsList.appendChild(card);
+  });
+}
+
+function getNextReviewPage(pool){
+  if(!pool.length)return null;
+  // Round-robin: pick the one with the oldest (or no) lastReviewedDate
+  return [...pool].sort((a,b)=>{
+    if(!a.lastReviewedDate&&!b.lastReviewedDate)return 0;
+    if(!a.lastReviewedDate)return -1;
+    if(!b.lastReviewedDate)return 1;
+    return a.lastReviewedDate.localeCompare(b.lastReviewedDate);
+  })[0];
+}
+
+async function syncReviewPool(projectId){
+  // Check if pool already exists for this project
+  const existing=(S.websiteReviewPool||[]).filter(p=>p.projectId===projectId);
+  if(existing.length)return; // already seeded
+
+  // Seed with static pages
+  const rows=[];
+  for(const page of STATIC_REVIEW_PAGES){
+    rows.push([projectId,page.url,page.label,page.type,'']);
+  }
+
+  // Fetch C7 products and add them
+  try{
+    const token=await getC7Token();
+    const prodResp=await fetch(`${C7_PROXY}/v1/product?pageSize=200`,{headers:{Authorization:'Bearer '+token,'tenant-id':C7_TENANT}});
+    if(prodResp.ok){
+      const prodData=await prodResp.json();
+      (prodData.product||[]).forEach(p=>{
+        if(p.slug&&p.title){
+          rows.push([projectId,'https://mcgregorwinery.com/product/'+p.slug,p.title,'product','']);
+        }
+      });
+    }
+  }catch(e){console.warn('Could not fetch C7 products for review pool',e);}
+
+  // Save to sheet and state
+  if(rows.length){
+    await sheetsAppend('WebsiteReviewPool!A:E',rows);
+    rows.forEach(r=>S.websiteReviewPool.push({projectId:r[0],url:r[1],label:r[2],type:r[3],lastReviewedDate:r[4]}));
+  }
+}
+
+async function runWebsiteReview(){
+  const projectId=S.activeProject;
+  const pool=(S.websiteReviewPool||[]).filter(p=>p.projectId===projectId);
+  const page=getNextReviewPage(pool);
+  if(!page){showToast('No pages in review pool','err');return;}
+
+  const runDiv=document.getElementById('pj-wr-running');
+  const progressEl=document.getElementById('pj-wr-progress');
+  const btn=document.getElementById('pj-wr-run-btn');
+  runDiv.style.display='';
+  btn.disabled=true;
+  btn.textContent='Running...';
+
+  try{
+    let pageContent='';
+
+    if(page.type==='product'){
+      // Pull from C7 API
+      progressEl.textContent='Fetching product data from Commerce7...';
+      try{
+        const token=await getC7Token();
+        const slug=page.url.split('/product/')[1];
+        const resp=await fetch(`${C7_PROXY}/v1/product/${slug}`,{headers:{Authorization:'Bearer '+token,'tenant-id':C7_TENANT}});
+        if(resp.ok){
+          const data=await resp.json();
+          pageContent=`PRODUCT: ${data.title||page.label}\nPrice: ${data.price||'N/A'}\nAvailable: ${data.available||'unknown'}\nDescription: ${data.description||'No description'}\nVintage: ${data.vintage||''}\nVarietal: ${data.varietal||''}\nAppellation: ${data.appellation||''}\nAlcohol: ${data.alcohol||''}\nTasting Notes: ${data.tastingNotes||''}\nFood Pairing: ${data.foodPairing||''}\nWinemaker Notes: ${data.winemakerNotes||''}`;
+        } else {
+          pageContent=`Product page: ${page.label}\nURL: ${page.url}\n(Product data unavailable)`;
+        }
+      }catch(e){pageContent=`Product page: ${page.label}\nURL: ${page.url}`;}
+    } else if(page.type==='collection'){
+      // Pull from C7 API
+      progressEl.textContent='Fetching collection data from Commerce7...';
+      try{
+        const token=await getC7Token();
+        const collSlug=page.url.split('/collection/')[1]?.replace(/\//g,'');
+        const resp=await fetch(`${C7_PROXY}/v1/collection/${collSlug}`,{headers:{Authorization:'Bearer '+token,'tenant-id':C7_TENANT}});
+        if(resp.ok){
+          const data=await resp.json();
+          const wines=(data.products||[]).map(p=>`- ${p.title} ($${p.price||'?'}) — ${p.available?'In stock':'Out of stock'}`).join('\n');
+          pageContent=`COLLECTION: ${data.title||page.label}\nDescription: ${data.description||'No description'}\nProducts (${(data.products||[]).length}):\n${wines}`;
+        } else {
+          pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Collection data unavailable)`;
+        }
+      }catch(e){pageContent=`Collection: ${page.label}\nURL: ${page.url}`;}
+    } else {
+      // Fetch static page via proxy
+      progressEl.textContent='Fetching page content...';
+      try{
+        const resp=await fetch(`https://mcgregor-c7-proxy.dan-f74.workers.dev/fetch-page?url=${encodeURIComponent(page.url)}`);
+        if(resp.ok){pageContent=await resp.text();}
+        else{pageContent=`Page: ${page.label}\nURL: ${page.url}\n(Could not fetch page content)`;}
+      }catch(e){pageContent=`Page: ${page.label}\nURL: ${page.url}`;}
+    }
+
+    // Send to Claude API for review
+    progressEl.textContent='Analyzing with AI...';
+    const prompt=`You are reviewing a page on McGregor Vineyard's website (mcgregorwinery.com), a family-owned estate winery on Keuka Lake in the Finger Lakes region of New York, founded in 1971.
+
+PAGE: ${page.label}
+URL: ${page.url}
+TYPE: ${page.type}
+
+CONTENT:
+${pageContent.slice(0,6000)}
+
+Please review this page and respond ONLY with a valid JSON object (no markdown, no explanation) in this exact format:
+{
+  "summary": "2-3 sentence overall assessment of the page",
+  "issues": ["issue 1", "issue 2"],
+  "actionItems": ["action 1", "action 2"]
+}
+
+Review for:
+- Copy quality: typos, grammatical errors, unclear language
+- Outdated information: old dates, sold-out wines still featured prominently, expired promotions
+- Missing information: things a visitor would expect to find
+- SEO: meta description quality, keyword relevance
+- Brand consistency: tone, messaging alignment with a premium Finger Lakes winery
+- For products/collections: accuracy of descriptions, pricing visibility, availability status
+
+Keep issues and action items concrete and specific. If the page looks good, return empty arrays for issues and actionItems.`;
+
+    const apiResp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    const apiData=await apiResp.json();
+    const rawText=(apiData.content||[]).map(c=>c.text||'').join('').trim();
+    let parsed={summary:'Review complete.',issues:[],actionItems:[]};
+    try{
+      const clean=rawText.replace(/```json|```/g,'').trim();
+      parsed=JSON.parse(clean);
+    }catch(e){parsed.summary=rawText.slice(0,500);}
+
+    // Save review
+    progressEl.textContent='Saving review...';
+    const reviewId=uid();
+    const reviewDate=today();
+    const review={
+      id:reviewId,projectId,reviewDate,
+      pageLabel:page.label,pageUrl:page.url,pageType:page.type,
+      summary:parsed.summary||'',
+      issues:(parsed.issues||[]).join('||'),
+      actionItems:(parsed.actionItems||[]).join('||'),
+      reviewedBy:TEAM[S.cu]?.name||''
+    };
+    await sheetsAppend('WebsiteReviews!A:J',[[reviewId,projectId,reviewDate,page.label,page.url,page.type,review.summary,review.issues,review.actionItems,review.reviewedBy]]);
+    S.websiteReviews.push(review);
+
+    // Update pool lastReviewedDate for this page
+    const poolEntry=(S.websiteReviewPool||[]).find(p=>p.projectId===projectId&&p.url===page.url);
+    if(poolEntry){
+      poolEntry.lastReviewedDate=reviewDate;
+      const allPoolRows=await sheetsGet('WebsiteReviewPool!A2:E');
+      const ri=allPoolRows.findIndex(r=>r[0]===projectId&&r[1]===page.url);
+      if(ri>=0)await sheetsUpdate('WebsiteReviewPool!E'+(ri+2),[[reviewDate]]);
+    }
+
+    runDiv.style.display='none';
+    btn.disabled=false;
+    btn.textContent='▶ Run today\'s review';
+    renderWebsiteReviewSection(projectId);
+    showToast('Review complete — '+page.label);
+
+  }catch(e){
+    runDiv.style.display='none';
+    btn.disabled=false;
+    btn.textContent='▶ Run today\'s review';
+    showToast('Error: '+e.message,'err');
+  }
+}
+
+async function manageReviewPool(){
+  const projectId=S.activeProject;
+  const pool=(S.websiteReviewPool||[]).filter(p=>p.projectId===projectId).sort((a,b)=>a.label.localeCompare(b.label));
+  // Simple list in a confirm-style display for now
+  const labels=pool.map((p,i)=>`${i+1}. [${p.type.toUpperCase()}] ${p.label} — last reviewed: ${p.lastReviewedDate||'never'}`).join('\n');
+  alert(`Review Pool (${pool.length} pages):\n\n${labels}\n\nTo add or remove pages, edit the WebsiteReviewPool sheet tab directly.`);
+}
 function getCoreChecklist(){
   if(S.wineReleaseChecklist&&S.wineReleaseChecklist.length)
     return [...S.wineReleaseChecklist].sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
@@ -7663,7 +7959,7 @@ function renderWineReleaseList(projectId){
     const wineDiv=document.createElement('div');
     wineDiv.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;';
     const header=document.createElement('div');
-    header.style.cssText=`padding:14px 16px;background:${headerBg};color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;transition:background .4s;position:sticky;top:0;z-index:10;border-radius:10px 10px 0 0;`;
+    header.style.cssText=`padding:14px 16px;background:${headerBg};color:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;transition:background .4s;position:sticky;top:0;z-index:10;border-radius:10px 10px 0 0;box-shadow:0 2px 8px rgba(0,0,0,0.18);`;
     header.onclick=()=>{
       if(openWines.has(wine.id))openWines.delete(wine.id);else openWines.add(wine.id);
       el._openWines=openWines;
@@ -7740,7 +8036,7 @@ function renderWineReleaseList(projectId){
         // Part header (if exists)
         if(part.header){
           const hdrRow=document.createElement('div');
-          hdrRow.style.cssText=`padding:8px 16px;background:var(--cream);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;`;
+          hdrRow.style.cssText=`padding:8px 16px;background:var(--cream);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;position:sticky;top:0;z-index:9;`;
           const doneCount=part.tasks.filter(({item})=>item.done).length;
           hdrRow.innerHTML=`
             <div>
@@ -7782,7 +8078,7 @@ function renderWineReleaseList(projectId){
           const hasDue=!!item.dueDate;
           const dueIsOverdue=hasDue&&item.dueDate<today()&&!item.done;
           const dueIsToday=hasDue&&item.dueDate===today()&&!item.done;
-          row.style.cssText=`padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:flex-start;gap:12px;${item.done?'opacity:.55;':''}`;
+          row.style.cssText=`padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:flex-start;gap:12px;background:white;${item.done?'opacity:.55;':''}`;
           row.innerHTML=`
             <div style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr-s);display:flex;align-items:center;justify-content:center;cursor:pointer;background:${item.done?'var(--s-tx)':'white'};color:white;font-size:10px;flex-shrink:0;margin-top:2px;" onclick="toggleWineReleaseItem('${item.id}')">${item.done?'✓':''}</div>
             <div style="flex:1;min-width:0;">
@@ -8773,6 +9069,7 @@ function renderProjects(){
     {key:'WineRelease',label:'🍷 Wine Release'},
     {key:'CustomerContact',label:'📞 Customer Contact'},
     {key:'PreOrder',label:'🛒 Pre-Order'},
+    {key:'WebsiteReview',label:'🌐 Website Review'},
   ];
 
   // Single grid for all active projects
@@ -8818,10 +9115,12 @@ function buildProjectCard(p,colorIdx,isArchived=false){
   const isPO=p.type==='PreOrder';
   const isWR=p.type==='WineRelease';
   const isCC=p.type==='CustomerContact';
+  const isWebR=p.type==='WebsiteReview';
   const invEntries=isInv?S.inventoryEntries.filter(e=>e.projectId===p.id):[];
   const poContacts=isPO?S.projectContacts.filter(c=>c.projectId===p.id):[];
   const wrWines=isWR?(S.wineReleaseWines||[]).filter(w=>w.projectId===p.id):[];
   const ccContacts=isCC?(S.projectContacts||[]).filter(c=>c.projectId===p.id):[];
+  const webReviews=isWebR?(S.websiteReviews||[]).filter(r=>r.projectId===p.id):[];
   const m=TEAM[p.assignee]||(p.assignee===-1?null:null);
   let pct=0,doneCount=0,totalCount=0;
   if(isInv){totalCount=invEntries.length;doneCount=invEntries.filter(e=>e.availableForSale!==null).length;}
@@ -8830,17 +9129,19 @@ function buildProjectCard(p,colorIdx,isArchived=false){
   else if(isCC){totalCount=ccContacts.length;doneCount=ccContacts.filter(c=>c.completionType&&c.completionType!=='').length;}
   else{totalCount=contacts.length;doneCount=contacts.filter(c=>c.done).length;}
   pct=totalCount>0?Math.round(doneCount/totalCount*100):0;
-  const pie=totalCount>0?pieChartSVG(pct,col.accent,44):'';
+  const pie=(!isWebR&&totalCount>0)?pieChartSVG(pct,col.accent,44):'';
   const typeTag=isInv
     ?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">📦 Inventory</span>`
     :isPO?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">🛒 PreOrder</span>`
     :isWR?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">🍷 Wine Release</span>`
-    :isCC?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">📞 Customer Contact</span>`:'';
+    :isCC?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">📞 Customer Contact</span>`
+    :isWebR?`<span style="background:${col.border};color:${col.text};border-radius:8px;padding:1px 7px;font-size:10px;margin-left:6px;">🌐 Website Review</span>`:'';
   const statsHtml=isInv
     ?`${invEntries.length} wine${invEntries.length!==1?'s':''}`
     :isPO?`${poContacts.length} customer${poContacts.length!==1?'s':''}`
     :isWR?`${wrWines.length} wine${wrWines.length!==1?'s':''} · ${doneCount}/${totalCount} tasks`
     :isCC?`${ccContacts.length} contact${ccContacts.length!==1?'s':''} · ${doneCount} resolved`
+    :isWebR?`${webReviews.length} review${webReviews.length!==1?'s':''} completed`
     :`${contacts.length} item${contacts.length!==1?'s':''}`;
   const div=document.createElement('div');
   div.style.cssText=`background:${col.bg};border:1px solid ${col.border};border-radius:12px;padding:16px 18px;cursor:pointer;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;gap:10px;${isArchived?'opacity:.65;':''}`;
@@ -8887,17 +9188,20 @@ function showInventoryOrStandard(p){
   const isPO=p.type==='PreOrder';
   const isWR=p.type==='WineRelease';
   const isCC=p.type==='CustomerContact';
-  document.getElementById('pj-standard-section').style.display=(!isInv&&!isPO&&!isWR&&!isCC)?'':'none';
+  const isWebR=p.type==='WebsiteReview';
+  document.getElementById('pj-standard-section').style.display=(!isInv&&!isPO&&!isWR&&!isCC&&!isWebR)?'':'none';
   document.getElementById('pj-inventory-section').style.display=isInv?'':'none';
   document.getElementById('pj-preorder-section').style.display=isPO?'':'none';
   document.getElementById('pj-winerelease-section').style.display=isWR?'':'none';
   document.getElementById('pj-customercontact-section').style.display=isCC?'':'none';
+  document.getElementById('pj-websitereview-section').style.display=isWebR?'':'none';
   const pbiPanel=document.getElementById('pj-powerbi-panel');
   if(pbiPanel)pbiPanel.style.display=isInv?'':'none';
   if(isInv)renderInventoryList(p.id);
   else if(isPO)renderPreOrderList(p.id);
   else if(isWR)renderWineReleaseList(p.id);
   else if(isCC)renderCustomerContactList(p.id);
+  else if(isWebR)renderWebsiteReviewSection(p.id);
   else renderProjectContacts(p.id);
 }
 
