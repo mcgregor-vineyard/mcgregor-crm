@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.288</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.289</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7472,13 +7472,14 @@ async function runWebsiteReview(){
         }
       }catch(e){pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Error: ${e.message})`;}
     } else {
-      // Fetch static page directly (site is public, no auth needed)
+      // Fetch static page via proxy (CORS requires server-side fetch)
       progressEl.textContent='Fetching page content...';
       try{
-        const resp=await fetch(page.url,{headers:{'User-Agent':'McGregorConnect/1.0'}});
+        const proxyUrl=CONFIG.C7_WORKER_URL.replace(/\?url=.*$/,'').replace(/\/$/,'');
+        const resp=await fetch(`${proxyUrl}/fetch-page?url=${encodeURIComponent(page.url)}`);
         if(resp.ok){
           const html=await resp.text();
-          // Strip HTML tags and collapse whitespace for readable content
+          // Strip tags and collapse whitespace for readable content
           const txt=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'')
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'')
             .replace(/<[^>]+>/g,' ')
