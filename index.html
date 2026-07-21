@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.290</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.294</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7355,18 +7355,25 @@ async function renderWebsiteReviewSection(projectId){
     const issues=review.issues?review.issues.split('||').filter(Boolean):[];
     const actions=review.actionItems?review.actionItems.split('||').filter(Boolean):[];
     const typeIcon=review.pageType==='product'?'🍷':review.pageType==='collection'?'🗂':'📄';
+    const notes=review.actionItems||'';
     card.innerHTML=`
       <div style="padding:14px 16px;background:var(--cream);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <div>
           <div style="font-size:13px;font-weight:600;">${typeIcon} ${review.pageLabel}</div>
           <div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${review.reviewDate} · <a href="${review.pageUrl}" target="_blank" style="color:var(--burg);text-decoration:none;">${review.pageUrl}</a></div>
         </div>
-        <span style="font-size:11px;background:${issues.length?'#FEF3C7':'#DCFCE7'};color:${issues.length?'#92400E':'#166534'};border-radius:20px;padding:3px 10px;flex-shrink:0;">${issues.length?issues.length+' issue'+(issues.length!==1?'s':''):'✓ No issues'}</span>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <a href="${review.pageUrl}" target="_blank" class="btn" style="font-size:11px;">↗ Open page</a>
+          <button onclick="deleteWebsiteReview('${review.id}')" class="btn" style="font-size:11px;color:var(--d-tx);">✕</button>
+        </div>
       </div>
       <div style="padding:14px 16px;">
-        <div style="font-size:13px;color:var(--ink);line-height:1.6;margin-bottom:${issues.length||actions.length?'12px':'0'}">${review.summary}</div>
-        ${issues.length?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--w-tx);margin-bottom:6px;">⚠ Issues found</div>${issues.map(i=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--bdr);color:var(--ink);">• ${i}</div>`).join('')}</div>`:''}
-        ${actions.length?`<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--burg);margin-bottom:6px;">✏ Action items</div>${actions.map(a=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--bdr);color:var(--ink);">→ ${a}</div>`).join('')}</div>`:''}
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-m);margin-bottom:8px;">Page content snapshot</div>
+        <div style="font-size:12px;color:var(--ink);line-height:1.7;white-space:pre-wrap;max-height:300px;overflow-y:auto;background:var(--cream);border-radius:6px;padding:10px 12px;border:1px solid var(--bdr);">${review.summary||'(No content captured)'}</div>
+        <div style="margin-top:12px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--burg);margin-bottom:6px;">✏ Your notes</div>
+          <textarea style="width:100%;font-size:12px;border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;font-family:inherit;line-height:1.5;resize:vertical;min-height:60px;" placeholder="Add your observations, issues found, action items..." onblur="saveReviewNotes('${review.id}',this.value)">${notes}</textarea>
+        </div>
       </div>`;
     reviewsList.appendChild(card);
   });
@@ -7494,57 +7501,16 @@ async function runWebsiteReview(){
       }catch(e){pageContent=`Page: ${page.label}\nURL: ${page.url}\n(Could not fetch: ${e.message})`;}
     }
 
-    // Send to Claude API for review
-    progressEl.textContent='Analyzing with AI...';
-    const prompt=`You are reviewing a page on McGregor Vineyard's website (mcgregorwinery.com), a family-owned estate winery on Keuka Lake in the Finger Lakes region of New York, founded in 1971.
-
-PAGE: ${page.label}
-URL: ${page.url}
-TYPE: ${page.type}
-
-CONTENT:
-${pageContent.slice(0,6000)}
-
-Please review this page and respond ONLY with a valid JSON object (no markdown, no explanation) in this exact format:
-{
-  "summary": "2-3 sentence overall assessment of the page",
-  "issues": ["issue 1", "issue 2"],
-  "actionItems": ["action 1", "action 2"]
-}
-
-Review for:
-- Copy quality: typos, grammatical errors, unclear language
-- Outdated information: old dates, sold-out wines still featured prominently, expired promotions
-- Missing information: things a visitor would expect to find
-- SEO: meta description quality, keyword relevance
-- Brand consistency: tone, messaging alignment with a premium Finger Lakes winery
-- For products/collections: accuracy of descriptions, pricing visibility, availability status
-
-Keep issues and action items concrete and specific. If the page looks good, return empty arrays for issues and actionItems.`;
-
-    const apiResp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
-    });
-    const apiData=await apiResp.json();
-    const rawText=(apiData.content||[]).map(c=>c.text||'').join('').trim();
-    let parsed={summary:'Review complete.',issues:[],actionItems:[]};
-    try{
-      const clean=rawText.replace(/```json|```/g,'').trim();
-      parsed=JSON.parse(clean);
-    }catch(e){parsed.summary=rawText.slice(0,500);}
-
-    // Save review
+    // Save review with raw content — no AI analysis
     progressEl.textContent='Saving review...';
     const reviewId=uid();
     const reviewDate=today();
     const review={
       id:reviewId,projectId,reviewDate,
       pageLabel:page.label,pageUrl:page.url,pageType:page.type,
-      summary:parsed.summary||'',
-      issues:(parsed.issues||[]).join('||'),
-      actionItems:(parsed.actionItems||[]).join('||'),
+      summary:pageContent.slice(0,4000),
+      issues:'',
+      actionItems:'',
       reviewedBy:TEAM[S.cu]?.name||''
     };
     await sheetsAppend('WebsiteReviews!A:J',[[reviewId,projectId,reviewDate,page.label,page.url,page.type,review.summary,review.issues,review.actionItems,review.reviewedBy]]);
@@ -7573,10 +7539,33 @@ Keep issues and action items concrete and specific. If the page looks good, retu
   }
 }
 
+async function saveReviewNotes(reviewId,notes){
+  const review=(S.websiteReviews||[]).find(r=>r.id===reviewId);if(!review)return;
+  review.actionItems=notes;
+  try{
+    const allRows=await sheetsGet('WebsiteReviews!A2:J');
+    const ri=allRows.findIndex(r=>r[0]===reviewId);
+    if(ri>=0)await sheetsUpdate('WebsiteReviews!I'+(ri+2),[[notes]]);
+    showToast('Notes saved');
+  }catch(e){showToast('Error saving notes','err');}
+}
+
+async function deleteWebsiteReview(reviewId){
+  if(!confirm('Delete this review?'))return;
+  try{
+    const allRows=await sheetsGet('WebsiteReviews!A2:J');
+    const ri=allRows.findIndex(r=>r[0]===reviewId);
+    if(ri>=0)await sheetsUpdate('WebsiteReviews!A'+(ri+2)+':J'+(ri+2),[['','','','','','','','','','']]);
+    S.websiteReviews=S.websiteReviews.filter(r=>r.id!==reviewId);
+    renderWebsiteReviewSection(S.activeProject);
+    showToast('Review deleted');
+  }catch(e){showToast('Error deleting review','err');}
+}
+
+
 async function manageReviewPool(){
   const projectId=S.activeProject;
   const pool=(S.websiteReviewPool||[]).filter(p=>p.projectId===projectId).sort((a,b)=>a.label.localeCompare(b.label));
-  // Simple list in a confirm-style display for now
   const labels=pool.map((p,i)=>`${i+1}. [${p.type.toUpperCase()}] ${p.label} — last reviewed: ${p.lastReviewedDate||'never'}`).join('\n');
   alert(`Review Pool (${pool.length} pages):\n\n${labels}\n\nTo add or remove pages, edit the WebsiteReviewPool sheet tab directly.`);
 }
