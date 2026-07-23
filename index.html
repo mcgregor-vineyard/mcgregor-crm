@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.300</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.303</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -599,8 +599,13 @@ select.fi{cursor:pointer;}
                 <div id="pj-wr-reviews-list"></div>
               </div>
             </div>
-            <!-- Right: notes + Power BI (Inventory only) -->
+            <!-- Right: notes + Power BI (Inventory only) + action items (WebsiteReview only) -->
             <div>
+              <!-- Website Review consolidated action items panel -->
+              <div id="pj-wr-actions-panel" style="display:none;margin-bottom:20px;">
+                <div style="font-weight:600;font-size:14px;margin-bottom:10px;">All action items</div>
+                <div id="pj-wr-actions-panel-list"></div>
+              </div>
               <div style="font-weight:600;font-size:14px;margin-bottom:10px;">Notes</div>
               <div id="pj-notes-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
               <textarea class="fi" id="pj-new-note" rows="3" placeholder="Add a note..."></textarea>
@@ -7479,6 +7484,9 @@ async function renderWebsiteReviewSection(projectId){
       </div>`;
   }
 
+  // Render consolidated action items panel
+  renderWrActionsPanel(projectId);
+
   // Render past reviews
   const reviews=allReviews.sort((a,b)=>b.reviewDate.localeCompare(a.reviewDate));
   reviewsList.innerHTML='';
@@ -7489,56 +7497,107 @@ async function renderWebsiteReviewSection(projectId){
   reviews.forEach(review=>{
     const card=document.createElement('div');
     card.style.cssText='background:white;border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;overflow:hidden;';
-    const issues=review.issues?review.issues.split('||').filter(Boolean):[];
     const actions=review.actionItems?review.actionItems.split('||').filter(Boolean):[];
+    const doneActions=review.issues?review.issues.split('||').filter(Boolean):[];// reuse issues col for done items
     const typeIcon=review.pageType==='product'?'🍷':review.pageType==='collection'?'🗂':'📄';
-    const notes=review.actionItems||'';
     const thumbUrl=`https://s.wordpress.com/mshots/v1/${encodeURIComponent(review.pageUrl)}?w=600&h=400`;
-    // Parse structured snapshot into SEO block and body
     const content=review.summary||'';
     const seoRaw=content.includes('=== SEO & META DATA ===')?content.split('=== PAGE CONTENT ===')[0].replace('=== SEO & META DATA ===','').trim():'';
     const bodyRaw=content.includes('=== PAGE CONTENT ===')?content.split('=== PAGE CONTENT ===')[1]?.trim():content;
     const seoLines=seoRaw?seoRaw.split('\n').filter(l=>l.trim()):[];
+    const isExpanded=!review.completed;
+    const bodyId='wr-body-'+review.id;
     card.innerHTML=`
-      <div style="padding:14px 16px;background:${review.completed?'#F0FDF4':'var(--cream)'};border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;">
-        <div style="width:22px;height:22px;border-radius:50%;border:2px solid ${review.completed?'var(--s-tx)':'var(--bdr-s)'};display:flex;align-items:center;justify-content:center;cursor:pointer;background:${review.completed?'var(--s-tx)':'white'};color:white;font-size:11px;flex-shrink:0;" onclick="toggleReviewComplete('${review.id}')">${review.completed?'✓':''}</div>
+      <div style="padding:14px 16px;background:${review.completed?'#F0FDF4':'var(--cream)'};border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="toggleReviewCard('${bodyId}')">
+        <div style="width:22px;height:22px;border-radius:50%;border:2px solid ${review.completed?'var(--s-tx)':'var(--bdr-s)'};display:flex;align-items:center;justify-content:center;cursor:pointer;background:${review.completed?'var(--s-tx)':'white'};color:white;font-size:11px;flex-shrink:0;" onclick="event.stopPropagation();toggleReviewComplete('${review.id}')">${review.completed?'✓':''}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;${review.completed?'text-decoration:line-through;color:var(--ink-m);':''}">${typeIcon} ${review.pageLabel}</div>
-          <div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${review.reviewDate}${review.reviewedBy?' · '+review.reviewedBy:''} · <a href="${review.pageUrl}" target="_blank" style="color:var(--burg);text-decoration:none;">${review.pageUrl}</a></div>
+          <div style="font-size:11px;color:var(--ink-m);margin-top:2px;">${review.reviewDate}${review.reviewedBy?' · '+review.reviewedBy:''} · <a href="${review.pageUrl}" target="_blank" style="color:var(--burg);text-decoration:none;" onclick="event.stopPropagation()">${review.pageUrl}</a>${actions.length?` · <span style="color:var(--burg);font-weight:600;">${actions.length} action item${actions.length!==1?'s':''}</span>`:''}</div>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0;">
+        <div style="display:flex;gap:6px;flex-shrink:0;" onclick="event.stopPropagation()">
           <a href="${review.pageUrl}" target="_blank" class="btn" style="font-size:11px;">↗ Open</a>
           <button onclick="deleteWebsiteReview('${review.id}')" class="btn" style="font-size:11px;color:var(--d-tx);">✕</button>
+          <span style="font-size:14px;color:var(--ink-m);padding:0 4px;">${isExpanded?'▲':'▼'}</span>
         </div>
       </div>
-      <div style="display:flex;gap:0;">
-        <div style="flex:0 0 220px;border-right:1px solid var(--bdr);overflow:hidden;background:#f5f5f5;min-height:140px;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+      <div id="${bodyId}" style="display:${isExpanded?'flex':'none'};gap:0;">
+        <div style="flex:0 0 200px;border-right:1px solid var(--bdr);overflow:hidden;background:#f5f5f5;min-height:120px;display:flex;align-items:center;justify-content:center;flex-direction:column;flex-shrink:0;">
           <img src="${thumbUrl}" alt="Page thumbnail" style="width:100%;height:auto;display:block;"
             onerror="this.parentElement.innerHTML='<div style=\\'padding:12px;text-align:center;color:var(--ink-m);font-size:11px;\\'>Preview unavailable</div>'" />
         </div>
-        <div style="flex:1;min-width:0;">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
           ${seoLines.length?`
-          <div style="padding:12px 16px;border-bottom:1px solid var(--bdr);background:#FAFAF8;">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--burg);margin-bottom:8px;">🔍 SEO & Meta</div>
-            <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;">
-              ${seoLines.map(l=>{
-                const [k,...rest]=l.split(': ');const v=rest.join(': ');
-                const missing=v==='(none)';
-                return `<span style="font-size:11px;color:var(--ink-m);white-space:nowrap;">${k}:</span><span style="font-size:11px;color:${missing?'var(--d-tx)':'var(--ink)'};font-style:${missing?'italic':'normal'};">${v}</span>`;
-              }).join('')}
+          <div style="padding:10px 14px;border-bottom:1px solid var(--bdr);background:#FAFAF8;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--burg);margin-bottom:6px;">🔍 SEO & Meta</div>
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;">
+              ${seoLines.map(l=>{const[k,...rest]=l.split(': ');const v=rest.join(': ');const missing=v==='(none)';return `<span style="font-size:11px;color:var(--ink-m);white-space:nowrap;">${k}:</span><span style="font-size:11px;color:${missing?'var(--d-tx)':'var(--ink)'};font-style:${missing?'italic':'normal'};">${v}</span>`;}).join('')}
             </div>
           </div>`:''}
-          <div style="padding:12px 16px;border-bottom:1px solid var(--bdr);">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-m);margin-bottom:6px;">Page content</div>
-            <div style="font-size:12px;color:var(--ink);line-height:1.7;white-space:pre-wrap;max-height:160px;overflow-y:auto;">${bodyRaw||'(No content captured)'}</div>
+          <div style="padding:10px 14px;border-bottom:1px solid var(--bdr);">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-m);margin-bottom:4px;">Page content</div>
+            <div style="font-size:12px;color:var(--ink);line-height:1.6;white-space:pre-wrap;max-height:140px;overflow-y:auto;">${bodyRaw||'(No content captured)'}</div>
           </div>
-          <div style="padding:12px 16px;">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--burg);margin-bottom:6px;">✏ Your notes</div>
-            <textarea style="width:100%;font-size:12px;border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;font-family:inherit;line-height:1.5;resize:vertical;min-height:56px;box-sizing:border-box;" placeholder="Observations, issues, action items..." onblur="saveReviewNotes('${review.id}',this.value)">${notes}</textarea>
+          <div style="padding:10px 14px;flex:1;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--burg);margin-bottom:8px;">✏ Action items</div>
+            <div id="wr-actions-${review.id}" style="margin-bottom:8px;">
+              ${actions.map((a,i)=>`
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr);">
+                  <div style="width:16px;height:16px;border-radius:3px;border:1.5px solid var(--bdr-s);cursor:pointer;background:white;flex-shrink:0;" onclick="checkReviewAction('${review.id}',${i})"></div>
+                  <span style="font-size:12px;flex:1;">${a}</span>
+                  <button onclick="removeReviewAction('${review.id}',${i})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-f);padding:0 2px;">✕</button>
+                </div>`).join('')}
+              ${doneActions.map(a=>`
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr);opacity:.5;">
+                  <div style="width:16px;height:16px;border-radius:3px;border:1.5px solid var(--s-tx);cursor:default;background:var(--s-tx);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:white;font-size:9px;">✓</span></div>
+                  <span style="font-size:12px;flex:1;text-decoration:line-through;color:var(--ink-m);">${a}</span>
+                </div>`).join('')}
+            </div>
+            <div style="display:flex;gap:6px;">
+              <input type="text" id="wr-new-action-${review.id}" placeholder="Add action item..." style="flex:1;font-size:12px;border:1px solid var(--bdr);border-radius:5px;padding:5px 8px;font-family:inherit;" onkeydown="if(event.key==='Enter')addReviewAction('${review.id}')" />
+              <button onclick="addReviewAction('${review.id}')" class="btn" style="font-size:12px;padding:5px 10px;">+ Add</button>
+            </div>
           </div>
         </div>
       </div>`;
     reviewsList.appendChild(card);
+  });
+}
+
+function renderWrActionsPanel(projectId){
+  const panel=document.getElementById('pj-wr-actions-panel-list');
+  if(!panel)return;
+  const reviews=(S.websiteReviews||[]).filter(r=>r.projectId===projectId);
+  // Gather all open action items across all reviews
+  const items=[];
+  reviews.forEach(review=>{
+    const actions=review.actionItems?review.actionItems.split('||').filter(Boolean):[];
+    actions.forEach((a,i)=>items.push({text:a,reviewId:review.id,pageLabel:review.pageLabel,idx:i,reviewCompleted:review.completed}));
+  });
+  panel.innerHTML='';
+  if(!items.length){
+    panel.innerHTML='<div style="font-size:12px;color:var(--ink-m);padding:8px 0;">No open action items yet.</div>';
+    return;
+  }
+  // Group by review
+  const byReview={};
+  items.forEach(item=>{
+    if(!byReview[item.reviewId])byReview[item.reviewId]=[];
+    byReview[item.reviewId].push(item);
+  });
+  Object.values(byReview).forEach(group=>{
+    const pageLabel=group[0].pageLabel;
+    const sec=document.createElement('div');
+    sec.style.cssText='margin-bottom:12px;';
+    sec.innerHTML=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-m);margin-bottom:5px;">${pageLabel}</div>`;
+    group.forEach(item=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr);';
+      row.innerHTML=`
+        <div style="width:15px;height:15px;border-radius:3px;border:1.5px solid var(--bdr-s);cursor:pointer;background:white;flex-shrink:0;margin-top:1px;" onclick="checkReviewAction('${item.reviewId}',${item.idx})"></div>
+        <span style="font-size:12px;flex:1;line-height:1.4;">${item.text}</span>`;
+      sec.appendChild(row);
+    });
+    panel.appendChild(sec);
   });
 }
 
@@ -7634,7 +7693,6 @@ async function runWebsiteReview(){
         }
       }catch(e){pageContent=`Product page: ${page.label}\nURL: ${page.url}\n(Error: ${e.message})`;}
     } else if(page.type==='collection'){
-      // Pull from C7 API
       progressEl.textContent='Fetching collection data from Commerce7...';
       try{
         const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
@@ -7649,7 +7707,23 @@ async function runWebsiteReview(){
           const wines=(coll.products||[]).map(p=>`- ${p.title} ($${p.price||'?'}) — ${p.available?'In stock':'Out of stock'}`).join('\n');
           pageContent=`COLLECTION: ${coll.title||page.label}\nDescription: ${(coll.description||'No description').replace(/<[^>]+>/g,' ')}\nProducts (${(coll.products||[]).length}):\n${wines}`;
         } else {
-          pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Collection data unavailable — HTTP ${resp.status})`;
+          // Fall back to fetching the static page HTML
+          progressEl.textContent='Fetching page content...';
+          const workerBase=(()=>{try{const u=new URL(CONFIG.C7_WORKER_URL);return u.origin;}catch(e){return 'https://mcgregor-c7-proxy.dan-f74.workers.dev';}})();
+          const htmlResp=await fetch(`${workerBase}/fetch-page?url=${encodeURIComponent(page.url)}`);
+          if(htmlResp.ok){
+            const html=await htmlResp.text();
+            const getMeta=(attr,val)=>{const re=new RegExp(`<meta[^>]+${attr}=["']${val}["'][^>]*>`,'i');const tag=html.match(re)?.[0]||'';const m=tag.match(/content=["']([^"']*)/i);return m?m[1].trim():'';};
+            const getTag=(re)=>{const m=html.match(re);return m?m[1].trim():'';};
+            const title=getTag(/<title[^>]*>([^<]+)<\/title>/i);
+            const metaDesc=getMeta('name','description');
+            const ogDesc=getMeta('property','og:description');
+            const h1s=[...html.matchAll(/<h1[^>]*>([^<]+)<\/h1>/gi)].map(m=>m[1].trim()).filter(Boolean);
+            const bodyText=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'').replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,3000);
+            pageContent=['=== SEO & META DATA ===',`Page Title: ${title||'(none)'}`,`Meta Description: ${metaDesc||'(none)'}`,`OG Description: ${ogDesc||'(none)'}`,`H1 Tags: ${h1s.join(' | ')||'(none)'}`,`Canonical URL: ${page.url}`,'','=== PAGE CONTENT ===',bodyText].join('\n');
+          } else {
+            pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Could not fetch — HTTP ${htmlResp.status})`;
+          }
         }
       }catch(e){pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Error: ${e.message})`;}
     } else {
@@ -7766,15 +7840,63 @@ async function toggleReviewComplete(reviewId){
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
-async function saveReviewNotes(reviewId,notes){
+function toggleReviewCard(bodyId){
+  const el=document.getElementById(bodyId);
+  if(!el)return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'flex';
+  // Update chevron in header
+  const header=el.previousElementSibling;
+  if(header){const ch=header.querySelector('span:last-child');if(ch&&(ch.textContent==='▲'||ch.textContent==='▼'))ch.textContent=open?'▼':'▲';}
+}
+
+async function addReviewAction(reviewId){
+  const input=document.getElementById('wr-new-action-'+reviewId);
+  if(!input)return;
+  const text=input.value.trim();
+  if(!text)return;
   const review=(S.websiteReviews||[]).find(r=>r.id===reviewId);if(!review)return;
-  review.actionItems=notes;
+  const actions=review.actionItems?review.actionItems.split('||').filter(Boolean):[];
+  actions.push(text);
+  review.actionItems=actions.join('||');
+  input.value='';
   try{
     const allRows=await sheetsGet('WebsiteReviews!A2:K');
     const ri=allRows.findIndex(r=>r[0]===reviewId);
-    if(ri>=0)await sheetsUpdate('WebsiteReviews!I'+(ri+2),[[notes]]);
-    showToast('Notes saved');
-  }catch(e){showToast('Error saving notes','err');}
+    if(ri>=0)await sheetsUpdate('WebsiteReviews!I'+(ri+2),[[review.actionItems]]);
+    renderWebsiteReviewSection(S.activeProject);
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+async function checkReviewAction(reviewId,idx){
+  const review=(S.websiteReviews||[]).find(r=>r.id===reviewId);if(!review)return;
+  const actions=review.actionItems?review.actionItems.split('||').filter(Boolean):[];
+  const doneActions=review.issues?review.issues.split('||').filter(Boolean):[];
+  const item=actions[idx];if(!item)return;
+  // Move from actions to done
+  actions.splice(idx,1);
+  doneActions.push(item);
+  review.actionItems=actions.join('||');
+  review.issues=doneActions.join('||');
+  try{
+    const allRows=await sheetsGet('WebsiteReviews!A2:K');
+    const ri=allRows.findIndex(r=>r[0]===reviewId);
+    if(ri>=0)await sheetsUpdate('WebsiteReviews!H'+(ri+2)+':I'+(ri+2),[[review.issues,review.actionItems]]);
+    renderWebsiteReviewSection(S.activeProject);
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+async function removeReviewAction(reviewId,idx){
+  const review=(S.websiteReviews||[]).find(r=>r.id===reviewId);if(!review)return;
+  const actions=review.actionItems?review.actionItems.split('||').filter(Boolean):[];
+  actions.splice(idx,1);
+  review.actionItems=actions.join('||');
+  try{
+    const allRows=await sheetsGet('WebsiteReviews!A2:K');
+    const ri=allRows.findIndex(r=>r[0]===reviewId);
+    if(ri>=0)await sheetsUpdate('WebsiteReviews!I'+(ri+2),[[review.actionItems]]);
+    renderWebsiteReviewSection(S.activeProject);
+  }catch(e){showToast('Error: '+e.message,'err');}
 }
 
 async function deleteWebsiteReview(reviewId){
@@ -9445,6 +9567,8 @@ function showInventoryOrStandard(p){
   document.getElementById('pj-websitereview-section').style.display=isWebR?'':'none';
   const pbiPanel=document.getElementById('pj-powerbi-panel');
   if(pbiPanel)pbiPanel.style.display=isInv?'':'none';
+  const wrActionsPanel=document.getElementById('pj-wr-actions-panel');
+  if(wrActionsPanel)wrActionsPanel.style.display=isWebR?'':'none';
   if(isInv)renderInventoryList(p.id);
   else if(isPO)renderPreOrderList(p.id);
   else if(isWR)renderWineReleaseList(p.id);
