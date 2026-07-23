@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.304</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.305</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7689,9 +7689,9 @@ async function runWebsiteReview(){
           const variants=(data.variants||[]).map(v=>`  - ${v.sku||''}: $${v.price||'?'} ${v.available?'(In stock)':'(Out of stock)'}`).join('\n');
           pageContent=`PRODUCT: ${data.title||page.label}\nDescription: ${(data.description||'').replace(/<[^>]+>/g,' ')}\nVintage: ${data.vintage||''}\nVarietal: ${data.type||''}\nAppellation: ${data.appellation||''}\nAlcohol: ${data.alcohol||''}\nTasting Notes: ${(data.tastingNotes||'').replace(/<[^>]+>/g,' ')}\nFood Pairing: ${(data.foodPairing||'').replace(/<[^>]+>/g,' ')}\nVariants/Pricing:\n${variants}`;
         } else {
-          pageContent=`Product page: ${page.label}\nURL: ${page.url}\n(Product data unavailable — HTTP ${resp.status})`;
+          pageContent=`Product data unavailable (HTTP ${resp.status})\nURL: ${page.url}`;
         }
-      }catch(e){pageContent=`Product page: ${page.label}\nURL: ${page.url}\n(Error: ${e.message})`;}
+      }catch(e){pageContent=`Error fetching product: ${e.message}\nURL: ${page.url}`;}
     } else if(page.type==='collection'){
       progressEl.textContent='Fetching collection data from Commerce7...';
       try{
@@ -7722,10 +7722,10 @@ async function runWebsiteReview(){
             const bodyText=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'').replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,3000);
             pageContent=['=== SEO & META DATA ===',`Page Title: ${title||'(none)'}`,`Meta Description: ${metaDesc||'(none)'}`,`OG Description: ${ogDesc||'(none)'}`,`H1 Tags: ${h1s.join(' | ')||'(none)'}`,`Canonical URL: ${page.url}`,'','=== PAGE CONTENT ===',bodyText].join('\n');
           } else {
-            pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Could not fetch — HTTP ${htmlResp.status})`;
+            pageContent=`Could not fetch — HTTP ${htmlResp.status}\nURL: ${page.url}`;
           }
         }
-      }catch(e){pageContent=`Collection: ${page.label}\nURL: ${page.url}\n(Error: ${e.message})`;}
+      }catch(e){pageContent=`Error fetching page: ${e.message}\nURL: ${page.url}`;}
     } else {
       // Fetch static page via proxy (CORS requires server-side fetch)
       progressEl.textContent='Fetching page content...';
