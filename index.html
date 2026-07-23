@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.303</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.304</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7517,7 +7517,7 @@ async function renderWebsiteReviewSection(projectId){
         <div style="display:flex;gap:6px;flex-shrink:0;" onclick="event.stopPropagation()">
           <a href="${review.pageUrl}" target="_blank" class="btn" style="font-size:11px;">↗ Open</a>
           <button onclick="deleteWebsiteReview('${review.id}')" class="btn" style="font-size:11px;color:var(--d-tx);">✕</button>
-          <span style="font-size:14px;color:var(--ink-m);padding:0 4px;">${isExpanded?'▲':'▼'}</span>
+          <span data-chevron style="font-size:14px;color:var(--ink-m);padding:0 4px;">${isExpanded?'▲':'▼'}</span>
         </div>
       </div>
       <div id="${bodyId}" style="display:${isExpanded?'flex':'none'};gap:0;">
@@ -7843,11 +7843,10 @@ async function toggleReviewComplete(reviewId){
 function toggleReviewCard(bodyId){
   const el=document.getElementById(bodyId);
   if(!el)return;
-  const open=el.style.display!=='none';
+  const open=el.style.display!=='none'&&el.style.display!=='';
   el.style.display=open?'none':'flex';
-  // Update chevron in header
   const header=el.previousElementSibling;
-  if(header){const ch=header.querySelector('span:last-child');if(ch&&(ch.textContent==='▲'||ch.textContent==='▼'))ch.textContent=open?'▼':'▲';}
+  if(header){const ch=header.querySelector('[data-chevron]');if(ch)ch.textContent=open?'▼':'▲';}
 }
 
 async function addReviewAction(reviewId){
