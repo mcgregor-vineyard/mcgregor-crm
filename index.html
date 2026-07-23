@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.305</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.306</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7500,7 +7500,7 @@ async function renderWebsiteReviewSection(projectId){
     const actions=review.actionItems?review.actionItems.split('||').filter(Boolean):[];
     const doneActions=review.issues?review.issues.split('||').filter(Boolean):[];// reuse issues col for done items
     const typeIcon=review.pageType==='product'?'🍷':review.pageType==='collection'?'🗂':'📄';
-    const thumbUrl=`https://s.wordpress.com/mshots/v1/${encodeURIComponent(review.pageUrl)}?w=600&h=400`;
+    const thumbUrl=`https://api.microlink.io?url=${encodeURIComponent(review.pageUrl)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=1200&viewport.height=800`;
     const content=review.summary||'';
     const seoRaw=content.includes('=== SEO & META DATA ===')?content.split('=== PAGE CONTENT ===')[0].replace('=== SEO & META DATA ===','').trim():'';
     const bodyRaw=content.includes('=== PAGE CONTENT ===')?content.split('=== PAGE CONTENT ===')[1]?.trim():content;
