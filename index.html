@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.298</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.300</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -1926,6 +1926,10 @@ select.fi{cursor:pointer;}
           <option value="order">Order notes</option>
           <option value="outreach">Outreach</option>
           <option value="club">Club comms</option>
+          <option value="winerelease">Wine release tasks</option>
+          <option value="websitereview">Website reviews</option>
+          <option value="inventory">Inventory</option>
+          <option value="customercontact">Customer contact</option>
         </select>
         <select id="activity-rep-filter" class="fi" style="width:auto;font-size:12px;padding:4px 8px;" onchange="renderActivityLog()">
           <option value="all">All reps</option>
@@ -5470,6 +5474,94 @@ function renderActivityLog(){
     });
   }
 
+  // Wine release task completions
+  if(typeFilter==='all'||typeFilter==='winerelease'){
+    (S.wineReleaseItems||[]).filter(i=>i.done&&i.completedAt).forEach(i=>{
+      if(repFilter!=='all'){const idx=TEAM.findIndex(t=>t.name===i.completedBy);if(String(idx)!==repFilter)return;}
+      const wine=(S.wineReleaseWines||[]).find(w=>w.id===i.wineId);
+      const proj=(S.projects||[]).find(p=>p.id===i.projectId);
+      events.push({
+        ts:i.completedAt||'',
+        type:'winerelease',
+        icon:'🍷',
+        color:'var(--burg-f)',
+        colorTx:'var(--burg)',
+        label:'Wine task done',
+        title:i.task,
+        detail:(wine?wine.wineName:'')+(proj?' · '+proj.name:''),
+        sub:'',
+        author:TEAM.findIndex(t=>t.name===i.completedBy),
+        ref:i.wineId,
+        refType:'winerelease'
+      });
+    });
+  }
+
+  // Website review checkoffs
+  if(typeFilter==='all'||typeFilter==='websitereview'){
+    (S.websiteReviews||[]).filter(r=>r.completed).forEach(r=>{
+      if(repFilter!=='all'&&String(TEAM.findIndex(t=>t.name===r.reviewedBy))!==repFilter)return;
+      events.push({
+        ts:r.reviewDate||'',
+        type:'websitereview',
+        icon:'🌐',
+        color:'#EFF6FF',
+        colorTx:'#1E40AF',
+        label:'Page reviewed',
+        title:r.pageLabel,
+        detail:r.pageUrl,
+        sub:'',
+        author:TEAM.findIndex(t=>t.name===r.reviewedBy),
+        ref:r.id,
+        refType:'websitereview'
+      });
+    });
+  }
+
+  // Inventory items marked available
+  if(typeFilter==='all'||typeFilter==='inventory'){
+    (S.inventoryEntries||[]).filter(e=>e.availableForSale!==null&&e.availableForSale!==undefined&&e.availableForSale!=='').forEach(e=>{
+      if(repFilter!=='all'&&String(e.assignee)!==repFilter)return;
+      const proj=(S.projects||[]).find(p=>p.id===e.projectId);
+      events.push({
+        ts:e.updatedAt||e.createdAt||'',
+        type:'inventory',
+        icon:'📦',
+        color:'var(--d-bg)',
+        colorTx:'var(--d-tx)',
+        label:'Inventory updated',
+        title:e.wineName||e.sku||'Wine',
+        detail:'Available for sale: '+e.availableForSale+(proj?' · '+proj.name:''),
+        sub:'',
+        author:parseInt(e.assignee)||0,
+        ref:e.projectId,
+        refType:'inventory'
+      });
+    });
+  }
+
+  // Customer contact log
+  if(typeFilter==='all'||typeFilter==='customercontact'){
+    (S.customerContactLog||[]).forEach(log=>{
+      if(repFilter!=='all'&&String(log.author)!==repFilter)return;
+      const proj=(S.projects||[]).find(p=>p.id===log.projectId);
+      events.push({
+        ts:log.createdAt||'',
+        type:'customercontact',
+        icon:'📞',
+        color:'var(--i-bg)',
+        colorTx:'var(--i-tx)',
+        label:'Customer contact',
+        title:proj?proj.name:'Customer contact',
+        detail:(log.method?log.method+' · ':'')+log.outcome+(log.notes?' · "'+log.notes+'"':''),
+        sub:'',
+        author:log.author,
+        ref:log.projectId,
+        refType:'customercontact'
+      });
+    });
+  }
+
   // Sort newest first — no reminders
   events.sort((a,b)=>b.ts.localeCompare(a.ts));
 
@@ -7485,7 +7577,7 @@ async function syncReviewPool(projectId){
 
   // Fetch C7 products and add them
   try{
-    const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_SECRET);
+    const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
     const c7url='https://api.commerce7.com/v1/product?pageSize=200';
     const prodResp=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(c7url),{
       headers:{'Authorization':'Basic '+auth,'tenant':CONFIG.C7_TENANT,'Content-Type':'application/json'}
@@ -7527,7 +7619,7 @@ async function runWebsiteReview(){
       // Pull from C7 API
       progressEl.textContent='Fetching product data from Commerce7...';
       try{
-        const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_SECRET);
+        const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
         const slug=page.url.split('/product/')[1]?.replace(/\//g,'');
         const c7url=`https://api.commerce7.com/v1/product/${slug}`;
         const resp=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(c7url),{
@@ -7545,7 +7637,7 @@ async function runWebsiteReview(){
       // Pull from C7 API
       progressEl.textContent='Fetching collection data from Commerce7...';
       try{
-        const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_SECRET);
+        const auth=btoa(CONFIG.C7_APP_ID+':'+CONFIG.C7_APP_SECRET);
         const collSlug=page.url.split('/collection/')[1]?.replace(/\//g,'');
         const c7url=`https://api.commerce7.com/v1/collection?slug=${collSlug}`;
         const resp=await fetch(CONFIG.C7_WORKER_URL+'?url='+encodeURIComponent(c7url),{
@@ -7569,21 +7661,29 @@ async function runWebsiteReview(){
         const resp=await fetch(fetchUrl);
         if(resp.ok){
           const html=await resp.text();
-          // Extract SEO / meta data
-          const getTag=(pattern)=>{const m=html.match(pattern);return m?m[1].trim():'';};
-          const title=getTag(/<title[^>]*>([^<]*)<\/title>/i);
-          const metaDesc=getTag(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)/i)||getTag(/<meta[^>]+content=["']([^"']*)[^>]+name=["']description["']/i);
-          const ogTitle=getTag(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)/i)||getTag(/<meta[^>]+content=["']([^"']*)[^>]+property=["']og:title["']/i);
-          const ogDesc=getTag(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)/i)||getTag(/<meta[^>]+content=["']([^"']*)[^>]+property=["']og:description["']/i);
-          const ogImage=getTag(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']*)/i)||getTag(/<meta[^>]+content=["']([^"']*)[^>]+property=["']og:image["']/i);
-          const canonical=getTag(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']*)/i)||getTag(/<link[^>]+href=["']([^"']*)[^>]+rel=["']canonical["']/i);
-          const h1s=[...html.matchAll(/<h1[^>]*>([^<]*)<\/h1>/gi)].map(m=>m[1].trim()).filter(Boolean);
-          const h2s=[...html.matchAll(/<h2[^>]*>([^<]*)<\/h2>/gi)].map(m=>m[1].trim()).filter(Boolean).slice(0,8);
+          // Robust meta extractor — handles any attribute order
+          const getMeta=(attr,val)=>{
+            const re=new RegExp(`<meta[^>]+${attr}=["']${val}["'][^>]*>|<meta[^>]*>[^<]*${val}[^<]*<\/meta>`,'i');
+            const tag=html.match(re)?.[0]||'';
+            const m=tag.match(/content=["']([^"']*)/i);
+            return m?m[1].trim():'';
+          };
+          const getTag=(re)=>{const m=html.match(re);return m?m[1].trim():'';};
+          const title=getTag(/<title[^>]*>([^<]+)<\/title>/i);
+          const metaDesc=getMeta('name','description');
+          const ogTitle=getMeta('property','og:title');
+          const ogDesc=getMeta('property','og:description');
+          const ogImage=getMeta('property','og:image');
+          const twitterDesc=getMeta('name','twitter:description');
+          const canonical=getTag(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)/i)||getTag(/<link[^>]+href=["']([^"']+)[^>]+rel=["']canonical["']/i);
+          const robots=getMeta('name','robots');
+          const h1s=[...html.matchAll(/<h1[^>]*>([^<]+)<\/h1>/gi)].map(m=>m[1].trim()).filter(Boolean);
+          const h2s=[...html.matchAll(/<h2[^>]*>([^<]+)<\/h2>/gi)].map(m=>m[1].trim()).filter(Boolean).slice(0,6);
           // Strip to readable text
           const bodyText=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'')
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'')
-            .replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,3000);
-          // Build structured snapshot
+            .replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').replace(/&#\d+;/g,'')
+            .replace(/\s{2,}/g,' ').trim().slice(0,3000);
           const seoSection=[
             '=== SEO & META DATA ===',
             'Page Title: '+(title||'(none)'),
@@ -7591,7 +7691,9 @@ async function runWebsiteReview(){
             'OG Title: '+(ogTitle||'(none)'),
             'OG Description: '+(ogDesc||'(none)'),
             'OG Image: '+(ogImage||'(none)'),
+            'Twitter Description: '+(twitterDesc||'(none)'),
             'Canonical URL: '+(canonical||'(none)'),
+            'Robots: '+(robots||'(none)'),
             'H1 Tags: '+(h1s.length?h1s.join(' | '):'(none)'),
             'H2 Tags: '+(h2s.length?h2s.join(' | '):'(none)'),
             '',
@@ -7652,6 +7754,13 @@ async function toggleReviewComplete(reviewId){
     const allRows=await sheetsGet('WebsiteReviews!A2:K');
     const ri=allRows.findIndex(r=>r[0]===reviewId);
     if(ri>=0)await sheetsUpdate('WebsiteReviews!K'+(ri+2),[[review.completed?'true':'false']]);
+    // Log to activity when marked complete
+    if(review.completed){
+      const logId=uid();
+      await sheetsAppend('CustomerContactLog!A:H',[[logId,'',review.projectId,'Website Review','Completed',review.pageLabel+' — '+review.pageUrl,S.cu,today()]]);
+      if(!S.customerContactLog)S.customerContactLog=[];
+      S.customerContactLog.push({id:logId,contactId:'',projectId:review.projectId,method:'Website Review',outcome:'Completed',notes:review.pageLabel+' — '+review.pageUrl,author:S.cu,createdAt:today()});
+    }
     renderWebsiteReviewSection(S.activeProject);
     showToast(review.completed?'Marked complete':'Marked incomplete');
   }catch(e){showToast('Error: '+e.message,'err');}
@@ -8018,6 +8127,14 @@ async function toggleWineReleaseItem(itemId){
     const allRows=await sheetsGet('WineReleaseItems!A2:J');
     const rowIdx=allRows.findIndex(r=>r[0]===itemId);
     if(rowIdx>=0)await sheetsUpdate('WineReleaseItems!F'+(rowIdx+2)+':H'+(rowIdx+2),[[item.done.toString(),item.completedBy,item.completedAt]]);
+    // Log to activity
+    if(item.done){
+      const wine=(S.wineReleaseWines||[]).find(w=>w.id===item.wineId);
+      const logId=uid();
+      await sheetsAppend('CustomerContactLog!A:H',[[logId,'',item.projectId,'Wine Release Task','Completed',item.task+(wine?' — '+wine.wineName:''),S.cu,today()]]);
+      if(!S.customerContactLog)S.customerContactLog=[];
+      S.customerContactLog.push({id:logId,contactId:'',projectId:item.projectId,method:'Wine Release Task',outcome:'Completed',notes:item.task+(wine?' — '+wine.wineName:''),author:S.cu,createdAt:today()});
+    }
     // Resolve linked reminder when marking done
     if(item.done&&item.dueDate){
       const rem=(S.reminders||[]).find(r=>r.refType==='wine-release-item'&&r.refId===itemId&&!r.done);
@@ -10320,6 +10437,14 @@ async function saveInventoryWine(){
     closeModal('inventory-wine-modal');
     renderInventoryList(projectId);
     showToast(editId?'Wine updated':'Wine added');
+    // Log to activity if availableForSale was set
+    if(availableForSale!==null){
+      const logId=uid();
+      const logNote=name+' — '+availableForSale+' bottles available';
+      await sheetsAppend('CustomerContactLog!A:H',[[logId,'',projectId,'Inventory','Counted',logNote,S.cu,today()]]);
+      if(!S.customerContactLog)S.customerContactLog=[];
+      S.customerContactLog.push({id:logId,contactId:'',projectId,method:'Inventory',outcome:'Counted',notes:logNote,author:S.cu,createdAt:today()});
+    }
   }catch(e){showToast('Error: '+e.message,'err');}
 }
 
