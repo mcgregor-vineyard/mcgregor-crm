@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.294</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.295</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7381,13 +7381,24 @@ async function renderWebsiteReviewSection(projectId){
 
 function getNextReviewPage(pool){
   if(!pool.length)return null;
-  // Round-robin: pick the one with the oldest (or no) lastReviewedDate
-  return [...pool].sort((a,b)=>{
-    if(!a.lastReviewedDate&&!b.lastReviewedDate)return 0;
-    if(!a.lastReviewedDate)return -1;
-    if(!b.lastReviewedDate)return 1;
-    return a.lastReviewedDate.localeCompare(b.lastReviewedDate);
-  })[0];
+  // Shuffled rotation: find all pages in the current "cycle" (not yet reviewed
+  // since the last time the full pool was completed), pick randomly from those.
+  // When all pages have been reviewed at least once in this cycle, start a new
+  // shuffle by treating all pages as available again.
+  const reviewed=pool.filter(p=>p.lastReviewedDate);
+  const unreviewed=pool.filter(p=>!p.lastReviewedDate);
+  // If any pages haven't been reviewed at all, pick randomly from those first
+  if(unreviewed.length){
+    return unreviewed[Math.floor(Math.random()*unreviewed.length)];
+  }
+  // All pages have been reviewed at least once — find the oldest review date
+  // to establish the current cycle boundary
+  const dates=reviewed.map(p=>p.lastReviewedDate).sort();
+  const cycleStart=dates[Math.floor(dates.length/2)]; // midpoint as cycle boundary
+  // Pages reviewed before the midpoint are "due" for this cycle
+  const due=pool.filter(p=>p.lastReviewedDate<=cycleStart);
+  const candidates=due.length?due:pool; // fallback to full pool if all caught up
+  return candidates[Math.floor(Math.random()*candidates.length)];
 }
 
 async function syncReviewPool(projectId){
