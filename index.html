@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.297</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.298</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7402,6 +7402,11 @@ async function renderWebsiteReviewSection(projectId){
     const typeIcon=review.pageType==='product'?'🍷':review.pageType==='collection'?'🗂':'📄';
     const notes=review.actionItems||'';
     const thumbUrl=`https://s.wordpress.com/mshots/v1/${encodeURIComponent(review.pageUrl)}?w=600&h=400`;
+    // Parse structured snapshot into SEO block and body
+    const content=review.summary||'';
+    const seoRaw=content.includes('=== SEO & META DATA ===')?content.split('=== PAGE CONTENT ===')[0].replace('=== SEO & META DATA ===','').trim():'';
+    const bodyRaw=content.includes('=== PAGE CONTENT ===')?content.split('=== PAGE CONTENT ===')[1]?.trim():content;
+    const seoLines=seoRaw?seoRaw.split('\n').filter(l=>l.trim()):[];
     card.innerHTML=`
       <div style="padding:14px 16px;background:${review.completed?'#F0FDF4':'var(--cream)'};border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;">
         <div style="width:22px;height:22px;border-radius:50%;border:2px solid ${review.completed?'var(--s-tx)':'var(--bdr-s)'};display:flex;align-items:center;justify-content:center;cursor:pointer;background:${review.completed?'var(--s-tx)':'white'};color:white;font-size:11px;flex-shrink:0;" onclick="toggleReviewComplete('${review.id}')">${review.completed?'✓':''}</div>
@@ -7414,17 +7419,30 @@ async function renderWebsiteReviewSection(projectId){
           <button onclick="deleteWebsiteReview('${review.id}')" class="btn" style="font-size:11px;color:var(--d-tx);">✕</button>
         </div>
       </div>
-      <div style="display:flex;gap:0;border-bottom:1px solid var(--bdr);">
-        <div style="flex:0 0 260px;border-right:1px solid var(--bdr);overflow:hidden;background:#f5f5f5;min-height:160px;display:flex;align-items:center;justify-content:center;">
+      <div style="display:flex;gap:0;">
+        <div style="flex:0 0 220px;border-right:1px solid var(--bdr);overflow:hidden;background:#f5f5f5;min-height:140px;display:flex;align-items:center;justify-content:center;flex-direction:column;">
           <img src="${thumbUrl}" alt="Page thumbnail" style="width:100%;height:auto;display:block;"
-            onerror="this.parentElement.innerHTML='<div style=\\'padding:16px;text-align:center;color:var(--ink-m);font-size:11px;\\'>Preview unavailable</div>'" />
+            onerror="this.parentElement.innerHTML='<div style=\\'padding:12px;text-align:center;color:var(--ink-m);font-size:11px;\\'>Preview unavailable</div>'" />
         </div>
-        <div style="flex:1;padding:14px 16px;min-width:0;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-m);margin-bottom:6px;">Page content snapshot</div>
-          <div style="font-size:12px;color:var(--ink);line-height:1.7;white-space:pre-wrap;max-height:200px;overflow-y:auto;background:var(--cream);border-radius:6px;padding:8px 10px;border:1px solid var(--bdr);">${review.summary||'(No content captured)'}</div>
-          <div style="margin-top:12px;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--burg);margin-bottom:6px;">✏ Your notes</div>
-            <textarea style="width:100%;font-size:12px;border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;font-family:inherit;line-height:1.5;resize:vertical;min-height:60px;" placeholder="Add your observations, issues found, action items..." onblur="saveReviewNotes('${review.id}',this.value)">${notes}</textarea>
+        <div style="flex:1;min-width:0;">
+          ${seoLines.length?`
+          <div style="padding:12px 16px;border-bottom:1px solid var(--bdr);background:#FAFAF8;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--burg);margin-bottom:8px;">🔍 SEO & Meta</div>
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;">
+              ${seoLines.map(l=>{
+                const [k,...rest]=l.split(': ');const v=rest.join(': ');
+                const missing=v==='(none)';
+                return `<span style="font-size:11px;color:var(--ink-m);white-space:nowrap;">${k}:</span><span style="font-size:11px;color:${missing?'var(--d-tx)':'var(--ink)'};font-style:${missing?'italic':'normal'};">${v}</span>`;
+              }).join('')}
+            </div>
+          </div>`:''}
+          <div style="padding:12px 16px;border-bottom:1px solid var(--bdr);">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-m);margin-bottom:6px;">Page content</div>
+            <div style="font-size:12px;color:var(--ink);line-height:1.7;white-space:pre-wrap;max-height:160px;overflow-y:auto;">${bodyRaw||'(No content captured)'}</div>
+          </div>
+          <div style="padding:12px 16px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--burg);margin-bottom:6px;">✏ Your notes</div>
+            <textarea style="width:100%;font-size:12px;border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;font-family:inherit;line-height:1.5;resize:vertical;min-height:56px;box-sizing:border-box;" placeholder="Observations, issues, action items..." onblur="saveReviewNotes('${review.id}',this.value)">${notes}</textarea>
           </div>
         </div>
       </div>`;
@@ -7546,23 +7564,47 @@ async function runWebsiteReview(){
       // Fetch static page via proxy (CORS requires server-side fetch)
       progressEl.textContent='Fetching page content...';
       try{
-        // Extract just the worker base URL (strip any path/query)
-        const workerBase=(()=>{
-          try{const u=new URL(CONFIG.C7_WORKER_URL);return u.origin;}
-          catch(e){return 'https://mcgregor-c7-proxy.dan-f74.workers.dev';}
-        })();
-        console.log('[WebsiteReview] fetch-page URL:', `${workerBase}/fetch-page?url=${encodeURIComponent(page.url)}`);
-        const resp=await fetch(`${workerBase}/fetch-page?url=${encodeURIComponent(page.url)}`);
+        const workerBase=(()=>{try{const u=new URL(CONFIG.C7_WORKER_URL);return u.origin;}catch(e){return 'https://mcgregor-c7-proxy.dan-f74.workers.dev';}})();
+        const fetchUrl=`${workerBase}/fetch-page?url=${encodeURIComponent(page.url)}`;
+        const resp=await fetch(fetchUrl);
         if(resp.ok){
           const html=await resp.text();
-          const txt=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'')
+          // Extract SEO / meta data
+          const getTag=(pattern)=>{const m=html.match(pattern);return m?m[1].trim():'';};
+          const title=getTag(/<title[^>]*>([^<]*)<\/title>/i);
+          const metaDesc=getTag(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)/i)||getTag(/<meta[^>]+content=["']([^"']*)[^>]+name=["']description["']/i);
+          const ogTitle=getTag(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)/i)||getTag(/<meta[^>]+content=["']([^"']*)[^>]+property=["']og:title["']/i);
+          const ogDesc=getTag(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)/i)||getTag(/<meta[^>]+content=["']([^"']*)[^>]+property=["']og:description["']/i);
+          const ogImage=getTag(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']*)/i)||getTag(/<meta[^>]+content=["']([^"']*)[^>]+property=["']og:image["']/i);
+          const canonical=getTag(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']*)/i)||getTag(/<link[^>]+href=["']([^"']*)[^>]+rel=["']canonical["']/i);
+          const h1s=[...html.matchAll(/<h1[^>]*>([^<]*)<\/h1>/gi)].map(m=>m[1].trim()).filter(Boolean);
+          const h2s=[...html.matchAll(/<h2[^>]*>([^<]*)<\/h2>/gi)].map(m=>m[1].trim()).filter(Boolean).slice(0,8);
+          // Strip to readable text
+          const bodyText=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'')
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'')
-            .replace(/<[^>]+>/g,' ')
-            .replace(/\s{2,}/g,' ')
-            .trim();
-          pageContent=txt.slice(0,8000);
-        }else{pageContent=`Page: ${page.label}\nURL: ${page.url}\n(HTTP ${resp.status})`;}
-      }catch(e){pageContent=`Page: ${page.label}\nURL: ${page.url}\n(Could not fetch: ${e.message})`;}
+            .replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,3000);
+          // Build structured snapshot
+          const seoSection=[
+            '=== SEO & META DATA ===',
+            'Page Title: '+(title||'(none)'),
+            'Meta Description: '+(metaDesc||'(none)'),
+            'OG Title: '+(ogTitle||'(none)'),
+            'OG Description: '+(ogDesc||'(none)'),
+            'OG Image: '+(ogImage||'(none)'),
+            'Canonical URL: '+(canonical||'(none)'),
+            'H1 Tags: '+(h1s.length?h1s.join(' | '):'(none)'),
+            'H2 Tags: '+(h2s.length?h2s.join(' | '):'(none)'),
+            '',
+            '=== PAGE CONTENT ===',
+            bodyText
+          ].join('\n');
+          pageContent=seoSection;
+        }else{
+          pageContent=`⚠ Worker returned HTTP ${resp.status}.\n\nMake sure you have deployed the updated mcgregor-c7-proxy Worker with the /fetch-page route.\n\nURL attempted: ${fetchUrl}`;
+        }
+      }catch(e){
+        pageContent=`⚠ Could not reach the proxy Worker.\n\nError: ${e.message}\n\nMake sure the updated mcgregor-c7-proxy Worker (with /fetch-page route) is deployed in your Cloudflare dashboard.`;
+      }
     }
 
     // Save review with raw content — no AI analysis
