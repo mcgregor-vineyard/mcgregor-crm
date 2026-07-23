@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.306</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.307</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -7521,9 +7521,9 @@ async function renderWebsiteReviewSection(projectId){
         </div>
       </div>
       <div id="${bodyId}" style="display:${isExpanded?'flex':'none'};gap:0;">
-        <div style="flex:0 0 200px;border-right:1px solid var(--bdr);overflow:hidden;background:#f5f5f5;min-height:120px;display:flex;align-items:center;justify-content:center;flex-direction:column;flex-shrink:0;">
-          <img src="${thumbUrl}" alt="Page thumbnail" style="width:100%;height:auto;display:block;"
-            onerror="this.parentElement.innerHTML='<div style=\\'padding:12px;text-align:center;color:var(--ink-m);font-size:11px;\\'>Preview unavailable</div>'" />
+        <div style="flex:0 0 200px;border-right:1px solid var(--bdr);overflow:hidden;background:#f5f5f5;align-self:stretch;flex-shrink:0;position:relative;">
+          <img src="${thumbUrl}" alt="Page thumbnail" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;position:absolute;top:0;left:0;"
+            onerror="this.style.display='none';this.parentElement.innerHTML+='<div style=\\'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;text-align:center;color:var(--ink-m);font-size:11px;\\'>Preview unavailable</div>'" />
         </div>
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
           ${seoLines.length?`
