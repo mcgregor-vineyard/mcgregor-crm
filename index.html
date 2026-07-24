@@ -146,7 +146,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.309</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.310</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -1347,6 +1347,30 @@ select.fi{cursor:pointer;}
       <div class="fr"><label class="fl">Count date</label><input type="date" class="fi" id="iw-date" /></div>
       <div style="background:var(--cream);border:1px solid var(--bdr);border-radius:8px;padding:14px;margin-top:4px;">
         <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-f);margin-bottom:10px;">Inventory Calculator</div>
+        <!-- Optional cases helper -->
+        <div style="margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:var(--ink-m);">
+            <input type="checkbox" id="iw-use-cases" onchange="toggleCasesHelper()" style="cursor:pointer;" />
+            Enter by cases + loose bottles
+          </label>
+          <div id="iw-cases-helper" style="display:none;margin-top:10px;padding:10px 12px;background:white;border:1px solid var(--bdr);border-radius:7px;">
+            <div class="f2">
+              <div class="fr">
+                <label class="fl">Cases</label>
+                <input type="number" class="fi" id="iw-cases" min="0" placeholder="0" oninput="calcCases()" />
+              </div>
+              <div class="fr">
+                <label class="fl">Bottles per case</label>
+                <input type="number" class="fi" id="iw-bottles-per-case" min="1" placeholder="12" value="12" oninput="calcCases()" />
+              </div>
+            </div>
+            <div class="fr" style="margin-top:4px;">
+              <label class="fl">Loose bottles</label>
+              <input type="number" class="fi" id="iw-loose" min="0" placeholder="0" oninput="calcCases()" />
+            </div>
+            <div style="font-size:11px;color:var(--ink-m);margin-top:6px;" id="iw-cases-summary"></div>
+          </div>
+        </div>
         <div class="f2">
           <div class="fr"><label class="fl">New bottle count</label><input type="number" class="fi" id="iw-new-count" min="0" placeholder="0" oninput="calcInventory()" /></div>
           <div class="fr"><label class="fl">Bottles owed</label><input type="number" class="fi" id="iw-owed" min="0" placeholder="0" oninput="calcInventory()" /></div>
@@ -10497,6 +10521,30 @@ function generateInventoryPrint(){
   closeModal('inventory-print-modal');
 }
 
+function toggleCasesHelper(){
+  const checked=document.getElementById('iw-use-cases').checked;
+  const helper=document.getElementById('iw-cases-helper');
+  if(helper)helper.style.display=checked?'block':'none';
+  if(!checked){
+    // Clear cases fields when hiding
+    ['iw-cases','iw-loose'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    document.getElementById('iw-cases-summary').textContent='';
+  }
+}
+
+function calcCases(){
+  const cases=parseInt(document.getElementById('iw-cases').value)||0;
+  const bpc=parseInt(document.getElementById('iw-bottles-per-case').value)||12;
+  const loose=parseInt(document.getElementById('iw-loose').value)||0;
+  const total=(cases*bpc)+loose;
+  const summary=document.getElementById('iw-cases-summary');
+  if(summary)summary.textContent=`${cases} case${cases!==1?'s':''} × ${bpc} + ${loose} loose = ${total} bottles`;
+  // Push total into the bottle count field and recalculate
+  const countEl=document.getElementById('iw-new-count');
+  if(countEl){countEl.value=total||'';}
+  calcInventory();
+}
+
 function calcInventory(){
   const n=parseInt(document.getElementById('iw-new-count').value)||0;
   const o=parseInt(document.getElementById('iw-owed').value)||0;
@@ -10522,6 +10570,16 @@ function openInventoryWineModal(entryId){
   let countedByIdx=S.cu;
   if(e&&e.countedBy){const idx=TEAM.findIndex(t=>t.name===e.countedBy);if(idx>=0)countedByIdx=idx;}
   document.getElementById('iw-counted-by').value=countedByIdx;
+  // Reset cases helper
+  const useCases=document.getElementById('iw-use-cases');
+  if(useCases)useCases.checked=false;
+  const casesHelper=document.getElementById('iw-cases-helper');
+  if(casesHelper)casesHelper.style.display='none';
+  ['iw-cases','iw-loose'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const casesSummary=document.getElementById('iw-cases-summary');
+  if(casesSummary)casesSummary.textContent='';
+  const bpc=document.getElementById('iw-bottles-per-case');
+  if(bpc)bpc.value='12';
   calcInventory();
   openModal('inventory-wine-modal');
 }
