@@ -88,6 +88,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);f
 .av-t{background:#0F6E56;}
 .av-bl{background:#185FA5;}
 .av-r{background:#7B3F00;}
+.av-red{background:#C0392B;}
 .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(28,20,16,.5);z-index:100;align-items:flex-start;justify-content:center;padding-top:60px;}
 .modal-backdrop.op{display:flex;}
 .modal{background:white;border-radius:10px;width:520px;max-width:95vw;z-index:2;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
@@ -146,7 +147,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.310</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.311</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -171,7 +172,7 @@ select.fi{cursor:pointer;}
   <div class="usr">
     <div class="uav" id="cuav">DJ</div>
     <select id="cusel" style="background:white;color:var(--burg);border:none;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;outline:none;border-radius:5px;padding:4px 8px;font-weight:500;" onchange="setCU(this.value)">
-      <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option>
+      <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
     </select>
     <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;" onclick="openMyTasks()">✓ My tasks</button>
     <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:white;" onclick="openActivityLog()">📋 Activity</button>
@@ -318,7 +319,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
-            <option value="3">John McGregor</option>
+            <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
           </select>
           <button class="btn btnp" style="font-size:12px;" onclick="bulkAssign()">Apply</button>
           <button class="btn" style="font-size:12px;color:var(--d-tx);border-color:var(--d-tx);" onclick="bulkRemove()">Remove from campaign</button>
@@ -990,7 +991,7 @@ select.fi{cursor:pointer;}
       <div class="fr"><label class="fl">Assign to</label>
         <select class="fi" id="co-assign">
           <option value="-1">Unassigned</option>
-          <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option>
+          <option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
         </select>
       </div>
       <div class="fr"><label class="fl">Add reason <span style="color:var(--ink-f);font-weight:400;">(optional)</span></label><input type="text" class="fi" id="co-reason" placeholder="e.g. Referred by John, Previous customer, Walk-in" /></div>
@@ -1023,7 +1024,7 @@ select.fi{cursor:pointer;}
         </select>
       </div>
       <div class="fr"><label class="fl">Notes</label><textarea class="fi" id="am-notes" rows="2" placeholder="What did they say?"></textarea></div>
-      <div class="fr"><label class="fl">Logged by</label><select class="fi" id="am-rep"><option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option></select></div>
+      <div class="fr"><label class="fl">Logged by</label><select class="fi" id="am-rep"><option value="0">Dan Jimerson</option><option value="1">Mike DeGaetano</option><option value="2">Ellen Quibell</option><option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option></select></div>
       <div id="sale-fields" style="display:none;">
         <div id="recent-orders-wrap" style="margin-bottom:10px;display:none;">
           <div style="font-size:11px;color:var(--ink-m);margin-bottom:6px;">Recent orders — click to select</div>
@@ -1083,7 +1084,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
-            <option value="3">John McGregor</option>
+            <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
           </select>
         </div>
       </div>
@@ -1123,7 +1124,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
-          <option value="3">John McGregor</option>
+          <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
         </select>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 12px;background:var(--cream);border-radius:7px;">
@@ -1177,7 +1178,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
-            <option value="3">John McGregor</option>
+            <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
           </select>
         </div>
       </div>
@@ -1252,7 +1253,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
-          <option value="3">John McGregor</option>
+          <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
         </select>
       </div>
     </div>
@@ -1389,7 +1390,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
-            <option value="3">John McGregor</option>
+            <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
           </select>
         </div>
         <div class="fr"><label class="fl">Notes</label><textarea class="fi" id="iw-notes" rows="2" placeholder="Optional notes..."></textarea></div>
@@ -1774,7 +1775,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
-            <option value="3">John McGregor</option>
+            <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
           </select>
         </div>
       </div>
@@ -1812,7 +1813,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
-          <option value="3">John McGregor</option>
+          <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
         </select>
         <button class="btn" style="font-size:12px;color:var(--s-tx);border-color:var(--s-tx);" onclick="resolveOutreach()">✓ Resolve</button>
         <div style="display:flex;align-items:center;gap:6px;flex:1;">
@@ -1866,7 +1867,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
-          <option value="3">John McGregor</option>
+          <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
         </select>
       </div>
       <div class="fr"><label class="fl">Method</label>
@@ -1965,7 +1966,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
-          <option value="3">John McGregor</option>
+          <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
         </select>
       </div>
       <button class="mcls" onclick="closeModal('activity-modal')">✕</button>
@@ -2085,7 +2086,7 @@ select.fi{cursor:pointer;}
             <option value="0">Dan Jimerson</option>
             <option value="1">Mike DeGaetano</option>
             <option value="2">Ellen Quibell</option>
-            <option value="3">John McGregor</option>
+            <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
           </select>
         </div>
         <div class="fr"><label class="fl">Due date</label><input type="date" class="fi" id="tm-due-date" /></div>
@@ -2127,7 +2128,7 @@ select.fi{cursor:pointer;}
           <option value="0">Dan Jimerson</option>
           <option value="1">Mike DeGaetano</option>
           <option value="2">Ellen Quibell</option>
-          <option value="3">John McGregor</option>
+          <option value="3">John McGregor</option><option value="4">Sherry DeGaetano</option>
         </select>
       </div>
       <div id="thread-messages" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
@@ -2208,7 +2209,7 @@ KGp83R3Cm4HG0H0o3zOQLQ==
 };
 // ============================================================
 
-const TEAM=[{name:'Dan Jimerson',init:'DJ',cls:'av-b'},{name:'Mike DeGaetano',init:'MD',cls:'av-g'},{name:'Ellen Quibell',init:'EQ',cls:'av-t'},{name:'John McGregor',init:'JM',cls:'av-r'}];
+const TEAM=[{name:'Dan Jimerson',init:'DJ',cls:'av-b'},{name:'Mike DeGaetano',init:'MD',cls:'av-g'},{name:'Ellen Quibell',init:'EQ',cls:'av-t'},{name:'John McGregor',init:'JM',cls:'av-r'},{name:'Sherry DeGaetano',init:'SD',cls:'av-red'}];
 const CAMP_COLORS=[
   {bg:'#F3E8FF',border:'#A855F7',text:'#6B21A8'},  // purple
   {bg:'#FEF3C7',border:'#D97706',text:'#92400E'},  // amber
