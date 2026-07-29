@@ -147,7 +147,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.312</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.313</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -659,7 +659,13 @@ select.fi{cursor:pointer;}
           <div id="club-instructions-placeholder" style="font-size:13px;color:var(--ink-m);font-style:italic;">Click ✏️ to add instructions or notes for this tab...</div>
           <button onclick="openClubInstructions()" style="position:absolute;top:10px;right:10px;background:none;border:1px solid var(--bdr);border-radius:5px;cursor:pointer;font-size:12px;color:var(--ink-m);padding:2px 8px;">✏️ Edit</button>
         </div>
-        <div id="club-sync-status" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;"></div>
+        <div id="club-sync-status" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:6px;"></div>
+        <div id="club-sync-progress-wrap" style="display:none;margin-bottom:12px;">
+          <div style="background:var(--bdr);border-radius:4px;height:6px;overflow:hidden;">
+            <div id="club-sync-progress-bar" style="height:100%;width:0%;background:var(--burg);border-radius:4px;transition:width .3s;"></div>
+          </div>
+          <div id="club-sync-progress-label" style="font-size:11px;color:var(--ink-m);margin-top:4px;text-align:right;"></div>
+        </div>
         <div id="club-last-sync" style="display:none;padding:6px 12px;background:var(--cream);border:1px solid var(--bdr);border-radius:6px;font-size:12px;color:var(--ink-m);margin-bottom:12px;"></div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
           <div class="dsc"><div class="dsn" id="club-stat-active">—</div><div class="dsl">Active members</div></div>
@@ -9013,13 +9019,25 @@ async function syncClubMembers(){
   if(!CONFIG.C7_WORKER_URL){showToast('C7_WORKER_URL not set','err');return;}
   const btn=document.getElementById('club-sync-btn');
   const statusEl=document.getElementById('club-sync-status');
+  const progressWrap=document.getElementById('club-sync-progress-wrap');
+  const progressBar=document.getElementById('club-sync-progress-bar');
+  const progressLabel=document.getElementById('club-sync-progress-label');
+
+  const setProgress=(pct,label)=>{
+    if(progressBar)progressBar.style.width=pct+'%';
+    if(progressLabel)progressLabel.textContent=label;
+  };
+
   btn.disabled=true;btn.textContent='Refreshing...';
   statusEl.style.display='block';statusEl.style.background='var(--i-bg)';statusEl.style.color='var(--i-tx)';
-  statusEl.textContent='Fetching club members from Commerce7...';
+  statusEl.textContent='Connecting to Commerce7...';
+  if(progressWrap)progressWrap.style.display='block';
+  setProgress(2,'Starting...');
+
   const ALLOWED_CLUBS=['McGregor Vineyard Wine Club','McGregor Vineyard Library Wine Club'];
   const syncedAt=gmt4Now();
   try{
-    // Fetch ALL pages, then filter
+    // Phase 1: Fetch all pages (~60% of total time)
     let allRaw=[];let page=0;let hasMore=true;
     while(hasMore){
       const data=await c7Req('GET','/club-membership?limit=50&page='+page,null);
@@ -9027,17 +9045,22 @@ async function syncClubMembers(){
       allRaw=[...allRaw,...batch];
       hasMore=batch.length===50;
       page++;
-      statusEl.textContent='Loading club members... '+allRaw.length+' fetched (page '+page+')';
+      // Estimate progress: pages typically 4-8, so cap fetch phase at 60%
+      const fetchPct=Math.min(60,Math.round((page/(page+2))*60));
+      statusEl.textContent='Fetching members from Commerce7...';
+      setProgress(fetchPct,allRaw.length+' members fetched (page '+page+')');
       if(page>100)break;
       await new Promise(r=>setTimeout(r,300));
     }
-    // Filter: only target clubs, no cancelled
+
+    // Phase 2: Filter and deduplicate (instant)
+    setProgress(62,'Filtering...');
+    statusEl.textContent='Filtering and deduplicating...';
     const allMembers=allRaw.filter(m=>{
       const status=m.status||'';
       if(status==='CancelledByMember'||status==='Cancelled')return false;
       return ALLOWED_CLUBS.includes(m.club?.title||'');
     });
-    // Deduplicate: one row per customerId per club
     const seen={};
     const deduped=allMembers.filter(m=>{
       const key=(m.customerId||m.id)+'|'+(m.club?.title||'');
@@ -9047,19 +9070,20 @@ async function syncClubMembers(){
       if(da<db){seen[key]=m;return true;}
       return false;
     });
-    // Sort nearest process date first — sheet will be ordered this way
     deduped.sort((a,b)=>(a.subscription?.nextProcessDate||'9999').localeCompare(b.subscription?.nextProcessDate||'9999'));
 
     S.clubMembers=deduped;
     S.clubMembersLastSync=syncedAt;
-    S._clubRenderSig=null; // force re-render on next tab switch
-    // Populate club filter
+    S._clubRenderSig=null;
     const clubs=[...new Set(deduped.map(m=>m.club?.title||'').filter(Boolean))].sort();
     const sel=document.getElementById('club-filter-club');
     if(sel)sel.innerHTML='<option value="">All clubs</option>'+clubs.map(c=>`<option value="${c}">${c}</option>`).join('');
-    // Save to sheet: clear then rewrite
+
+    // Phase 3: Save to sheet (~40% of total time)
+    setProgress(65,'Saving to sheet...');
     statusEl.textContent='Saving to sheet...';
     await sheetsClear('ClubMembers!A2:K');
+    setProgress(70,'Cleared old data...');
     const rows=deduped.map(m=>([
       m.id||((m.customerId||'')+'|'+(m.club?.title||'')),
       m.customerId||'',
@@ -9074,17 +9098,24 @@ async function syncClubMembers(){
       syncedAt,
       m.subscription?.shipmentBuildStatus||''
     ]));
+    const batches=Math.ceil(rows.length/200);
     for(let i=0;i<rows.length;i+=200){
       await sheetsAppend('ClubMembers!A:K',rows.slice(i,i+200));
-      statusEl.textContent='Saving... '+Math.min(i+200,rows.length)+' of '+rows.length;
+      const batchNum=Math.floor(i/200)+1;
+      const savePct=70+Math.round((batchNum/batches)*28);
+      setProgress(savePct,'Saved '+Math.min(i+200,rows.length)+' of '+rows.length+' members...');
     }
+
+    setProgress(100,'Complete!');
     renderClubView();
     statusEl.style.background='var(--s-bg)';statusEl.style.color='var(--s-tx)';
-    statusEl.textContent=deduped.length+' members saved ('+allRaw.length+' total fetched from C7).';
+    statusEl.textContent='✓ '+deduped.length+' members loaded ('+allRaw.length+' total fetched from C7).';
+    setTimeout(()=>{if(progressWrap)progressWrap.style.display='none';},2000);
     autoCreateClubReminders();
   }catch(e){
     statusEl.style.background='var(--d-bg)';statusEl.style.color='var(--d-tx)';
     statusEl.textContent='Error: '+e.message;
+    if(progressWrap)progressWrap.style.display='none';
   }finally{btn.disabled=false;btn.textContent='⬇ Load from C7';}
 }
 
