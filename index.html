@@ -147,7 +147,7 @@ select.fi{cursor:pointer;}
 
 <div class="hdr">
   <div style="display:flex;align-items:center;gap:14px;">
-    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.311</div></div>
+    <div class="logo">McGregor Connect<div style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:.05em;margin-top:2px;">v0.312</div></div>
     <div class="nav">
       <button class="ntab" onclick="sv('home')">Home</button>
       <button class="ntab" onclick="sv('campaigns')">Campaigns</button>
@@ -2609,7 +2609,18 @@ function sv(view){
     tbarActions.innerHTML=actions[view]||'';
   }
 
-  closeDP();if(view==='home')renderHome();else renderAll();
+  closeDP();
+  if(view==='home'){renderHome();}
+  else if(view==='club'){showTabClub();}
+  else if(view==='campaigns'){renderCampaigns();}
+  else if(view==='contacts'){renderContacts();}
+  else if(view==='tickets'){renderTickets();}
+  else if(view==='orders'){renderOrders();}
+  else if(view==='reminders'){renderReminders();}
+  else if(view==='outreach'){renderOutreach();}
+  else if(view==='projects'){renderProjects();}
+  else if(view==='reports'){renderReports();}
+  updateCounts();
   renderSidebar();
 }
 
@@ -2626,6 +2637,14 @@ function openModal(id){document.getElementById(id).classList.add('op');}
 function closeModal(id){document.getElementById(id).classList.remove('op');}
 
 function renderAll(){renderSidebar();renderCampaigns();renderContacts();renderTickets();renderOrders();renderReminders();renderOutreach();renderProjects();renderReports();updateCounts();}
+
+function showTabClub(){
+  // Only re-render club if data changed since last render
+  const sig=S.clubMembers.length+'|'+(S.clubMembersLastSync||'')+'|'+(S.clubAcknowledged||[]).length;
+  if(sig===S._clubRenderSig)return;
+  S._clubRenderSig=sig;
+  renderClubView();
+}
 
 function updateCounts(){
   const activeContacts=S.contacts.filter(c=>{
@@ -8667,6 +8686,7 @@ async function acknowledgeClubMember(customerId, type, cycleDate, ackState='done
     await sheetsAppend('ClubAcknowledged!A:G',[[id,customerId,type,cycleDate,rep.name,ackState,today()]]);
     if(!S.clubAcknowledged)S.clubAcknowledged=[];
     S.clubAcknowledged.push(ack);
+    S._clubRenderSig=null;
     renderClubView();
     showToast(ackState==='remind-next'?'Will remind next time':'Marked done');
   }catch(e){showToast('Error: '+e.message,'err');}
@@ -9032,6 +9052,7 @@ async function syncClubMembers(){
 
     S.clubMembers=deduped;
     S.clubMembersLastSync=syncedAt;
+    S._clubRenderSig=null; // force re-render on next tab switch
     // Populate club filter
     const clubs=[...new Set(deduped.map(m=>m.club?.title||'').filter(Boolean))].sort();
     const sel=document.getElementById('club-filter-club');
